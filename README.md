@@ -1,8 +1,8 @@
 # Forge
 
-Forge is a local, deterministic, model-free workbench for understanding what a body of source code can do. It reads code you explicitly give it, records structure (definitions, classes, imports, calls) and the call sites of APIs you name in a data-only profile, lets you search that metadata, and packages source-identified leads for human review.
+Forge is a local, deterministic, model-free static-analysis workbench for **Python source code**. It reads Python files you explicitly give it (plain files, ZIPs, notebooks and Python code blocks in text files), records structure (definitions, classes, imports, calls) and the call sites of APIs you name in a data-only profile, lets you search that metadata, and packages source-identified leads for human review. Files in other languages are listed but not analysed.
 
-It never executes the code it inspects, makes no model calls, and needs no network access for any command in this README.
+It never executes the code it inspects and makes no model calls. Analysis is fully offline: no command in this README touches the network. The only network feature is optional, operator-started GitHub discovery of public example code; see [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) for exactly what it sends and its limits.
 
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
@@ -20,7 +20,8 @@ It never executes the code it inspects, makes no model calls, and needs no netwo
 - **Local search.** BM25 with reciprocal-rank fusion over definitions, imports and call sites, backed by SQLite FTS5.
 - **Local web UI.** `forge.py serve` binds to `127.0.0.1` only.
 - **Review packets.** Results are packaged as source-identified leads with hashes so a person can check every claim.
-- **Reproducible.** No network access, no model calls, no third-party Python dependencies. Analyzer files are hash-pinned and verified on every workspace.
+- **Offline and reproducible.** Analysis makes no network requests or model calls, and Forge has no third-party Python dependencies. Analyzer files are hash-pinned and verified on every workspace.
+- **Opt-in public discovery.** `forge.py run` (or **Run** in the UI) can search GitHub for public, permissively licensed example code with bounded, GET-only requests. It never runs unless you start it. See [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md).
 
 ## Project layout
 
@@ -33,6 +34,8 @@ It never executes the code it inspects, makes no model calls, and needs no netwo
 | `runner/` | The research runner: bounded multi-source research missions with checkpoints, producing a compact review packet. |
 | `examples/demo/` | Public demo pack. Synthetic data only. |
 | `tests/`, `tools/`, `contracts/`, `templates/`, `assets/` | Test suite, maintenance tools, frozen test contracts, profile templates and web UI assets. |
+
+The layers reflect how Forge grew. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) explains which component owns what.
 
 The analyzer (`loop/`, `addon/`, `hound/`) ships as plain source. Each component has a `SHA256SUMS.txt`, and `contracts/analyzer_lock.json` pins those manifests. When you create a workspace, Forge copies the analyzer into the workspace and verifies every file. After an intentional analyzer change, run `python3 tools/update_analyzer_manifests.py` and review the diff.
 
@@ -66,12 +69,12 @@ python3 forge.py --home /tmp/forge-home corpus-search --run-id demo --query "pic
 python3 forge.py --home /tmp/forge-home serve          # web UI on 127.0.0.1
 ```
 
-See `examples/demo/README.md` for how to point Forge at your own code. A workspace (`--home`) must be outside the repository. The default is `~/.forge-workbench-0.8.4`.
+See `examples/demo/README.md` for how to point Forge at your own code. A workspace (`--home`) must be outside the repository. The default is `~/.forge-workbench-0.8.4` (a fixed folder name, not the release version).
 
 ## Running the tests
 
 ```sh
-python3 run_tests.py --out /tmp/forge-tests             # Workbench suite (783 tests)
+python3 run_tests.py --out /tmp/forge-tests             # Workbench suite (785 tests)
 python3 hound/run_tests.py --out /tmp/hound-tests       # Hound suite (483 tests)
 (cd runner && python3 -m unittest discover -s tests)   # Research runner (64 tests)
 python3 runner/run_demo.py --out /tmp/forge-research    # Research runner demo mission
@@ -84,11 +87,12 @@ Output folders must be new and outside the repository.
 
 - Results are static observations and lexical leads, not runtime guarantees, quality scores or permission to reuse code. A missing match does not prove a capability is absent.
 - Resource limits on parsing are consistency controls, not a hostile-code sandbox. Only scan code you are allowed to read.
+- Forge's secret-pattern checks (discovery search text, sensitive file names, `tools/prepublish_check.py`) are accidental-disclosure linting, not a credential-separation or DLP boundary. See [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md).
 - The Opportunity Lab produces rule-based hypotheses from reviewed inputs. It does not validate a market, clear prior art, or give legal advice.
 
 ## Before publishing a fork
 
-`tools/prepublish_check.py` scans every file (and, optionally, git history) for secrets, absolute home-directory paths and a denylist of terms you supply in a file outside the repository:
+`tools/prepublish_check.py` scans every file (and, optionally, git history) for common secret formats, absolute home-directory paths and a denylist of terms you supply in a file outside the repository. It is a lint for accidental disclosure, not a guarantee that nothing sensitive remains:
 
 ```sh
 FORGE_DENYLIST=/path/outside/repo/denylist.txt python3 tools/prepublish_check.py --history
@@ -101,6 +105,10 @@ Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) before
 ## Security
 
 Please do not report security problems in public issues. See [SECURITY.md](SECURITY.md) for how to report them privately.
+
+## Versions
+
+The current release is **0.8.4** (`python3 forge.py --version`). Hound, the add-on, the loop and the runner carry their own component versions; see [docs/VERSIONS.md](docs/VERSIONS.md).
 
 ## License
 

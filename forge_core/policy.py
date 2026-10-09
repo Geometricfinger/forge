@@ -22,6 +22,9 @@ def validate_profile(p):
     return p
 
 def query(q):
+    # Accidental-disclosure lint only: catches obvious pastes (URLs, token prefixes, the
+    # word 'password', private-key headers) before search text is sent to GitHub. It is
+    # not a credential-separation or DLP boundary; see docs/THREAT_MODEL.md.
     text(q,220)
     if any(s in q.lower() for s in ['http:','https:','password','api_key','token=','ghp_','github_pat_','-----begin','is:private']):raise Blocked('PUBLIC_QUERY_REQUIRED')
     if not re.fullmatch(r'[A-Za-z0-9_ :,".\-]+',q):raise Blocked('QUERY_CHARACTERS')

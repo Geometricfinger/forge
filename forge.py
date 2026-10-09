@@ -6,7 +6,7 @@ from forge_core.common import *
 from forge_core.workspace import initialize,Workbench
 from forge_core.policy import template
 from forge_core.github import GitHub,Response
-from forge_core import demo
+from forge_core import demo,__version__,DEFAULT_HOME_NAME
 
 def outcome_exit(status):
     return 0 if status in {'COMPLETED_FOR_BOUNDED_MISSION','COMPLETED_NO_MATCH'} else 2
@@ -20,7 +20,7 @@ def export_packet(store,mission,out):
     return {'packet_path':str(out),'kind':packet['kind'],'url':packet['url']}
 
 def main():
-    p=argparse.ArgumentParser(description=__doc__);p.add_argument('--home',type=Path,default=Path.home()/'.forge-workbench-0.8.4')
+    p=argparse.ArgumentParser(description=__doc__);p.add_argument('--version',action='version',version='Forge '+__version__);p.add_argument('--home',type=Path,default=Path.home()/DEFAULT_HOME_NAME)
     s=p.add_subparsers(dest='command',required=True)
     s.add_parser('init');a=s.add_parser('serve');a.add_argument('--no-browser',action='store_true')
     a=s.add_parser('new');a.add_argument('--template',choices=['understanding','reliability','evaluation'],default='understanding');a.add_argument('--query');a.add_argument('--brief')

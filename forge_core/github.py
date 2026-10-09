@@ -6,6 +6,8 @@ import time
 from email.utils import parsedate_to_datetime
 from .common import *
 from .policy import url_for
+from . import __version__
+USER_AGENT='FORGE-Workbench/'+__version__
 @dataclass
 class Response:
     status:int
@@ -20,7 +22,7 @@ class GitHub:
         self.opener=build_opener(NoRedirect())
     def get(self,packet):
         # Reconstruct from validated task fields, never trust supplied packet URL.
-        url=url_for(packet['kind'],packet['payload']);headers={'User-Agent':'FORGE-Workbench/0.3','Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'}
+        url=url_for(packet['kind'],packet['payload']);headers={'User-Agent':USER_AGENT,'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'}
         if self.token:headers['Authorization']='Bearer '+self.token
         req=Request(url,headers=headers,method='GET');limit=packet['max_response_bytes']
         try:

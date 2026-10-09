@@ -1,4 +1,6 @@
-# Product direction and implementation status — 0.4
+# Product direction and implementation status
+
+<sub>First written at internal milestone 0.4; the current release version is in [VERSIONS.md](VERSIONS.md). See [ARCHITECTURE.md](ARCHITECTURE.md) for which component owns what.</sub>
 
 The objective is a private, evidence-backed capability-reuse workbench. This release implements the missing requirement comparison and packet step, plus one supervised first-party execution path. It does not claim the full competitive roadmap has been delivered.
 

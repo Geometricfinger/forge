@@ -9,7 +9,7 @@ Forge is a local, read-only static-analysis workbench for Python source. You giv
 What Forge does **not** do:
 
 - It never imports, runs or installs the code it scans.
-- The code-analysis commands in this file make no network requests and no model calls. (The `new`/`run`/`packet`/`accept` GitHub discovery commands can make GET requests to `api.github.com`; you do not need them to analyse local code.)
+- The code-analysis commands in this file are **offline analysis**: no network requests, no model calls. The only network feature is **operator-authorized public discovery**: `forge.py run` (or **Run** in the UI) sends bounded GET requests to `api.github.com`. You do not need it to analyse local code; do not run it unless the user asks. See [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md).
 - It only analyses Python: `.py`, `.pyi`, `.pyw`, Jupyter notebooks, and `python` code fences inside `.md`/`.txt`/`.rst` files. Other languages are recorded as `LANGUAGE_NOT_ANALYZED`.
 - Its parser limits are consistency controls, not a sandbox for hostile code.
 - Its output is a set of leads for human review. It is not proof of a vulnerability, a quality score, or permission to reuse code. A missing match does not prove a capability is absent.
@@ -234,6 +234,8 @@ Only when the user asks you to change Forge itself (not when analysing their cod
 
 - Read [CONTRIBUTING.md](CONTRIBUTING.md). Keep pull requests small and add or update tests next to the code you change.
 - Standard library only. Do not add third-party runtime dependencies, and do not add code or dependencies under licenses that restrict commercial use or are incompatible with Apache-2.0.
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) says which component owns what. The release version lives only in `forge_core/__init__.py` ([docs/VERSIONS.md](docs/VERSIONS.md)); do not hard-code it elsewhere.
+- Keep the network boundary in [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md): no network access in analysis code.
 - If you change `hound/`, `addon/` or `loop/`, run `python3 tools/update_analyzer_manifests.py` and include the diff.
 - Before opening a pull request, `python3 verify.py --out <new folder outside the repo>` and `python3 tools/prepublish_check.py --history` must pass.
 - Never commit secrets, personal data, absolute home-directory paths or real scan output. Use synthetic examples like `examples/demo/`.

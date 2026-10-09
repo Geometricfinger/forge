@@ -17,6 +17,8 @@ TEXT_EXT={'.txt','.md','.markdown','.rst'}
 CODE_EXT={'.py','.pyi','.pyw'}
 OTHER_CODE={'.js','.jsx','.ts','.tsx','.sh','.bash','.go','.rs','.c','.cpp','.h','.java','.cs','.sql','.yaml','.yml','.toml'}
 VENDOR={'.git','.venv','venv','node_modules','site-packages','__pycache__','vendor','__macosx'}
+# Accidental-disclosure lint: skip files whose names usually hold credentials. Name-based
+# only, so it is not a credential-separation or DLP boundary (docs/THREAT_MODEL.md).
 SECRET_NAMES={'.env','id_rsa','id_ed25519','credentials.py','credentials.json','secrets.json','secrets.py','tokens.json'}
 STOP={'the','a','an','of','for','to','and','or','in','is','are','this','that','with','from','return','returns','self','none','true','false','def','class'}
 

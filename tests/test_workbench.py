@@ -227,6 +227,16 @@ class NetworkTests(Setup):
             status=200;headers={}
         with patch.object(client.opener,'open',return_value=Fake()) as op:
             client.get(p);req=op.call_args[0][0];self.assertTrue(req.full_url.startswith('https://api.github.com/'));self.assertEqual(req.method,'GET')
+    def test_user_agent_is_release_version(self):
+        from forge_core import __version__
+        p=self.store.claim(self.mid);client=GitHub()
+        class Fake:
+            def __enter__(self):return self
+            def __exit__(self,*a):pass
+            def read(self,n):return b'{}'
+            status=200;headers={}
+        with patch.object(client.opener,'open',return_value=Fake()) as op:
+            client.get(p);self.assertEqual(op.call_args[0][0].get_header('User-agent'),'FORGE-Workbench/'+__version__)
     def test_network_failure_recorded(self):
         class Dead:
             def get(self,p):raise Blocked('NETWORK_UNAVAILABLE')
@@ -254,6 +264,11 @@ class ConsoleTests(Setup):
         c.request(method,path,canonical(obj) if obj is not None else None,headers);r=c.getresponse();body=r.read();st=r.status;c.close();return st,body
     def test_page_no_token_leak(self):
         st,b=self.request('/',token=False);self.assertEqual(st,200);self.assertNotIn(self.server.token.encode(),b)
+    def test_pages_show_release_version(self):
+        from forge_core import __version__
+        for path in ('/','/opportunities','/contracts'):
+            st,b=self.request(path,token=False);self.assertEqual(st,200)
+            self.assertIn(__version__.encode(),b);self.assertNotIn(b'{{FORGE_VERSION}}',b)
     def test_missing_auth(self):self.assertEqual(self.request('/api/state',token=False)[0],403)
     def test_wrong_origin(self):self.assertEqual(self.request('/api/state',origin='https://evil.example')[0],403)
     def test_wrong_host(self):self.assertEqual(self.request('/api/state',host='evil.example')[0],403)

@@ -11,4 +11,4 @@ labels: enhancement
 **Alternatives you considered**
 
 **Additional context**
-Forge stays offline, read-only and free of third-party runtime dependencies. Please mention if your idea would change that.
+Forge keeps analysis offline and read-only, keeps network access limited to opt-in GitHub discovery (see docs/THREAT_MODEL.md), and has no third-party runtime dependencies. Please mention if your idea would change that.

@@ -12,6 +12,9 @@ Supply them in a file outside the repo, one case-insensitive regex per line ('#'
 
 Known intentional matches are listed in tools/prepublish_allowlist.json (path + exact substring).
 Exit code 0 = clean, 1 = findings, 2 = usage error. Matched values are never printed in full.
+
+This is accidental-disclosure linting: pattern matching catches common mistakes but cannot
+prove a tree is free of secrets and is not a DLP boundary (see docs/THREAT_MODEL.md).
 """
 from __future__ import annotations
 import argparse, json, os, re, subprocess, sys

@@ -5,7 +5,10 @@ Thank you for your interest in improving Forge. This guide explains how to propo
 ## Ground rules
 
 - Forge has **no third-party runtime dependencies**. Please do not add any. Standard library only, Python 3.11+.
-- Forge must stay **read-only and offline**: it never executes inspected code, makes no network requests and calls no models. Changes that weaken this need a strong justification and an open discussion first.
+- Forge must stay **read-only**, never execute inspected code and call no models.
+- Keep the network boundary in [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md): analysis is **offline** (no network requests), and the only network path is **operator-authorized public discovery** (GET-only, bounded requests to `api.github.com`, started explicitly by the operator). Do not add network access to analysis commands or a second network path. Changes that weaken either side need a strong justification and an open discussion first.
+- Secret-pattern checks are accidental-disclosure linting. Do not describe them, in code or docs, as a credential-separation or DLP boundary.
+- See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for which component owns what, and [docs/VERSIONS.md](docs/VERSIONS.md) for how versions work (the release version lives only in `forge_core/__init__.py`).
 - Keep pull requests small and focused on one change.
 - All contributions are made under the Apache License 2.0 (see `LICENSE`). Only submit code you wrote or have the right to contribute under that license. Do not paste code from sources with incompatible licenses.
 - Never commit secrets, personal data, absolute home-directory paths or real scan output. Use synthetic examples, like the ones in `examples/demo/`.

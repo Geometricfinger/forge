@@ -4,7 +4,7 @@ import json,secrets,threading,os,time,subprocess,signal
 from urllib.parse import urlsplit,parse_qs
 from .common import *
 from .workspace import Workbench,ROOT
-from . import policy,demo
+from . import policy,demo,__version__
 from .github import GitHub
 
 class Console(ThreadingHTTPServer):
@@ -82,7 +82,9 @@ class Handler(BaseHTTPRequestHandler):
             self.check_host();path=urlsplit(self.path).path
             static={'/':'index.html','/app.js':'app.js','/style.css':'style.css','/opportunities':'opportunities.html','/opportunities.js':'opportunities.js','/contracts':'contracts.html','/contracts.js':'contracts.js'}
             if path in static:
-                f=ROOT/'assets'/static[path];mime={'html':'text/html; charset=utf-8','js':'text/javascript','css':'text/css'}[f.suffix[1:]];return self.send(200,read(f),mime)
+                f=ROOT/'assets'/static[path];mime={'html':'text/html; charset=utf-8','js':'text/javascript','css':'text/css'}[f.suffix[1:]];body=read(f)
+                if f.suffix=='.html':body=body.replace(b'{{FORGE_VERSION}}',__version__.encode())
+                return self.send(200,body,mime)
             self.authorize()
             if path=='/api/state':value={'missions':self.server.app.store.snapshot(),'operation':self.server.operation,'reuse_cases':self.server.casebook().list(),'templates':[{'id':n,'title':policy.template(n)['title']} for n in ['understanding','reliability','evaluation']]}
             elif path=='/api/integration-contract':
