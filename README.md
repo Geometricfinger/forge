@@ -6,6 +6,10 @@ It never executes the code it inspects, makes no model calls, and needs no netwo
 
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
+![Forge demo: scanning the synthetic demo source, running the bundled demo and searching for call sites](docs/media/forge-demo.gif)
+
+<sub>The demo above runs `examples/demo/run_demo.py` and `corpus-search` on the bundled synthetic source. A replayable recording is in [`docs/media/forge-demo.cast`](docs/media/forge-demo.cast) (`asciinema play docs/media/forge-demo.cast`).</sub>
+
 ## Features
 
 - **Static, read-only analysis.** Hound parses Python source and reports a call only when it can bind it to a declared import. It never imports or runs the code it inspects.
