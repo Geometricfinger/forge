@@ -1,6 +1,6 @@
 # AGENTS.md: instructions for AI coding agents
 
-This file tells AI coding agents (Codex, Cursor, Copilot and similar) how to install Forge, point it at a user's code, and read the results. Humans should start with [README.md](README.md).
+This file tells AI coding agents (Claude Code, Codex, Cursor, Copilot and similar) how to install Forge, point it at a user's code, and read the results. Humans should start with [README.md](README.md).
 
 ## What Forge is
 
