@@ -1,0 +1,26 @@
+{
+  "epoch": "FORGE-MULTISOURCE-AUTOMATION-001",
+  "date": "2026-09-22",
+  "purpose": "Automate bounded multi-source evidence collection and selection around the FORGE engine in this repository.",
+  "primary_acceptance": [
+    "Original FORGE source, tests, budgets, and verifier remain unchanged.",
+    "Normal frozen FORGE corpus inspection is actually called for admitted Python inputs.",
+    "Full definition text preserves searchable annotations; references and unsupported-language text are separate evidence kinds.",
+    "All results bind to source hashes and explicit captured-content provenance.",
+    "Fixed reciprocal-rank fusion has no target labels or target-specific synonym list.",
+    "No claims of semantic correctness, demand, novelty, independent inference, or executed source arise from retrieval.",
+    "A task cannot run before its dependencies; source failure does not become source absence.",
+    "Bounded work checkpoints resume, completed records are verified before reuse, and cancellation prevents new tasks.",
+    "Source and aggregate byte budgets, query counts and packet bytes are enforced without weakening FORGE.",
+    "References cannot satisfy an implementation-only requirement and lexical text cannot satisfy observed-API filters.",
+    "The reviewer handoff is bounded and points to separately retained detailed evidence.",
+    "No model calls, deployments, or arbitrary source executions are permitted by this runner."
+  ],
+  "predictions": [
+    "Keeping full-source lexical leads should recover some metadata misses, but may regress other rankings; report all outcomes.",
+    "Literature/reference search should supply context, never automatically prove a product gap.",
+    "Fixed snapshot and query reruns should reproduce semantic results; elapsed time is separate telemetry."
+  ],
+  "evaluation": "Developer-authored development scenarios. Prior public pilot is diagnostic replay, not holdout. New sources are not guaranteed unknown to the model.",
+  "promotion": "An add-on development candidate only. Any failure of unchanged baseline qualification remains a release block."
+}

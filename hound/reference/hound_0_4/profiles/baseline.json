@@ -1,0 +1,25 @@
+[
+  {
+    "id": "geometry.rigid_icp_call",
+    "version": "1",
+    "detector": "literal_call_contract",
+    "purpose": "Find imported Trimesh ICP calls explicitly disabling scale fitting and reflection.",
+    "target": "trimesh.registration.icp",
+    "required_keywords": {"scale": false, "reflection": false},
+    "limitations": ["Syntax candidate, not proof of numerical correctness, physical scale preservation by the enclosing pipeline, units, reachability, dependency defaults, or monkey-patch absence.", "Unresolved wrappers and alternative libraries are outside this detector; they are not evidence that the capability is absent."]
+  },
+  {
+    "id": "validation.explicit_units_finite_values",
+    "version": "1",
+    "detector": "unit_finite_guard",
+    "purpose": "Find functions containing unit-membership rejection and finite-number checks in raising conditionals.",
+    "limitations": ["Co-occurrence does not prove the same value is guarded on every path.", "Does not establish dimensional correctness, conversions, complete validation, or a physical uncertainty budget."]
+  },
+  {
+    "id": "storage.resolved_path_guard",
+    "version": "1",
+    "detector": "resolved_path_guard",
+    "purpose": "Find the resolve-then-reject-outside-root path idiom.",
+    "limitations": ["Method receiver type and complete data/control flow are not established.", "Does not establish a security boundary, symlink-race resistance, or safety of filesystem writes."]
+  }
+]

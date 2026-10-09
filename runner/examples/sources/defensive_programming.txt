@@ -1,0 +1,2 @@
+Contributor summary of Software Carpentry's Defensive Programming lesson, not the complete lesson.
+The lesson distinguishes preconditions, postconditions and invariants. It writes tests before an implementation and uses intentionally incorrect rectangle and range examples to illustrate failed assertions and repairs. Those teaching examples must not be presented as newly discovered production vulnerabilities. The range overlap exercise must decide what no overlap and touching endpoints mean before choosing the final function.

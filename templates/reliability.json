@@ -1,0 +1,68 @@
+{
+  "schema": 1,
+  "template": "reliability",
+  "title": "Find reliability implementation clues for FORGE",
+  "public_brief": "Find reliability implementation clues for FORGE",
+  "queries": [
+    "python persistent queue in:name,description"
+  ],
+  "path_terms": [
+    "queue",
+    "scheduler",
+    "dupe",
+    "cache"
+  ],
+  "profile": {
+    "schema": 1,
+    "id": "forge-self-reliability",
+    "title": "Find reliability implementation clues for FORGE",
+    "targets": [
+      {
+        "api": "sqlite3.connect",
+        "capability": "persistent_record_store"
+      },
+      {
+        "api": "os.replace",
+        "capability": "atomic_replacement_candidate"
+      },
+      {
+        "api": "os.fsync",
+        "capability": "durable_flush_candidate"
+      },
+      {
+        "api": "concurrent.futures.ThreadPoolExecutor",
+        "capability": "thread_worker_pool"
+      },
+      {
+        "api": "concurrent.futures.ProcessPoolExecutor",
+        "capability": "process_worker_pool"
+      },
+      {
+        "api": "scrapy.utils.conf._job_dir",
+        "capability": "crawl_state_directory"
+      },
+      {
+        "api": "scrapy.utils.request.RequestFingerprinter",
+        "capability": "request_fingerprinter_construction"
+      }
+    ]
+  },
+  "limits": {
+    "max_requests": 20,
+    "max_repos": 2,
+    "max_files": 4,
+    "files_per_repo": 2,
+    "max_source_bytes": 150000,
+    "max_total_source_bytes": 500000,
+    "max_response_bytes": 1000000,
+    "max_attempts": 2
+  },
+  "permitted_licenses": [
+    "MIT",
+    "Apache-2.0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "CC0-1.0",
+    "Unlicense"
+  ]
+}

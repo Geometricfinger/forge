@@ -1,0 +1,4 @@
+Reviewed excerpt and contributor notes, not the complete documentation.
+Source: CPython 3.13.5 graphlib documentation.
+Excerpt: "Marks a set of nodes returned by get_ready as processed, unblocking any successor"
+Contributor paraphrase: A topological ordering respects predecessor dependencies. A complete ordering requires an acyclic directed graph. Preparation can expose a cycle. Ready nodes and completed nodes are distinct states. Completion is reported with done; fetching a ready node is not equivalent to completing its work.

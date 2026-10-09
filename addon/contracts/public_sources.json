@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "sources": [
+    {
+      "source_id": "github:Instagram/LibCST@d9a255843b5cdbecc6834684d233bce1f2987f9d:libcst/metadata/name_provider.py",
+      "path": "libcst_name_provider.py",
+      "sha256": "688149498e29816c8dd45fcc27f122f0a95645da8d0c553c56275d9388aa4ffe",
+      "git_blob_sha1": "7de76eb5e450a1e0e1385924cdf6d1d78f61e127",
+      "url": "https://github.com/Instagram/LibCST/blob/d9a255843b5cdbecc6834684d233bce1f2987f9d/libcst/metadata/name_provider.py",
+      "transfer": "GitHub fetch_file UTF-8 text staged locally; Git blob verified before scan. Raw fetch showed a docstring difference and was not accepted as the pinned content."
+    },
+    {
+      "source_id": "github:scrapy/scrapy@4f3e27e6c00f04497f603aa16ca248f34a4e59e4:scrapy/dupefilters.py",
+      "path": "scrapy_dupefilters.py",
+      "sha256": "3b58779ea82ba23537cb702994b185c8eac5b8a0e6025cdd65827d18dd07ad03",
+      "git_blob_sha1": "65c69b8a9f5e042eb50af85ee95835f11724f679",
+      "url": "https://github.com/scrapy/scrapy/blob/4f3e27e6c00f04497f603aa16ca248f34a4e59e4/scrapy/dupefilters.py",
+      "transfer": "GitHub fetch_file UTF-8 text staged locally; Git blob verified before scan. Raw fetch showed a docstring difference and was not accepted as the pinned content."
+    }
+  ]
+}

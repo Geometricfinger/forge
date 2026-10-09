@@ -1,0 +1,9 @@
+Synthetic text transcript, not public evidence.
+worker.py
+```python
+from typing import Callable
+def invoke_when_ready(callback: Callable[[], str], ready: bool):
+    if not ready:
+        return None
+    return callback()
+```

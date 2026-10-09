@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "id": "forge-self-evaluation",
+  "title": "Find evaluation implementation clues for FORGE",
+  "targets": [
+    {
+      "api": "unittest.defaultTestLoader.discover",
+      "capability": "test_discovery"
+    },
+    {
+      "api": "unittest.TextTestRunner",
+      "capability": "test_runner_construction"
+    },
+    {
+      "api": "hypothesis.stateful.run_state_machine_as_test",
+      "capability": "generated_action_sequences"
+    },
+    {
+      "api": "hypothesis.given",
+      "capability": "property_based_cases"
+    },
+    {
+      "api": "subprocess.run",
+      "capability": "subprocess_execution_candidate"
+    }
+  ]
+}

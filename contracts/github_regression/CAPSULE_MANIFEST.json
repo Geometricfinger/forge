@@ -1,0 +1,50 @@
+{
+  "schema": 1,
+  "files": [
+    {
+      "provider": "github",
+      "file_id": "github:jd/tenacity@3e58094d3bc414975aad9eadf343a32bdb3b89b3:selected-files",
+      "path": "jd--tenacity.zip",
+      "size": 6938,
+      "sha256": "d2cea07b780803bc4693a6cb63309d931b405ead625fc4d6ae995a9078018c72",
+      "source_url": "https://github.com/jd/tenacity/tree/3e58094d3bc414975aad9eadf343a32bdb3b89b3",
+      "repository": "jd/tenacity",
+      "commit": "3e58094d3bc414975aad9eadf343a32bdb3b89b3",
+      "container_kind": "LOCAL_SELECTED_FILE_ENVELOPE_NOT_FULL_REPOSITORY_ARCHIVE",
+      "selected_paths": [
+        "tenacity/wait.py",
+        "tenacity/stop.py",
+        "tenacity/_utils.py"
+      ]
+    },
+    {
+      "provider": "github",
+      "file_id": "github:untitaker/python-atomicwrites@4183999d9b7e81af85dee070d5311299bdf5164c:selected-files",
+      "path": "untitaker--python-atomicwrites.zip",
+      "size": 2593,
+      "sha256": "7d8f3a87dd87b06fe5158e7fb302e959114e33ef447df9c2495f852e1fe8fa18",
+      "source_url": "https://github.com/untitaker/python-atomicwrites/tree/4183999d9b7e81af85dee070d5311299bdf5164c",
+      "repository": "untitaker/python-atomicwrites",
+      "commit": "4183999d9b7e81af85dee070d5311299bdf5164c",
+      "container_kind": "LOCAL_SELECTED_FILE_ENVELOPE_NOT_FULL_REPOSITORY_ARCHIVE",
+      "selected_paths": [
+        "atomicwrites/__init__.py"
+      ]
+    },
+    {
+      "provider": "github",
+      "file_id": "github:networkx/networkx@bd45cfe38f6e4eb3aac1aca073acad24285b87de:selected-files",
+      "path": "networkx--networkx.zip",
+      "size": 1430,
+      "sha256": "30c4678240c5d51d83b45bef6ea314d0e5e1bcfdfb081e4f742fbdf5346ead8a",
+      "source_url": "https://github.com/networkx/networkx/tree/bd45cfe38f6e4eb3aac1aca073acad24285b87de",
+      "repository": "networkx/networkx",
+      "commit": "bd45cfe38f6e4eb3aac1aca073acad24285b87de",
+      "container_kind": "LOCAL_SELECTED_FILE_ENVELOPE_NOT_FULL_REPOSITORY_ARCHIVE",
+      "selected_paths": [
+        "networkx/utils/union_find.py"
+      ]
+    }
+  ],
+  "upstream_code_executed": false
+}

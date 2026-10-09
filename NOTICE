@@ -1,0 +1,26 @@
+Forge
+Copyright 2026 Forge contributors
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+This product includes third-party software and example material:
+
+1. rfc8785.py 0.1.4 (JSON Canonicalization Scheme)
+   Copyright Trail of Bits. Licensed under the Apache License, Version 2.0.
+   Source: https://github.com/trailofbits/rfc8785.py (commit 010be76943fb879ee3eeed7227e47b6cfb8907ee)
+   Included unchanged in forge_core/_vendor/rfc8785/. License: third_party/rfc8785/LICENSE.
+   The upstream implementation contains material adapted from Andrew Rundgren's (as credited upstream)
+   json-canonicalization reference implementation (Apache License, Version 2.0);
+   attribution is retained in the source comments.
+
+2. Example source files used as scan input by the research runner (runner/examples/sources/).
+   They are read as data and never imported or executed.
+   - CPython Lib/graphlib.py: Copyright (c) 2001-2024 Python Software Foundation.
+     PSF License Agreement, see runner/third_party/CPython_LICENSE.txt.
+   - Blinker _utilities.py: Copyright 2010 Jason Kirtland. MIT License,
+     see runner/third_party/Blinker_LICENSE.txt.
+   - Pluggy _result.py: Copyright (c) 2015 holger krekel. MIT License,
+     see runner/third_party/Pluggy_LICENSE.txt.
+
+Public repositories referenced by URL and commit in contracts/ and hound/contracts/
+are identifiers only; their source code is not included in this repository.

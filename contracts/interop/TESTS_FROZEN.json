@@ -1,0 +1,5 @@
+{
+  "path": "tests/test_contract_integration.py",
+  "sha256": "9dd1c7908f5db8681dec70833402cdfb2250c0cc3acb07a94ac8e97c064c7ca2",
+  "frozen_before_adapter": true
+}

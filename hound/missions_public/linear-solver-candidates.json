@@ -1,0 +1,1 @@
+{"id":"public-solve","title":"Linear-system solve calls","requirements":[{"id":"solve","profile_id":"geometry.computational_primitives","statuses":["COMPUTATIONAL_PRIMITIVE_OBSERVED"],"operations":["linear_system_solve"]}],"exclude_tests":true}

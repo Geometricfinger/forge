@@ -1,0 +1,1 @@
+{"id":"state-factor","title":"Class factor references requiring scale-context review","requirements":[{"id":"factor-context","profile_id":"geometry.object_factor_context","statuses":["OBJECT_FACTOR_CONTEXT_REQUIRES_REVIEW"]}],"exclude_tests":true}

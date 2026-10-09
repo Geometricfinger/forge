@@ -1,0 +1,48 @@
+{
+  "schema": 1,
+  "mission": "Use current Hound to find capabilities that improve FORGE; scoped supervised pilot.",
+  "baseline_archive_sha256": "90e02ae997f25ca0e0ee17c2a4049ee99ad638f018f7b9f457d263bf31691dc3",
+  "baseline_code_hashes": {
+    "atlas_hunt.py": "695d0aac4372811373f21d493101a384586c37313b83044eb20eabd8ee2991e9",
+    "baseline_sniffers.py": "c2f740a2f678a05f96a08b71bbd9cee26ccdf4b1e3f8d0fd0f5be3c28a457934",
+    "build_public_catalog.py": "6b02505e0722420cf84726aff81fd77317946a4e240174523ca99d0935db5d36",
+    "flow_core.py": "d74049e47abb25a32e946b33b1c8d53350a22cc000876bb52413738333e496d7",
+    "hound.py": "f873960b60be6dbe6ad495ed41a9acc43e583552d676044fcdca3e8581e0e0b3",
+    "library_rules.py": "644ea74be5c914fa3041d58c2ad0d135c3180c84480f2f8afc60cfee474c2253",
+    "mission_hunt.py": "ecf6c9ebc351a29437b320c802a3d53edc0754f6f91bed1e7a1bb174fb70089e",
+    "persistent_hunt.py": "d22d66a7dce02c9b8fd7f69b3749d8dc6c7906b7384a05c2bc0a508b7a19c49e",
+    "run_benchmark.py": "1b479a790b8fbdfeb38a632bb42350fc5aae9f1a2664f5543a50cd303183a004",
+    "run_defect_closure.py": "69b2149b18cc65852116e9bf4813ed8a1364847988d911a9169707590b2e776b",
+    "run_library_validation.py": "22930fac24ad3546d8a21c7f351239cca98bc2f2e899e3e33b4774c408806f35",
+    "run_qualification.py": "1d96b2f2901993dff06ba60ef70ea0a3205a0d38da30c19a4da11a366a46df59",
+    "run_review_benchmark.py": "017b900b4e4951b58aeda3c0101e8f871d2afcf9a6aa833d2f7ebd1c9a58328e",
+    "run_tests.py": "b874e2e6308e92faf4b000cd87cec0da60747748245125ede4803fd259ce5670",
+    "script_scope.py": "604d3cce0a103e9d604e026f8d8798cd9932e69b8691277f1f3315736ae3d42a",
+    "value_gate.py": "37e2794817498b96acbef0e2c94d4be341a638c5b386d357b322d545022675e4"
+  },
+  "acceptance": [
+    "All baseline 483 tests remain unchanged and pass.",
+    "Configurable exact API targets surface genuine supported calls with no hard-coded source filenames.",
+    "Shadows, comments and definitely unreachable calls do not become positive observations in the frozen cases.",
+    "Source bodies are not imported/executed or copied to output findings.",
+    "Every result binds to exact source, engine and target-profile digests.",
+    "Changed input or changed baseline is a blocker, not silent substitution.",
+    "Source-scope calls have no invented function identity.",
+    "No self-approval, changed evaluation rules, deployments or credential expansion."
+  ],
+  "independent_models": false,
+  "permissions": {
+    "source_read": true,
+    "modify_separate_tool_copy": true,
+    "upstream_execution": false,
+    "remote_write": false,
+    "deploy": false
+  },
+  "worker_roles": [
+    "understanding",
+    "reliability",
+    "evaluation"
+  ],
+  "max_concurrent_parser_processes": 3,
+  "source_count": 16
+}

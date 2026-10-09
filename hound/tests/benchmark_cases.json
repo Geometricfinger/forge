@@ -1,0 +1,126 @@
+{
+  "purpose": "Correct three-way imported ICP control classification; not geometry performance",
+  "scope": "Developer-authored diagnostic cases, not independently held out; expectations fixed before comparison run",
+  "rows": [
+    {
+      "id": "literal_false",
+      "source": "import trimesh\ndef f(a,b,flag):\n    return trimesh.registration.icp(a,b,scale=False,reflection=False)\n",
+      "expected": "STATIC_CANDIDATE"
+    },
+    {
+      "id": "literal_true",
+      "source": "import trimesh\ndef f(a,b,flag):\n    return trimesh.registration.icp(a,b,scale=True,reflection=False)\n",
+      "expected": "CONTRADICTED_CALL_CONTRACT"
+    },
+    {
+      "id": "reflections_enabled",
+      "source": "import trimesh\ndef f(a,b,flag):\n    return trimesh.registration.icp(a,b,scale=False,reflection=True)\n",
+      "expected": "CONTRADICTED_CALL_CONTRACT"
+    },
+    {
+      "id": "missing_scale",
+      "source": "import trimesh\ndef f(a,b,flag):\n    return trimesh.registration.icp(a,b,reflection=False)\n",
+      "expected": "NEEDS_CONTEXT"
+    },
+    {
+      "id": "parameter_default_not_guaranteed",
+      "source": "import trimesh\ndef f(a,b,flag=False):\n    return trimesh.registration.icp(a,b,scale=flag,reflection=False)\n",
+      "expected": "NEEDS_CONTEXT"
+    },
+    {
+      "id": "assigned_false",
+      "source": "import trimesh\ndef f(a,b,flag):\n    s=False\n    return trimesh.registration.icp(a,b,scale=s,reflection=False)\n",
+      "expected": "STATIC_CANDIDATE"
+    },
+    {
+      "id": "assigned_true",
+      "source": "import trimesh\ndef f(a,b,flag):\n    s=True\n    return trimesh.registration.icp(a,b,scale=s,reflection=False)\n",
+      "expected": "CONTRADICTED_CALL_CONTRACT"
+    },
+    {
+      "id": "reassigned_true",
+      "source": "import trimesh\ndef f(a,b,flag):\n    s=False\n    s=True\n    return trimesh.registration.icp(a,b,scale=s,reflection=False)\n",
+      "expected": "CONTRADICTED_CALL_CONTRACT"
+    },
+    {
+      "id": "reassigned_false",
+      "source": "import trimesh\ndef f(a,b,flag):\n    s=True\n    s=False\n    return trimesh.registration.icp(a,b,scale=s,reflection=False)\n",
+      "expected": "STATIC_CANDIDATE"
+    },
+    {
+      "id": "chained_alias",
+      "source": "import trimesh\ndef f(a,b,flag):\n    s=False\n    t=s\n    return trimesh.registration.icp(a,b,scale=t,reflection=False)\n",
+      "expected": "STATIC_CANDIDATE"
+    },
+    {
+      "id": "negated_flag",
+      "source": "import trimesh\ndef f(a,b,flag):\n    s=True\n    return trimesh.registration.icp(a,b,scale=not s,reflection=False)\n",
+      "expected": "STATIC_CANDIDATE"
+    },
+    {
+      "id": "callee_alias",
+      "source": "import trimesh\ndef f(a,b,flag):\n    op=trimesh.registration.icp\n    return op(a,b,scale=False,reflection=False)\n",
+      "expected": "STATIC_CANDIDATE"
+    },
+    {
+      "id": "both_variables",
+      "source": "import trimesh\ndef f(a,b,flag):\n    s=False\n    r=False\n    return trimesh.registration.icp(a,b,scale=s,reflection=r)\n",
+      "expected": "STATIC_CANDIDATE"
+    },
+    {
+      "id": "unknown_branch",
+      "source": "import trimesh\ndef f(a,b,flag):\n    s=False\n    if flag:\n        s=True\n    return trimesh.registration.icp(a,b,scale=s,reflection=False)\n",
+      "expected": "NEEDS_CONTEXT"
+    },
+    {
+      "id": "unknown_callee",
+      "source": "import trimesh\ndef f(a,b,flag):\n    s=flag()\n    return trimesh.registration.icp(a,b,scale=s,reflection=False)\n",
+      "expected": "NEEDS_CONTEXT"
+    },
+    {
+      "id": "import_alias",
+      "source": "import trimesh as tm\ndef f(a,b,flag):\n    return tm.registration.icp(a,b,scale=False,reflection=False)\n",
+      "expected": "STATIC_CANDIDATE"
+    },
+    {
+      "id": "direct_import",
+      "source": "from trimesh.registration import icp as align\ndef f(a,b,flag):\n    return align(a,b,scale=False,reflection=False)\n",
+      "expected": "STATIC_CANDIDATE"
+    },
+    {
+      "id": "kwargs_unknown",
+      "source": "import trimesh\ndef f(a,b,flag):\n    return trimesh.registration.icp(a,b,scale=False,reflection=False,**flag)\n",
+      "expected": "NEEDS_CONTEXT"
+    },
+    {
+      "id": "shadowed_parameter",
+      "source": "import trimesh\ndef f(a,b,trimesh):\n    return trimesh.registration.icp(a,b,scale=False,reflection=False)\n",
+      "expected": "NO_RESOLVED_CALL"
+    },
+    {
+      "id": "comment_decoy",
+      "source": "import trimesh\ndef f(a,b,flag):\n    # trimesh.registration.icp(a,b,scale=False,reflection=False)\n    return a\n",
+      "expected": "NO_RESOLVED_CALL"
+    },
+    {
+      "id": "dict_lookup_unknown",
+      "source": "import trimesh\ndef f(a,b,flag):\n    opts={\"scale\":False}\n    return trimesh.registration.icp(a,b,scale=opts[\"scale\"],reflection=False)\n",
+      "expected": "NEEDS_CONTEXT"
+    },
+    {
+      "id": "mixed_reflection_variable",
+      "source": "import trimesh\ndef f(a,b,flag):\n    r=True\n    return trimesh.registration.icp(a,b,scale=False,reflection=r)\n",
+      "expected": "CONTRADICTED_CALL_CONTRACT"
+    },
+    {
+      "id": "constant_conditional_expression",
+      "source": "import trimesh\ndef f(a,b,flag):\n    s=False if True else flag\n    return trimesh.registration.icp(a,b,scale=s,reflection=False)\n",
+      "expected": "STATIC_CANDIDATE"
+    },
+    {
+      "id": "unrelated_method",
+      "source": "import trimesh\ndef f(a,b,flag):\n    return flag.icp(a,b,scale=False,reflection=False)\n",
+      "expected": "NO_RESOLVED_CALL"
+    }
+  ]
+}

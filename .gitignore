@@ -1,0 +1,56 @@
+# macOS / editor junk
+._*
+.DS_Store
+*.swp
+.idea/
+.vscode/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+.venv/
+venv/
+
+# Secrets and local configuration
+.env
+.env.*
+*.pem
+*.key
+credentials*.json
+
+# Workspaces, runs and generated output (always write outside the repo)
+.forge-workbench*/
+home/
+runs/
+out/
+output/
+outputs/
+results/
+reports/
+evidence/
+!hound/evidence/
+hound/evidence/*
+!hound/evidence/benchmark_contract.json
+corpora/
+catalogs/
+*-qualification*/
+*-tests/
+mission/
+mission-work/
+
+# Catalogs, databases and archives
+*.sqlite
+*.sqlite-*
+*.db
+*.zip
+*.tgz
+*.tar
+*.tar.gz
+*.gz
+*.ndjson.gz
+
+# Review notes and denylists stay outside the repository
+REVIEW_FOR_*.md
+*denylist*.txt

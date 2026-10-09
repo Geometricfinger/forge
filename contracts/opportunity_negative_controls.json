@@ -1,0 +1,19 @@
+{
+  "tests": [
+    "test_opportunities.OpportunityTests.test_copy_same_words_not_second_user",
+    "test_opportunities.OpportunityTests.test_advertising_not_user_pain",
+    "test_opportunities.OpportunityTests.test_quote_changed_rejected",
+    "test_opportunities.OpportunityTests.test_shape_matching_missing_information_blocks_prerequisite",
+    "test_opportunity_review.ResultReview.test_partial_code_match_not_main_candidate",
+    "test_opportunity_final_review.FinalEvidenceReview.test_rehashed_agent_authority_still_rejected"
+  ],
+  "mutations": [
+    "duplicate_votes",
+    "marketing_as_pain",
+    "invented_quote",
+    "missing_prerequisites",
+    "partial_leads",
+    "agent_authority"
+  ],
+  "developer_authored": true
+}

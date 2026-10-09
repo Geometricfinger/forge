@@ -1,0 +1,149 @@
+{
+  "schema": 1,
+  "cases": [
+    {
+      "id": "direct",
+      "code": "import ast\ndef f(s):\n return ast.parse(s)\n",
+      "expected_count": 1
+    },
+    {
+      "id": "module_alias",
+      "code": "import ast as syntax\ndef f(s):\n return syntax.parse(s)\n",
+      "expected_count": 1
+    },
+    {
+      "id": "from_alias",
+      "code": "from ast import parse as make_tree\ndef f(s):\n return make_tree(s)\n",
+      "expected_count": 1
+    },
+    {
+      "id": "local_import",
+      "code": "def f(s):\n from ast import parse\n return parse(s)\n",
+      "expected_count": 1
+    },
+    {
+      "id": "callable_alias",
+      "code": "import ast\ndef f(s):\n parse_it = ast.parse\n return parse_it(s)\n",
+      "expected_count": 1
+    },
+    {
+      "id": "module_call",
+      "code": "import ast\nvalue=ast.parse(\"x=1\")\n",
+      "expected_count": 1
+    },
+    {
+      "id": "conditional_call",
+      "code": "import ast\ndef f(s,flag):\n if flag:\n  return ast.parse(s)\n",
+      "expected_count": 1
+    },
+    {
+      "id": "new_vendor_no_engine_change",
+      "code": "import customlib\ndef f(s):\n return customlib.feature(s)\n",
+      "expected_count": 1
+    },
+    {
+      "id": "sqlite",
+      "code": "from sqlite3 import connect\ndef f(path):\n return connect(path)\n",
+      "expected_count": 1
+    },
+    {
+      "id": "libcst",
+      "code": "import libcst as cst\ndef f(s):\n return cst.parse_module(s)\n",
+      "expected_count": 1
+    },
+    {
+      "id": "parameter_shadow",
+      "code": "import ast\ndef f(ast,s):\n return ast.parse(s)\n",
+      "expected_count": 0
+    },
+    {
+      "id": "local_rebind",
+      "code": "import ast\ndef f(s):\n ast = s\n return ast.parse(s)\n",
+      "expected_count": 0
+    },
+    {
+      "id": "unreachable",
+      "code": "import ast\ndef f(s):\n return s\n return ast.parse(s)\n",
+      "expected_count": 0
+    },
+    {
+      "id": "docstring_only",
+      "code": "import ast\ndef f(s):\n \"\"\"return ast.parse(s)\"\"\"\n return s\n",
+      "expected_count": 0
+    },
+    {
+      "id": "comment_only",
+      "code": "import ast\ndef f(s):\n # ast.parse(s)\n return s\n",
+      "expected_count": 0
+    },
+    {
+      "id": "local_function",
+      "code": "def parse(s):\n return s\ndef f(s):\n return parse(s)\n",
+      "expected_count": 0
+    },
+    {
+      "id": "similar_prefix",
+      "code": "import ast_fake\ndef f(s):\n return ast_fake.parse(s)\n",
+      "expected_count": 0
+    },
+    {
+      "id": "similar_member",
+      "code": "import ast\ndef f(s):\n return ast.parse_fake(s)\n",
+      "expected_count": 0
+    },
+    {
+      "id": "contradictory_alias",
+      "code": "import ast\ndef f(s,flag):\n p=ast.parse\n if flag:\n  p=s\n return p(s)\n",
+      "expected_count": 0
+    },
+    {
+      "id": "false_branch",
+      "code": "import ast\ndef f(s):\n if False:\n  return ast.parse(s)\n return s\n",
+      "expected_count": 0
+    },
+    {
+      "id": "nested_attribution",
+      "code": "import ast\ndef outer():\n def inner(s):\n  return ast.parse(s)\n return inner\n",
+      "expected_count": 1
+    },
+    {
+      "id": "async",
+      "code": "import ast\nasync def f(s):\n return ast.parse(s)\n",
+      "expected_count": 1
+    },
+    {
+      "id": "module_rebind",
+      "code": "import ast\nast = None\nx=ast.parse(\"x=1\")\n",
+      "expected_count": 0
+    },
+    {
+      "id": "module_main",
+      "code": "import ast\nif __name__==\"__main__\":\n x=ast.parse(\"x=1\")\n",
+      "expected_count": 1
+    }
+  ],
+  "profile": {
+    "schema": 1,
+    "id": "frozen-developer-api",
+    "title": "Frozen development API discovery contract",
+    "targets": [
+      {
+        "api": "ast.parse",
+        "capability": "python_syntax_tree"
+      },
+      {
+        "api": "customlib.feature",
+        "capability": "declared_custom_feature"
+      },
+      {
+        "api": "sqlite3.connect",
+        "capability": "persistent_record_store"
+      },
+      {
+        "api": "libcst.parse_module",
+        "capability": "concrete_syntax_tree"
+      }
+    ]
+  },
+  "note": "Developer-authored scoped diagnostics frozen before adapter implementation; not independent or a general-accuracy sample."
+}

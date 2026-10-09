@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "id": "forge.record-fingerprint.jcs-safe.v1",
+  "revision": 1,
+  "problem": "Share record fingerprints across Python and JavaScript without formatting, key-order, or numeric-spelling drift inside the declared numeric domain.",
+  "inputs": {
+    "representation": "raw JSON object",
+    "encoding": "UTF-8",
+    "units": "not applicable",
+    "coordinate_frame": "not applicable",
+    "max_bytes": 1000000,
+    "max_depth": 64,
+    "max_nodes": 100000
+  },
+  "outputs": {
+    "representation": "RFC 8785 canonical UTF-8 bytes and SHA-256 receipt",
+    "identity_scheme": "forge-jcs-safe-number-v1:sha256"
+  },
+  "numeric_profile": "Binary64 finite numbers. Reject integral values outside +/-9007199254740991 in every spelling; reject nonzero underflow. Larger/exact-decimal identifiers must be strings.",
+  "side_effects": {
+    "network": false,
+    "subprocess": false,
+    "writes": false
+  },
+  "implementation_id": "bundled_rfc8785_record_v1",
+  "baseline_id": "existing_forge_canonical",
+  "criteria": [
+    {
+      "id": "C01",
+      "stage": "component",
+      "claim": "Match all 26 published RFC Appendix B number examples, including the two required rejections.",
+      "evidence_kind": "external_vectors"
+    },
+    {
+      "id": "C02",
+      "stage": "component",
+      "claim": "Match the published UTF-16 sorting example and canonical UTF-8 sample.",
+      "evidence_kind": "external_vectors"
+    },
+    {
+      "id": "C03",
+      "stage": "adapter",
+      "claim": "Reject duplicate keys, invalid Unicode, nonfinite/unsafe numbers and non-object roots.",
+      "evidence_kind": "authored_checks"
+    },
+    {
+      "id": "C04",
+      "stage": "adapter",
+      "claim": "Equal admitted records have equal canonical bytes and digests after formatting/key-order changes; preserve array order and string distinctions.",
+      "evidence_kind": "authored_checks"
+    },
+    {
+      "id": "C05",
+      "stage": "integration",
+      "claim": "Produce a source/contract-bound sidecar without changing legacy internal evidence IDs.",
+      "evidence_kind": "authored_checks"
+    }
+  ],
+  "limitations": [
+    "This is a strict subset of accepted JCS inputs, not a parser accepting all JSON numbers.",
+    "Numeric decimal rounding follows binary64; it is not exact decimal arithmetic.",
+    "No Unicode normalization, unit conversion, schema truth check, signature or ownership proof.",
+    "No automatic source replacement, migration, market claim or deployment."
+  ],
+  "approval_required": true
+}

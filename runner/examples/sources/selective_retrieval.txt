@@ -1,0 +1,2 @@
+Contributor summary of the Repoformer ICML 2024 abstract, not an implemented model or the full paper.
+The authors investigate selective retrieval for repository-level code completion, including a model trained to judge when retrieved context is useful. Their results motivate evaluating retrieval cost and unnecessary context; they do not establish any accuracy or speed result for this FORGE runner. Our orchestration is rule-based and does not implement their learned retrieval policy.

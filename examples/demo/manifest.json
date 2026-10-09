@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "suite": "public_demo_pack",
+  "files": [
+    {
+      "provider": "synthetic",
+      "file_id": "demo_sinks",
+      "path": "sinks.py",
+      "size": 891,
+      "sha256": "e7f1b49ea9b80707e0960135d7dd0ec8d13a6ca25a84da12eb34d3bf58c4f8c9",
+      "source_url": "fixture://demo_sinks"
+    }
+  ]
+}

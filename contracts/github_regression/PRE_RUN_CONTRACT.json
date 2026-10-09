@@ -1,0 +1,207 @@
+{
+  "schema": 1,
+  "frozen_utc": "2026-09-21T05:31:56.103708+00:00",
+  "source_manifest_sha256": "47c54769896286ad06154d4234e3297f43c9b01a6ac9e1281b6b8c116088c8b2",
+  "goals": [
+    {
+      "id": "Q01",
+      "query": "exponential backoff jitter",
+      "targets": [
+        {
+          "path": "tenacity/wait.py",
+          "name": "wait_exponential_jitter.__call__",
+          "start_line": 320,
+          "end_line": 327
+        }
+      ],
+      "judgment": "Locate the calculation, not only its constructor.",
+      "kind": "target_retrieval"
+    },
+    {
+      "id": "Q02",
+      "query": "random uniform",
+      "targets": [
+        {
+          "path": "tenacity/wait.py",
+          "name": "wait_random_exponential.__call__",
+          "start_line": 274,
+          "end_line": 276
+        },
+        {
+          "path": "tenacity/wait.py",
+          "name": "wait_exponential_jitter.__call__",
+          "start_line": 320,
+          "end_line": 327
+        }
+      ],
+      "judgment": "Find randomized wait sampling; the jitter strategy is also an acceptable implementation.",
+      "kind": "target_retrieval"
+    },
+    {
+      "id": "Q03",
+      "query": "stop before delay",
+      "targets": [
+        {
+          "path": "tenacity/stop.py",
+          "name": "stop_before_delay.__call__",
+          "start_line": 132,
+          "end_line": 138
+        }
+      ],
+      "judgment": "Locate the stopping predicate; constructor alone does not make the decision.",
+      "kind": "target_retrieval"
+    },
+    {
+      "id": "Q04",
+      "query": "upcoming sleep max delay",
+      "targets": [
+        {
+          "path": "tenacity/stop.py",
+          "name": "stop_before_delay.__call__",
+          "start_line": 132,
+          "end_line": 138
+        }
+      ],
+      "judgment": "Behavior-description stress case: important state fields may not be indexed.",
+      "kind": "target_retrieval"
+    },
+    {
+      "id": "Q05",
+      "query": "event is set",
+      "targets": [
+        {
+          "path": "tenacity/stop.py",
+          "name": "stop_when_event_set.__call__",
+          "start_line": 85,
+          "end_line": 86
+        }
+      ],
+      "judgment": "Find the event-dependent stop predicate.",
+      "kind": "target_retrieval"
+    },
+    {
+      "id": "Q06",
+      "query": "iscoroutinefunction partial",
+      "targets": [
+        {
+          "path": "tenacity/_utils.py",
+          "name": "is_coroutine_callable",
+          "start_line": 113,
+          "end_line": 120
+        }
+      ],
+      "judgment": "Discover API-driven callable inspection.",
+      "kind": "target_retrieval"
+    },
+    {
+      "id": "Q07",
+      "query": "timedelta total seconds",
+      "targets": [
+        {
+          "path": "tenacity/_utils.py",
+          "name": "to_seconds",
+          "start_line": 107,
+          "end_line": 110
+        }
+      ],
+      "judgment": "Locate time conversion even without a helpful docstring.",
+      "kind": "target_retrieval"
+    },
+    {
+      "id": "Q08",
+      "query": "atomic write",
+      "targets": [
+        {
+          "path": "atomicwrites/__init__.py",
+          "name": "atomic_write",
+          "start_line": 214,
+          "end_line": 229
+        }
+      ],
+      "judgment": "Locate the public convenience entry point; this is not a durability certification.",
+      "kind": "target_retrieval"
+    },
+    {
+      "id": "Q09",
+      "query": "fsync flush",
+      "targets": [
+        {
+          "path": "atomicwrites/__init__.py",
+          "name": "AtomicWriter.sync",
+          "start_line": 196,
+          "end_line": 200
+        }
+      ],
+      "judgment": "Find the flush/fsync stage including its alias-dependent helper.",
+      "kind": "target_retrieval"
+    },
+    {
+      "id": "Q10",
+      "query": "mkstemp temporary file",
+      "targets": [
+        {
+          "path": "atomicwrites/__init__.py",
+          "name": "AtomicWriter.get_fileobject",
+          "start_line": 181,
+          "end_line": 194
+        }
+      ],
+      "judgment": "Find file creation, not a generic writer facade.",
+      "kind": "target_retrieval"
+    },
+    {
+      "id": "Q11",
+      "query": "merge disjoint sets",
+      "targets": [
+        {
+          "path": "networkx/utils/union_find.py",
+          "name": "UnionFind.union",
+          "start_line": 91,
+          "end_line": 106
+        }
+      ],
+      "judgment": "Find the merge operation; constructor is not an equivalent result.",
+      "kind": "target_retrieval"
+    },
+    {
+      "id": "Q12",
+      "query": "groups values",
+      "targets": [
+        {
+          "path": "networkx/utils/union_find.py",
+          "name": "UnionFind.to_sets",
+          "start_line": 72,
+          "end_line": 89
+        }
+      ],
+      "judgment": "Find a call-driven grouping implementation.",
+      "kind": "target_retrieval"
+    },
+    {
+      "id": "Q15",
+      "query": "quuxforgemissingcapability9317",
+      "kind": "empty_control",
+      "targets": []
+    },
+    {
+      "id": "Q16",
+      "query": "atomic write without overwriting existing file",
+      "kind": "constraint_warning",
+      "targets": [],
+      "expected": "NEGATION_REQUIRES_EXPLICIT_FILTERS_OR_REVIEW"
+    },
+    {
+      "id": "Q17",
+      "query": "wait",
+      "kind": "unjudged_exploration",
+      "targets": []
+    }
+  ],
+  "metric": "Best rank of an explicitly reviewed target among distinct results, reported at 1/3/10. Not exhaustive relevance, population recall, or runtime suitability.",
+  "independent_authorship": false,
+  "blind_evaluation": false,
+  "forged_sources": false,
+  "frozen_before_forge_runs": true,
+  "model_calls": 0,
+  "allowed_changes": "No Hound or ranker changes during this comparison."
+}

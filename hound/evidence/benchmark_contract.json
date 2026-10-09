@@ -1,0 +1,9 @@
+{
+  "case_count": 24,
+  "suite_sha256": "144a962c6db3faef9f30290443730fde99f7a2de4e47a7a268f58a1a7d3cf793",
+  "metric": "correct_decisions",
+  "direction": "higher",
+  "minimum_change": 1,
+  "max_required_regressions": 0,
+  "note": "Threshold fixed before first comparison; correct unknown answers count as correct classifications, not demonstrated capabilities."
+}

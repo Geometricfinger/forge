@@ -1,0 +1,31 @@
+{
+  "name": "rfc8785.py",
+  "version": "0.1.4",
+  "repository": "trailofbits/rfc8785.py",
+  "commit": "010be76943fb879ee3eeed7227e47b6cfb8907ee",
+  "license": "Apache-2.0",
+  "files": [
+    {
+      "path": "forge_core/_vendor/rfc8785/_impl.py",
+      "sha256": "d841b6d81ceefff296b528f54836b4d7612fab69fe7a48ebef8590eeb512637b",
+      "git_blob": "2c1062d4dfdc97f0c50a3ebffab378de95783547",
+      "bytes": 8045
+    },
+    {
+      "path": "forge_core/_vendor/rfc8785/__init__.py",
+      "sha256": "fa44927afd547caf7547247078bcf28863d1e69caf116d258c532b3f20ffd154",
+      "git_blob": "5a1f9d919643fa3bcaa0999ea66d9c535568c42a",
+      "bytes": 496
+    },
+    {
+      "path": "third_party/rfc8785/LICENSE",
+      "sha256": "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594",
+      "git_blob": "f433b1a53f5b830a205fd2df78e2b34974656c7b",
+      "bytes": 10174
+    }
+  ],
+  "modified": false,
+  "review": "Read exact implementation and public initializer; no file/network/process API in runtime module; external code execution limited to these pinned files.",
+  "acquisition": "GitHub connector text, staged locally with matching Git blob IDs. Native network failed DNS.",
+  "entire_dependency_tree_audited": false
+}

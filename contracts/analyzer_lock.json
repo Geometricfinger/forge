@@ -1,0 +1,8 @@
+{
+  "manifests": {
+    "addon": "9f5303f2922931dcdace9ffb5794763a60b2815221dada7fae258c5d3352bec9",
+    "hound": "116f3bb5064fd60e2fefa4d2a757367604586916942b2c19a258a652451741e3",
+    "loop": "595797f6eadfcbad5e41c6fca174b3d3578de9fd4e1bbcbd821e302de458df03"
+  },
+  "schema": 1
+}

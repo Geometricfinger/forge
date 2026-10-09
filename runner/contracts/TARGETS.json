@@ -1,0 +1,20 @@
+{
+  "targets": {
+    "G1": "TopologicalSorter.get_ready",
+    "G2": "TopologicalSorter.prepare",
+    "G3": "TopologicalSorter.static_order",
+    "G4": "TopologicalSorter.done",
+    "B1": "make_ref",
+    "B2": "make_id",
+    "B3": "Symbol.__new__",
+    "P1": "Result.from_call",
+    "P2": "Result.force_exception",
+    "P3": "Result.force_exception",
+    "F1": "run_with_timeout",
+    "F2": "save_checkpoint",
+    "T1": "invoke_when_ready"
+  },
+  "authorship": "Selected by contributors before runner search. P1/P3 are known development regressions, not unseen.",
+  "primary_metric": "target_in_top5",
+  "secondary": "top1 and full query evidence, per source family"
+}

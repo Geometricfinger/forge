@@ -1,0 +1,8 @@
+{
+  "fixture_sha256": "3a474f7e3a9bcdd901d90d4c7128eec2823d966343e0cebfca7e9484e6445ef1",
+  "required_findings": 80,
+  "maximum_symbol_table_builds_per_scan": 1,
+  "required_regressions": 0,
+  "no_cross_source_cache": true,
+  "author": "Developer-authored before scope-cache optimization; not a runtime-accuracy claim."
+}

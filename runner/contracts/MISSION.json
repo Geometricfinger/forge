@@ -1,0 +1,325 @@
+{
+  "schema": 1,
+  "objective": "Investigate dependency-aware work, callable handling and source-context gaps using code, teaching material, research and a small synthetic demo source. Prepare a reviewable evidence packet; do not claim novel products or execute collected code.",
+  "sources": [
+    {
+      "id": "graphlib",
+      "path": "cpython/graphlib.py",
+      "kind": "implementation",
+      "origin": "https://github.com/python/cpython/blob/6cb20a219a860eaf687b2d968b41c480c7461909/Lib/graphlib.py",
+      "capture": "exact_source",
+      "family": "python/cpython",
+      "size": 9648,
+      "sha256": "2a29e0adee584dc76251afef1236d7bedf250aca27911f91a4d442133ce81117",
+      "repository": "python/cpython",
+      "repo_path": "Lib/graphlib.py",
+      "commit": "6cb20a219a860eaf687b2d968b41c480c7461909",
+      "git_blob_sha1": "9512865a8e509e5c7ce00161d977eb711898043c"
+    },
+    {
+      "id": "blinker",
+      "path": "blinker_utilities.py",
+      "kind": "implementation",
+      "origin": "https://github.com/pallets-eco/blinker/blob/c3364059663df1ddce32799d6b1922af89a345f6/src/blinker/_utilities.py",
+      "capture": "exact_source",
+      "family": "pallets-eco/blinker",
+      "size": 1675,
+      "sha256": "d09ede7975d3531d08bdff1ab1fa71d32715929d04a9faa78f5d7bc769985fd1",
+      "repository": "pallets-eco/blinker",
+      "repo_path": "src/blinker/_utilities.py",
+      "commit": "c3364059663df1ddce32799d6b1922af89a345f6",
+      "git_blob_sha1": "000c902a2564d2d4a551edb646a9d654d9e7041b"
+    },
+    {
+      "id": "pluggy",
+      "path": "pluggy_result.py",
+      "kind": "implementation",
+      "origin": "https://github.com/pytest-dev/pluggy/blob/ab46a2a6e7257b844acc5bad112f33fed5431c8e/src/pluggy/_result.py",
+      "capture": "exact_source",
+      "family": "pytest-dev/pluggy",
+      "size": 3116,
+      "sha256": "f2668b485954c9e3f74a995bc4710d9f0390d012ac48a889a266864151aa5d4c",
+      "repository": "pytest-dev/pluggy",
+      "repo_path": "src/pluggy/_result.py",
+      "commit": "ab46a2a6e7257b844acc5bad112f33fed5431c8e",
+      "git_blob_sha1": "d9d5dbe8f83c3e9fa7b5afec6ebde7631a4a5fc8"
+    },
+    {
+      "id": "demo_jobs",
+      "path": "demo_jobs.py",
+      "kind": "implementation",
+      "origin": "fixture://demo_jobs",
+      "capture": "synthetic_fixture",
+      "family": "SYNTHETIC",
+      "size": 1065,
+      "sha256": "d5977223c1eb9c5a6a8e41e6887e7495a3a8723f071a332d0b9b4590bda20f0b"
+    },
+    {
+      "id": "graph_reference",
+      "path": "graphlib_reference.txt",
+      "kind": "documentation",
+      "origin": "https://github.com/python/cpython/blob/6cb20a219a860eaf687b2d968b41c480c7461909/Doc/library/graphlib.rst",
+      "capture": "reviewer_summary",
+      "family": "python/cpython",
+      "size": 533,
+      "sha256": "f7c9e9140ca07dfb044de5ef2b55bf5d092642d8fe6447153ac5c730782b5b0a"
+    },
+    {
+      "id": "lesson",
+      "path": "defensive_programming.txt",
+      "kind": "instructional",
+      "origin": "https://swcarpentry.github.io/python-novice-inflammation/10-defensive.html",
+      "capture": "reviewer_summary",
+      "family": "Software Carpentry",
+      "size": 531,
+      "sha256": "f8ea39218e72f418236b5dcc14706689af553adfea8a340a5ba4c59cc85f6944"
+    },
+    {
+      "id": "paper",
+      "path": "selective_retrieval.txt",
+      "kind": "research",
+      "origin": "https://proceedings.mlr.press/v235/wu24a.html",
+      "capture": "reviewer_summary",
+      "family": "Repoformer ICML 2024",
+      "size": 488,
+      "sha256": "9161b09c36f7f83191267bd28b9424a4f35b9e2a069e80c81aab449c6bd5a7af"
+    },
+    {
+      "id": "text_example",
+      "path": "mixed_snippet.txt",
+      "kind": "implementation",
+      "origin": "fixture://text_example",
+      "capture": "synthetic_fixture",
+      "family": "SYNTHETIC",
+      "size": 225,
+      "sha256": "ca54f29d378bc27b91f4f7dda1ac6bdd49376d983c267c3b9a899e6fb8cf379c"
+    },
+    {
+      "id": "js",
+      "path": "queue_fixture.js",
+      "kind": "implementation",
+      "origin": "fixture://js",
+      "capture": "synthetic_fixture",
+      "family": "SYNTHETIC",
+      "size": 223,
+      "sha256": "83f53d84d29f97e4c8e35ed8640b459a508ea550f6da4fd4b708f7e1166799db"
+    },
+    {
+      "id": "untrusted",
+      "path": "instructions_not_authority.txt",
+      "kind": "documentation",
+      "origin": "fixture://untrusted",
+      "capture": "synthetic_fixture",
+      "family": "SYNTHETIC",
+      "size": 186,
+      "sha256": "514afe950c504dbb1118546952694092c74b3d13816d1e206bce51a641c1bf51"
+    }
+  ],
+  "questions": [
+    {
+      "id": "G1",
+      "query": "nodes ready predecessors processed",
+      "sources": [
+        "graphlib"
+      ],
+      "intent": "code"
+    },
+    {
+      "id": "G2",
+      "query": "cycles graph prepare",
+      "sources": [
+        "graphlib"
+      ],
+      "intent": "code"
+    },
+    {
+      "id": "G3",
+      "query": "static_order",
+      "sources": [
+        "graphlib"
+      ],
+      "intent": "code"
+    },
+    {
+      "id": "G4",
+      "query": "marks nodes processed",
+      "sources": [
+        "graphlib"
+      ],
+      "intent": "code"
+    },
+    {
+      "id": "B1",
+      "query": "Callable callback WeakMethod",
+      "sources": [
+        "blinker"
+      ],
+      "intent": "code"
+    },
+    {
+      "id": "B2",
+      "query": "stable identifier receiver sender",
+      "sources": [
+        "blinker"
+      ],
+      "intent": "code"
+    },
+    {
+      "id": "B3",
+      "query": "symbols instance name",
+      "sources": [
+        "blinker"
+      ],
+      "intent": "code"
+    },
+    {
+      "id": "P1",
+      "query": "capture callable outcome exception",
+      "sources": [
+        "pluggy"
+      ],
+      "intent": "code"
+    },
+    {
+      "id": "P2",
+      "query": "force_exception",
+      "sources": [
+        "pluggy"
+      ],
+      "intent": "code"
+    },
+    {
+      "id": "P3",
+      "query": "override call with failure",
+      "sources": [
+        "pluggy"
+      ],
+      "intent": "code"
+    },
+    {
+      "id": "F1",
+      "query": "subprocess timeout",
+      "sources": [
+        "demo_jobs"
+      ],
+      "intent": "code"
+    },
+    {
+      "id": "F2",
+      "query": "checkpoint source",
+      "sources": [
+        "demo_jobs"
+      ],
+      "intent": "code"
+    },
+    {
+      "id": "T1",
+      "query": "Callable ready callback",
+      "sources": [
+        "text_example"
+      ],
+      "intent": "code"
+    },
+    {
+      "id": "J1",
+      "query": "validateConcurrency",
+      "sources": [
+        "js"
+      ],
+      "intent": "mixed"
+    },
+    {
+      "id": "D1",
+      "query": "predecessors completion",
+      "sources": [
+        "graph_reference"
+      ],
+      "intent": "reference"
+    },
+    {
+      "id": "D2",
+      "query": "preconditions postconditions invariants",
+      "sources": [
+        "lesson"
+      ],
+      "intent": "reference"
+    },
+    {
+      "id": "D3",
+      "query": "no overlap endpoints",
+      "sources": [
+        "lesson"
+      ],
+      "intent": "reference"
+    },
+    {
+      "id": "D4",
+      "query": "selective retrieval context",
+      "sources": [
+        "paper"
+      ],
+      "intent": "reference"
+    },
+    {
+      "id": "M1",
+      "query": "graph nodes",
+      "sources": [
+        "graphlib",
+        "graph_reference"
+      ],
+      "intent": "mixed"
+    },
+    {
+      "id": "M2",
+      "query": "manual approval opportunity",
+      "sources": [
+        "demo_jobs",
+        "paper"
+      ],
+      "intent": "mixed"
+    },
+    {
+      "id": "N1",
+      "query": "quasar teleportation mango",
+      "sources": [
+        "graphlib",
+        "blinker",
+        "pluggy"
+      ],
+      "intent": "code"
+    },
+    {
+      "id": "N2",
+      "query": "prove secure distributed identity",
+      "sources": [
+        "blinker",
+        "graph_reference"
+      ],
+      "intent": "mixed"
+    },
+    {
+      "id": "A1",
+      "query": "upload credentials",
+      "sources": [
+        "untrusted"
+      ],
+      "intent": "reference"
+    },
+    {
+      "id": "A2",
+      "query": "callback",
+      "sources": [
+        "blinker"
+      ],
+      "intent": "code",
+      "required_api": "unobserved.guaranteed.safe"
+    }
+  ],
+  "budgets": {
+    "max_sources": 16,
+    "max_source_bytes": 8000000,
+    "max_total_bytes": 16000000,
+    "max_questions": 32,
+    "packet_bytes": 12000
+  }
+}

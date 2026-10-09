@@ -1,0 +1,137 @@
+{
+  "origin": "RFC 8785 Appendix B, table 1",
+  "url": "https://www.rfc-editor.org/rfc/rfc8785.html#appendix-B",
+  "authority": "externally authored serialization examples; transcribed, not generated from candidate output",
+  "cases": [
+    {
+      "id": "RFC-B-1",
+      "ieee754_hex": "0000000000000000",
+      "expected": "0"
+    },
+    {
+      "id": "RFC-B-2",
+      "ieee754_hex": "8000000000000000",
+      "expected": "0"
+    },
+    {
+      "id": "RFC-B-3",
+      "ieee754_hex": "0000000000000001",
+      "expected": "5e-324"
+    },
+    {
+      "id": "RFC-B-4",
+      "ieee754_hex": "8000000000000001",
+      "expected": "-5e-324"
+    },
+    {
+      "id": "RFC-B-5",
+      "ieee754_hex": "7fefffffffffffff",
+      "expected": "1.7976931348623157e+308"
+    },
+    {
+      "id": "RFC-B-6",
+      "ieee754_hex": "ffefffffffffffff",
+      "expected": "-1.7976931348623157e+308"
+    },
+    {
+      "id": "RFC-B-7",
+      "ieee754_hex": "4340000000000000",
+      "expected": "9007199254740992"
+    },
+    {
+      "id": "RFC-B-8",
+      "ieee754_hex": "c340000000000000",
+      "expected": "-9007199254740992"
+    },
+    {
+      "id": "RFC-B-9",
+      "ieee754_hex": "4430000000000000",
+      "expected": "295147905179352830000"
+    },
+    {
+      "id": "RFC-B-10",
+      "ieee754_hex": "7fffffffffffffff",
+      "expected": null
+    },
+    {
+      "id": "RFC-B-11",
+      "ieee754_hex": "7ff0000000000000",
+      "expected": null
+    },
+    {
+      "id": "RFC-B-12",
+      "ieee754_hex": "44b52d02c7e14af5",
+      "expected": "9.999999999999997e+22"
+    },
+    {
+      "id": "RFC-B-13",
+      "ieee754_hex": "44b52d02c7e14af6",
+      "expected": "1e+23"
+    },
+    {
+      "id": "RFC-B-14",
+      "ieee754_hex": "44b52d02c7e14af7",
+      "expected": "1.0000000000000001e+23"
+    },
+    {
+      "id": "RFC-B-15",
+      "ieee754_hex": "444b1ae4d6e2ef4e",
+      "expected": "999999999999999700000"
+    },
+    {
+      "id": "RFC-B-16",
+      "ieee754_hex": "444b1ae4d6e2ef4f",
+      "expected": "999999999999999900000"
+    },
+    {
+      "id": "RFC-B-17",
+      "ieee754_hex": "444b1ae4d6e2ef50",
+      "expected": "1e+21"
+    },
+    {
+      "id": "RFC-B-18",
+      "ieee754_hex": "3eb0c6f7a0b5ed8c",
+      "expected": "9.999999999999997e-7"
+    },
+    {
+      "id": "RFC-B-19",
+      "ieee754_hex": "3eb0c6f7a0b5ed8d",
+      "expected": "0.000001"
+    },
+    {
+      "id": "RFC-B-20",
+      "ieee754_hex": "41b3de4355555553",
+      "expected": "333333333.3333332"
+    },
+    {
+      "id": "RFC-B-21",
+      "ieee754_hex": "41b3de4355555554",
+      "expected": "333333333.33333325"
+    },
+    {
+      "id": "RFC-B-22",
+      "ieee754_hex": "41b3de4355555555",
+      "expected": "333333333.3333333"
+    },
+    {
+      "id": "RFC-B-23",
+      "ieee754_hex": "41b3de4355555556",
+      "expected": "333333333.3333334"
+    },
+    {
+      "id": "RFC-B-24",
+      "ieee754_hex": "41b3de4355555557",
+      "expected": "333333333.33333343"
+    },
+    {
+      "id": "RFC-B-25",
+      "ieee754_hex": "becbf647612f3696",
+      "expected": "-0.0000033333333333333333"
+    },
+    {
+      "id": "RFC-B-26",
+      "ieee754_hex": "43143ff3c1cb0959",
+      "expected": "1424953923781206.2"
+    }
+  ]
+}

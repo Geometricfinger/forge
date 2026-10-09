@@ -1,0 +1,207 @@
+{
+  "scope": "Pre-change developer-authored diagnostic set; not independent holdout or real-world accuracy",
+  "cases": [
+    {
+      "id": "walrus_unknown_does_not_leave_false",
+      "source": "import trimesh\ndef f(a,b,flag):\n    s=False\n    if (s:=flag):\n        pass\n    return trimesh.registration.icp(a,b,scale=s,reflection=False)\n",
+      "profile": "geometry.rigid_icp_controls",
+      "expected": [
+        "NEEDS_CONTEXT"
+      ]
+    },
+    {
+      "id": "walrus_true_is_conflict",
+      "source": "import trimesh\ndef f(a,b,flag):\n    s=False\n    if (s:=True):\n        pass\n    return trimesh.registration.icp(a,b,scale=s,reflection=False)\n",
+      "profile": "geometry.rigid_icp_controls",
+      "expected": [
+        "CONTRADICTED_CALL_CONTRACT"
+      ]
+    },
+    {
+      "id": "conditional_return_stops_path",
+      "source": "import trimesh\ndef f(a,b,flag):\n    if True:\n        return a\n    return trimesh.registration.icp(a,b,scale=False,reflection=False)\n",
+      "profile": "geometry.rigid_icp_controls",
+      "expected": []
+    },
+    {
+      "id": "conditional_both_return_stops_path",
+      "source": "import trimesh\ndef f(a,b,flag):\n    if flag:\n        return a\n    else:\n        return b\n    return trimesh.registration.icp(a,b,scale=False,reflection=False)\n",
+      "profile": "geometry.rigid_icp_controls",
+      "expected": []
+    },
+    {
+      "id": "local_import_not_bound_before_execution",
+      "source": "\ndef f(a,b,flag):\n    x=trimesh.registration.icp(a,b,scale=False,reflection=False)\n    import trimesh\n    return x\n",
+      "profile": "geometry.rigid_icp_controls",
+      "expected": []
+    },
+    {
+      "id": "local_import_after_execution_is_bound",
+      "source": "\ndef f(a,b,flag):\n    import trimesh\n    return trimesh.registration.icp(a,b,scale=False,reflection=False)\n",
+      "profile": "geometry.rigid_icp_controls",
+      "expected": [
+        "STATIC_CANDIDATE"
+      ]
+    },
+    {
+      "id": "same_boolean_both_branches",
+      "source": "import trimesh\ndef f(a,b,flag):\n    if flag:\n        s=False\n    else:\n        s=False\n    return trimesh.registration.icp(a,b,scale=s,reflection=False)\n",
+      "profile": "geometry.rigid_icp_controls",
+      "expected": [
+        "STATIC_CANDIDATE"
+      ]
+    },
+    {
+      "id": "terminating_branch_does_not_pollute",
+      "source": "import trimesh\ndef f(a,b,flag):\n    s=False\n    if flag:\n        s=True\n        return None\n    return trimesh.registration.icp(a,b,scale=s,reflection=False)\n",
+      "profile": "geometry.rigid_icp_controls",
+      "expected": [
+        "STATIC_CANDIDATE"
+      ]
+    },
+    {
+      "id": "loop_copy_receiver",
+      "source": "import trimesh\ndef f(a,b,flag):\n    for item in a:\n        x=item.copy()\n        x.apply_scale(25.4)\n",
+      "profile": "geometry.scale_receiver_lineage",
+      "expected": [
+        "COPY_CALL_RESULT_RECEIVER"
+      ]
+    },
+    {
+      "id": "loop_direct_item_receiver",
+      "source": "import trimesh\ndef f(a,b,flag):\n    for item in a:\n        item.apply_scale(2)\n",
+      "profile": "geometry.scale_receiver_lineage",
+      "expected": [
+        "INPUT_ALIAS_RECEIVER"
+      ]
+    },
+    {
+      "id": "loop_earlier_iteration_invalidates_boolean",
+      "source": "import trimesh\ndef f(a,b,flag):\n    s=False\n    for item in a:\n        trimesh.registration.icp(a,b,scale=s,reflection=False)\n        s=True\n",
+      "profile": "geometry.rigid_icp_controls",
+      "expected": [
+        "NEEDS_CONTEXT"
+      ]
+    },
+    {
+      "id": "loop_local_assignment_before_use",
+      "source": "import trimesh\ndef f(a,b,flag):\n    for item in a:\n        s=False\n        trimesh.registration.icp(a,b,scale=s,reflection=False)\n",
+      "profile": "geometry.rigid_icp_controls",
+      "expected": [
+        "STATIC_CANDIDATE"
+      ]
+    },
+    {
+      "id": "input_alias_after_copy_still_input",
+      "source": "import trimesh\ndef f(a,b,flag):\n    x=a.copy()\n    x=b\n    x.apply_scale(2)\n",
+      "profile": "geometry.scale_receiver_lineage",
+      "expected": [
+        "INPUT_ALIAS_RECEIVER"
+      ]
+    },
+    {
+      "id": "dict_overwritten_status_not_abstention",
+      "source": "import trimesh\ndef f(a,b,flag):\n    return {\"status\":\"ambiguous\", \"status\":\"ok\"}\n",
+      "profile": "identification.explicit_nondecision",
+      "expected": []
+    },
+    {
+      "id": "dict_expansion_can_override_status",
+      "source": "import trimesh\ndef f(a,b,flag):\n    return {\"status\":\"ambiguous\", **flag}\n",
+      "profile": "identification.explicit_nondecision",
+      "expected": []
+    },
+    {
+      "id": "last_dict_key_is_explicit",
+      "source": "import trimesh\ndef f(a,b,flag):\n    return {**flag,\"status\":\"ambiguous\"}\n",
+      "profile": "identification.explicit_nondecision",
+      "expected": [
+        "EXPLICIT_NONDECISION_LITERAL"
+      ]
+    },
+    {
+      "id": "return_dictionary_via_name",
+      "source": "import trimesh\ndef f(a,b,flag):\n    result={\"status\":\"unknown\"}\n    return result\n",
+      "profile": "identification.explicit_nondecision",
+      "expected": [
+        "EXPLICIT_NONDECISION_LITERAL"
+      ]
+    },
+    {
+      "id": "return_dictionary_subscript_change",
+      "source": "import trimesh\ndef f(a,b,flag):\n    result={\"status\":\"unknown\"}\n    result[\"status\"]=\"ok\"\n    return result\n",
+      "profile": "identification.explicit_nondecision",
+      "expected": []
+    },
+    {
+      "id": "return_dictionary_alias_mutation",
+      "source": "import trimesh\ndef f(a,b,flag):\n    result={\"status\":\"unknown\"}\n    x=result\n    x.update({\"status\":\"ok\"})\n    return result\n",
+      "profile": "identification.explicit_nondecision",
+      "expected": []
+    },
+    {
+      "id": "return_dictionary_escapes_unknown_callee",
+      "source": "import trimesh\ndef f(a,b,flag):\n    result={\"status\":\"unknown\"}\n    flag(result)\n    return result\n",
+      "profile": "identification.explicit_nondecision",
+      "expected": []
+    },
+    {
+      "id": "conflicting_is_nondecision",
+      "source": "import trimesh\ndef f(a,b,flag):\n    return {\"status\":\"conflicting\"}\n",
+      "profile": "identification.explicit_nondecision",
+      "expected": [
+        "EXPLICIT_NONDECISION_LITERAL"
+      ]
+    },
+    {
+      "id": "insufficient_data_is_nondecision",
+      "source": "import trimesh\ndef f(a,b,flag):\n    return {\"status\":\"insufficient_data\"}\n",
+      "profile": "identification.explicit_nondecision",
+      "expected": [
+        "EXPLICIT_NONDECISION_LITERAL"
+      ]
+    },
+    {
+      "id": "plain_confidence_is_not_nondecision",
+      "source": "import trimesh\ndef f(a,b,flag):\n    return {\"confidence\":0.8}\n",
+      "profile": "identification.explicit_nondecision",
+      "expected": []
+    },
+    {
+      "id": "comment_is_not_call",
+      "source": "import trimesh\ndef f(a,b,flag):\n    \"\"\"scale=False reflection=False\"\"\"\n    return a\n",
+      "profile": "geometry.rigid_icp_controls",
+      "expected": []
+    },
+    {
+      "id": "parameter_default_not_actual_value",
+      "source": "import trimesh\ndef f(a,b,s=False):\n    return trimesh.registration.icp(a,b,scale=s,reflection=False)\n",
+      "profile": "geometry.rigid_icp_controls",
+      "expected": [
+        "NEEDS_CONTEXT"
+      ]
+    },
+    {
+      "id": "unsupported_match_invalidates_boolean",
+      "source": "import trimesh\ndef f(a,b,flag):\n    s=False\n    match flag:\n        case True:\n            s=True\n    return trimesh.registration.icp(a,b,scale=s,reflection=False)\n",
+      "profile": "geometry.rigid_icp_controls",
+      "expected": [
+        "NEEDS_CONTEXT"
+      ]
+    },
+    {
+      "id": "path_reassignment_clears_resolved_observation",
+      "source": "def f(root, other):\n x=root.resolve()\n x=other\n if not x.is_relative_to(root):\n  raise ValueError()\n return x\n",
+      "profile": "storage.resolved_path_guard",
+      "expected": []
+    },
+    {
+      "id": "path_containment_retained",
+      "source": "def f(root):\n x=root.resolve()\n if not x.is_relative_to(root):\n  raise ValueError()\n return x\n",
+      "profile": "storage.resolved_path_guard",
+      "expected": [
+        "STATIC_CANDIDATE"
+      ]
+    }
+  ]
+}

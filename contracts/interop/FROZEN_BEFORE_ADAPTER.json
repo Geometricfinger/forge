@@ -1,0 +1,9 @@
+{
+  "files": {
+    "contracts/interop/capability.json": "abf0c1fbcba536c8be247f76a3b543d09773dabab33a720b3ad645f50617d042",
+    "contracts/interop/rfc8785_numbers.json": "5aa923ceab5586ea3b309d7f25f5e59ab031f26017b801b395e4bffb6d2c35f3",
+    "contracts/interop/rfc8785_objects.json": "b09c890f8bbaf48bc466aa33903a1fa4e86a07dcfbc20e1d24fcfcea146ff191"
+  },
+  "independent_evaluator": false,
+  "external_specification": true
+}

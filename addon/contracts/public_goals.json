@@ -1,0 +1,29 @@
+{
+  "goals": [
+    {
+      "source": "libcst_name_provider.py",
+      "function": "QualifiedNameVisitor.on_visit",
+      "api": "libcst._metadata_dependent.LazyValue",
+      "goal": "Deferred metadata construction candidate."
+    },
+    {
+      "source": "libcst_name_provider.py",
+      "function": "FullyQualifiedNameProvider.gen_cache",
+      "api": "libcst.helpers.module.calculate_module_and_package",
+      "goal": "Package path context helper candidate."
+    },
+    {
+      "source": "scrapy_dupefilters.py",
+      "function": "RFPDupeFilter.__init__",
+      "api": "scrapy.utils.request.RequestFingerprinter",
+      "goal": "Request-fingerprint integration point."
+    },
+    {
+      "source": "scrapy_dupefilters.py",
+      "function": "RFPDupeFilter.from_crawler",
+      "api": "scrapy.utils.conf._job_dir",
+      "goal": "Crawl-state integration clue; private helper not approved public API."
+    }
+  ],
+  "authorship": "Developer selected after source review, before probe runs. Not held-out."
+}

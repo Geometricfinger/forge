@@ -1,0 +1,31 @@
+{
+  "schema": 1,
+  "id": "forge-self-understanding",
+  "title": "Find understanding implementation clues for FORGE",
+  "targets": [
+    {
+      "api": "ast.parse",
+      "capability": "python_syntax_tree"
+    },
+    {
+      "api": "ast.walk",
+      "capability": "syntax_tree_traversal"
+    },
+    {
+      "api": "symtable.symtable",
+      "capability": "compiler_scope_table"
+    },
+    {
+      "api": "libcst.parse_module",
+      "capability": "concrete_syntax_tree"
+    },
+    {
+      "api": "libcst.helpers.module.calculate_module_and_package",
+      "capability": "package_name_context"
+    },
+    {
+      "api": "libcst._metadata_dependent.LazyValue",
+      "capability": "deferred_metadata_computation"
+    }
+  ]
+}

@@ -1,0 +1,50 @@
+{
+  "note": "Known, intentional matches. Each entry allows one pattern only in one file. Keep this list short and review every addition.",
+  "entries": [
+    {
+      "path": "forge_core/corpus.py",
+      "contains": "https://drive.google.com/file/d/'+row['file_id']+'/view",
+      "reason": "Generic URL template for the optional Google Drive source provider; no file ID."
+    },
+    {
+      "path": "tests/test_corpus.py",
+      "contains": "https://drive.google.com/file/d/'+fid+'/view",
+      "reason": "Test builds the template with a synthetic ID."
+    },
+    {
+      "path": "tests/test_research_retrieval.py",
+      "contains": "https://drive.google.com/file/d/'+fid+'/view",
+      "reason": "Test builds the template with a synthetic ID."
+    },
+    {
+      "path": "tests/test_workbench.py",
+      "contains": "github_pat_secret",
+      "reason": "Fake token proving the query policy rejects tokens."
+    },
+    {
+      "path": "tests/test_workbench.py",
+      "contains": "password:hello",
+      "reason": "Fake query proving the policy rejects credentials."
+    },
+    {
+      "path": "tests/test_opportunities.py",
+      "contains": "name:password@example.org",
+      "reason": "Fake URL proving credentials in URIs are rejected."
+    },
+    {
+      "path": "addon/tool/test_addon.py",
+      "contains": "secret=\"DO_NOT_COPY_THIS_LITERAL_91381\"",
+      "reason": "Fake literal proving the scanner does not copy secret values."
+    },
+    {
+      "path": "hound/tests/test_flow_review.py",
+      "contains": "secret=\"do-not-copy-secret\"",
+      "reason": "Fake literal proving the scanner does not copy secret values."
+    },
+    {
+      "path": "hound/tests/test_hound.py",
+      "contains": "secret=\"DO_NOT_RETAIN_ABC123\"",
+      "reason": "Fake literal proving the scanner does not retain secret values."
+    }
+  ]
+}

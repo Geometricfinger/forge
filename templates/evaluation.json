@@ -1,0 +1,60 @@
+{
+  "schema": 1,
+  "template": "evaluation",
+  "title": "Find evaluation implementation clues for FORGE",
+  "public_brief": "Find evaluation implementation clues for FORGE",
+  "queries": [
+    "python stateful testing in:name,description"
+  ],
+  "path_terms": [
+    "state",
+    "test",
+    "check",
+    "validate"
+  ],
+  "profile": {
+    "schema": 1,
+    "id": "forge-self-evaluation",
+    "title": "Find evaluation implementation clues for FORGE",
+    "targets": [
+      {
+        "api": "unittest.defaultTestLoader.discover",
+        "capability": "test_discovery"
+      },
+      {
+        "api": "unittest.TextTestRunner",
+        "capability": "test_runner_construction"
+      },
+      {
+        "api": "hypothesis.stateful.run_state_machine_as_test",
+        "capability": "generated_action_sequences"
+      },
+      {
+        "api": "hypothesis.given",
+        "capability": "property_based_cases"
+      },
+      {
+        "api": "subprocess.run",
+        "capability": "subprocess_execution_candidate"
+      }
+    ]
+  },
+  "limits": {
+    "max_requests": 20,
+    "max_repos": 2,
+    "max_files": 4,
+    "files_per_repo": 2,
+    "max_source_bytes": 150000,
+    "max_total_source_bytes": 500000,
+    "max_response_bytes": 1000000,
+    "max_attempts": 2
+  },
+  "permitted_licenses": [
+    "MIT",
+    "Apache-2.0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "CC0-1.0",
+    "Unlicense"
+  ]
+}

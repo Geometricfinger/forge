@@ -1,0 +1,172 @@
+{
+  "schema": 1,
+  "scope": "Developer-authored fixed local semantics contract; not independent holdout",
+  "cases": [
+    {
+      "id": "for_else_assigns_true",
+      "source": "import trimesh\ndef f(a,b,flag,fn):\n    s=False\n    for x in a:\n        pass\n    else:\n        s=True\n    trimesh.registration.icp(a,b,scale=s,reflection=False)\n",
+      "profile": "geometry.rigid_icp_controls",
+      "expected": [
+        "CONTRADICTED_CALL_CONTRACT"
+      ],
+      "rationale": "An exhausted loop runs else; surviving normal completion has s=True."
+    },
+    {
+      "id": "for_else_terminates",
+      "source": "import trimesh\ndef f(a,b,flag,fn):\n    for x in a:\n        pass\n    else:\n        return None\n    trimesh.registration.icp(a,b,scale=s,reflection=False)\n",
+      "profile": "geometry.rigid_icp_controls",
+      "expected": [],
+      "rationale": "No break exists; else returns before the later call."
+    },
+    {
+      "id": "empty_for_skips_body",
+      "source": "import trimesh\ndef f(a,b,flag,fn):\n    for x in []:\n        trimesh.registration.icp(a,b,scale=False,reflection=False)\n",
+      "profile": "geometry.rigid_icp_controls",
+      "expected": [],
+      "rationale": "Literal empty iterable has no body execution."
+    },
+    {
+      "id": "empty_for_uses_else",
+      "source": "import trimesh\ndef f(a,b,flag,fn):\n    s=False\n    for x in []:\n        s=False\n    else:\n        s=True\n    trimesh.registration.icp(a,b,scale=s,reflection=False)\n",
+      "profile": "geometry.rigid_icp_controls",
+      "expected": [
+        "CONTRADICTED_CALL_CONTRACT"
+      ],
+      "rationale": "Empty literal executes else."
+    },
+    {
+      "id": "for_else_boolean_survives",
+      "source": "import trimesh\ndef f(a,b,flag,fn):\n    for x in a:\n        s=True\n    else:\n        s=False\n    trimesh.registration.icp(a,b,scale=s,reflection=False)\n",
+      "profile": "geometry.rigid_icp_controls",
+      "expected": [
+        "STATIC_CANDIDATE"
+      ],
+      "rationale": "Normal loop completion overwrites s with False."
+    },
+    {
+      "id": "list_mutation_invalidates_unpack",
+      "source": "import trimesh\ndef f(a,b,flag,fn):\n    flags=[False,False]\n    flags[0]=True\n    s,r=flags\n    trimesh.registration.icp(a,b,scale=s,reflection=r)\n",
+      "profile": "geometry.rigid_icp_controls",
+      "expected": [
+        "NEEDS_CONTEXT"
+      ],
+      "rationale": "Mutable list cannot retain stale elements after assignment."
+    },
+    {
+      "id": "list_alias_mutation_invalidates_unpack",
+      "source": "import trimesh\ndef f(a,b,flag,fn):\n    flags=[False,False]\n    alias=flags\n    alias.append(True)\n    s,r=flags\n    trimesh.registration.icp(a,b,scale=s,reflection=r)\n",
+      "profile": "geometry.rigid_icp_controls",
+      "expected": [
+        "NEEDS_CONTEXT"
+      ],
+      "rationale": "Mutation through alias invalidates element assumptions."
+    },
+    {
+      "id": "clean_list_unpack",
+      "source": "import trimesh\ndef f(a,b,flag,fn):\n    flags=[False,False]\n    s,r=flags\n    trimesh.registration.icp(a,b,scale=s,reflection=r)\n",
+      "profile": "geometry.rigid_icp_controls",
+      "expected": [
+        "STATIC_CANDIDATE"
+      ],
+      "rationale": "Unchanged literal list has explicit controls."
+    },
+    {
+      "id": "hidden_dict_escape",
+      "source": "import trimesh\ndef f(a,b,flag,fn):\n    d={\"status\":\"unknown\"}\n    box={\"payload\":d}\n    fn(box)\n    return d\n",
+      "profile": "identification.explicit_nondecision",
+      "expected": [],
+      "rationale": "Unknown callback may modify a dictionary held in an outer dict."
+    },
+    {
+      "id": "nested_list_escape",
+      "source": "import trimesh\ndef f(a,b,flag,fn):\n    d={\"status\":\"unknown\"}\n    box=[[d]]\n    fn(box)\n    return d\n",
+      "profile": "identification.explicit_nondecision",
+      "expected": [],
+      "rationale": "Nested mutable references cannot stay certified after escape."
+    },
+    {
+      "id": "dict_without_escape",
+      "source": "import trimesh\ndef f(a,b,flag,fn):\n    d={\"status\":\"unknown\"}\n    box={\"payload\":d}\n    return d\n",
+      "profile": "identification.explicit_nondecision",
+      "expected": [
+        "EXPLICIT_NONDECISION_LITERAL"
+      ],
+      "rationale": "Creating another reference does not itself mutate the dictionary."
+    },
+    {
+      "id": "finally_override",
+      "source": "import trimesh\ndef f(a,b,flag,fn):\n    try:\n        return {\"status\":\"unknown\"}\n    finally:\n        return {\"status\":\"ok\"}\n",
+      "profile": "identification.explicit_nondecision",
+      "expected": [
+        "NONDECISION_REQUIRES_CONTROL_FLOW_REVIEW"
+      ],
+      "rationale": "A pending return may be overridden by finally; do not certify it."
+    },
+    {
+      "id": "finally_mutates_pending",
+      "source": "import trimesh\ndef f(a,b,flag,fn):\n    d={\"status\":\"unknown\"}\n    try:\n        return d\n    finally:\n        d[\"status\"]=\"ok\"\n",
+      "profile": "identification.explicit_nondecision",
+      "expected": [
+        "NONDECISION_REQUIRES_CONTROL_FLOW_REVIEW"
+      ],
+      "rationale": "Finalization may alter the same pending result object."
+    },
+    {
+      "id": "with_exit_uncertain",
+      "source": "import trimesh\ndef f(a,b,flag,fn):\n    with fn():\n        d={\"status\":\"unknown\"}\n        return d\n",
+      "profile": "identification.explicit_nondecision",
+      "expected": [
+        "NONDECISION_REQUIRES_CONTROL_FLOW_REVIEW"
+      ],
+      "rationale": "Context manager exit can change control flow; positive return withheld."
+    },
+    {
+      "id": "literal_false_comprehension",
+      "source": "import trimesh\ndef f(a,b,flag,fn):\n    [trimesh.registration.icp(a,b,scale=False,reflection=False) for x in a if False]\n",
+      "profile": "geometry.rigid_icp_controls",
+      "expected": [],
+      "rationale": "A literal False comprehension guard prevents evaluation of the element."
+    },
+    {
+      "id": "empty_comprehension",
+      "source": "import trimesh\ndef f(a,b,flag,fn):\n    [trimesh.registration.icp(a,b,scale=False,reflection=False) for x in []]\n",
+      "profile": "geometry.rigid_icp_controls",
+      "expected": [],
+      "rationale": "No element expression runs in an empty literal comprehension."
+    },
+    {
+      "id": "unknown_comprehension_retains_candidate",
+      "source": "import trimesh\ndef f(a,b,flag,fn):\n    [trimesh.registration.icp(a,b,scale=False,reflection=False) for x in a if flag]\n",
+      "profile": "geometry.rigid_icp_controls",
+      "expected": [
+        "STATIC_CANDIDATE"
+      ],
+      "rationale": "Unknown filter may allow a call; an observation is not a reachability proof."
+    },
+    {
+      "id": "suspension_invalidates_dict",
+      "source": "import trimesh\ndef f(a,b,flag,fn):\n    d={\"status\":\"unknown\"}\n    yield d\n    return d\n",
+      "profile": "identification.explicit_nondecision",
+      "expected": [],
+      "rationale": "Yielded mutable dictionary can be changed before generator resumes."
+    },
+    {
+      "id": "generator_fresh_return",
+      "source": "import trimesh\ndef f(a,b,flag,fn):\n    yield 1\n    return {\"status\":\"unknown\"}\n",
+      "profile": "identification.explicit_nondecision",
+      "expected": [
+        "GENERATOR_RETURN_REQUIRES_REVIEW"
+      ],
+      "rationale": "Generator return becomes StopIteration.value, not an ordinary returned mapping."
+    },
+    {
+      "id": "assert_false_terminates",
+      "source": "import trimesh\ndef f(a,b,flag,fn):\n    assert False\n    trimesh.registration.icp(a,b,scale=False,reflection=False)\n",
+      "profile": "geometry.rigid_icp_controls",
+      "expected": [
+        "STATIC_CANDIDATE"
+      ],
+      "rationale": "Assertions can be stripped by optimization; retain a conditional call observation, not a guaranteed reachability claim."
+    }
+  ]
+}

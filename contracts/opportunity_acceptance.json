@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "feature": "Workflow opportunity discovery",
+  "author": "Forge contributors; developer-authored requirements",
+  "requirements": [
+    "Generate hypotheses from unmet workflow information requirements, not product-name recombinations",
+    "Keep not-described, explicitly-missing, manual, supported and contradictory evidence distinct",
+    "Exact evidence quotes must match source text and offsets; bind all input versions",
+    "A snippet demonstrates what the source says, not semantic truth or market demand",
+    "Deduplicate repeated text, source families and declared derivative sources before counting corroboration",
+    "Never treat code, advertisements or synthetic fixtures as independent user-demand observations",
+    "Discard stale evidence from support while retaining it for review; future dates rejected",
+    "Do not turn a related-domain existing product into proof that a target workflow is solved",
+    "Purpose and mechanism are separate; assumptions and prerequisites accompany analogies",
+    "Link generated code investigations through existing corpus search with actual source identities",
+    "Code retrieval never promotes technical readiness, demand, novelty or rights",
+    "Emit both a concrete concept and a disconfirmation/experiment plan",
+    "Keep rejected ideas and feedback without changing truth gates",
+    "No network, execution, installation or deployment is authorized by document text",
+    "CLI and authenticated local HTTP use the same evaluation implementation",
+    "Persist immutable runs, return repeat results idempotently, detect changed bytes",
+    "Input/file/output bounds, private-public separation and source sampling limitations remain visible",
+    "Retain all baseline tests; evaluate useful and misleading opportunities, refine actual failures",
+    "Report rule-based and reviewer-supplied reasoning, not autonomous models",
+    "No approval state may claim a validated business or production-ready generated application"
+  ],
+  "release_approved": false,
+  "independent_evaluation": false
+}

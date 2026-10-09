@@ -1,0 +1,16 @@
+{"schema":1,"id":"probe","title":"probe","targets":[
+{"api":"pickle.load","capability":"deser_pickle_load"},
+{"api":"subprocess.run","capability":"proc_run"},
+{"api":"subprocess.Popen","capability":"proc_popen"},
+{"api":"os.system","capability":"os_system"},
+{"api":"yaml.load","capability":"yaml_load"},
+{"api":"tarfile.open","capability":"tar_open"},
+{"api":"tarfile.TarFile.extractall","capability":"tar_extractall"},
+{"api":"zipfile.ZipFile.extractall","capability":"zip_extractall"},
+{"api":"sqlite3.connect","capability":"sqlite_connect"},
+{"api":"sqlite3.Cursor.execute","capability":"sqlite_execute"},
+{"api":"sqlite3.Connection.cursor","capability":"sqlite_cursor"},
+{"api":"builtins.eval","capability":"eval"},
+{"api":"builtins.exec","capability":"exec"},
+{"api":"xml.etree.ElementTree.fromstring","capability":"xml_parse"}
+]}

@@ -1,0 +1,16 @@
+{"schema":1,"title":"JSON evidence fingerprint","objective":"Choose a JSON-record fingerprint adapter that tolerates key order and formatting changes while rejecting ambiguous or invalid inputs.","cases":[
+{"id":"key_order","label":"Object key order does not change the digest","mode":"equal","a":"{\"b\":2,\"a\":1}","b":"{\"a\":1,\"b\":2}"},
+{"id":"nested_order","label":"Nested object key order is normalized","mode":"equal","a":"{\"v\":{\"b\":2,\"a\":1}}","b":"{\"v\":{\"a\":1,\"b\":2}}"},
+{"id":"formatting","label":"Whitespace does not change the digest","mode":"equal","a":"{ \"a\" : 1 }","b":"{\"a\":1}"},
+{"id":"escaped_text","label":"Equivalent JSON string escapes have equal digests","mode":"equal","a":"{\"name\":\"caf\\u00e9\"}","b":"{\"name\":\"café\"}"},
+{"id":"content_change","label":"A value change changes the digest in this fixture","mode":"different","a":"{\"value\":1}","b":"{\"value\":2}"},
+{"id":"array_order","label":"Array order remains significant","mode":"different","a":"{\"value\":[1,2]}","b":"{\"value\":[2,1]}"},
+{"id":"duplicate_key","label":"Repeated object keys are rejected","mode":"reject","a":"{\"a\":1,\"a\":2}"},
+{"id":"nested_duplicate","label":"Nested repeated keys are rejected","mode":"reject","a":"{\"v\":{\"a\":1,\"a\":2}}"},
+{"id":"not_a_number","label":"NaN is rejected","mode":"reject","a":"{\"a\":NaN}"},
+{"id":"infinity","label":"Infinity is rejected","mode":"reject","a":"{\"a\":Infinity}"},
+{"id":"overflow","label":"Nonfinite numeric overflow is rejected","mode":"reject","a":"{\"a\":1e9999}"},
+{"id":"object_only","label":"The adapter requires an object record","mode":"reject","a":"[1,2]"},
+{"id":"empty_input","label":"Empty input is rejected","mode":"reject","a":""},
+{"id":"invalid_json","label":"Malformed JSON is rejected","mode":"reject","a":"{not-json}"}
+]}

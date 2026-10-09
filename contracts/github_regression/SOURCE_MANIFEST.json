@@ -1,0 +1,65 @@
+{
+  "schema": 1,
+  "prepared_utc": "2026-09-21T05:31:56.092226+00:00",
+  "files": [
+    {
+      "repository": "jd/tenacity",
+      "commit": "3e58094d3bc414975aad9eadf343a32bdb3b89b3",
+      "path": "tenacity/wait.py",
+      "git_blob_sha1": "6607e4fd94f780a67f827a348e8b8c99c7229134",
+      "sha256": "fab8c53ae00dda64008a70c03654f22e059f3d697c3c8a6029513910fa7179fc",
+      "bytes": 11543,
+      "source_url": "https://github.com/jd/tenacity/blob/3e58094d3bc414975aad9eadf343a32bdb3b89b3/tenacity/wait.py",
+      "acquisition": "CONNECTED_GITHUB_FETCH_FILE_UTF8_VERIFIED",
+      "rights_status": "NOT_REVIEWED_FOR_REUSE"
+    },
+    {
+      "repository": "jd/tenacity",
+      "commit": "3e58094d3bc414975aad9eadf343a32bdb3b89b3",
+      "path": "tenacity/stop.py",
+      "git_blob_sha1": "c1f51ea98b6b02750e09ae2da411e6416e0d384b",
+      "sha256": "bd4b852e18e886fc271da51760c39fe49ff4174f916f07f3565c280f4f2d2c71",
+      "bytes": 4235,
+      "source_url": "https://github.com/jd/tenacity/blob/3e58094d3bc414975aad9eadf343a32bdb3b89b3/tenacity/stop.py",
+      "acquisition": "CONNECTED_GITHUB_FETCH_FILE_UTF8_VERIFIED",
+      "rights_status": "NOT_REVIEWED_FOR_REUSE"
+    },
+    {
+      "repository": "jd/tenacity",
+      "commit": "3e58094d3bc414975aad9eadf343a32bdb3b89b3",
+      "path": "tenacity/_utils.py",
+      "git_blob_sha1": "96c9e99f250b27c9e4b2657584dc1ed2bb572d79",
+      "sha256": "6ecccb8012d314f5000d75a5a01a1e3257ab1a3d727a21b457e2c922fbe3e79e",
+      "bytes": 4094,
+      "source_url": "https://github.com/jd/tenacity/blob/3e58094d3bc414975aad9eadf343a32bdb3b89b3/tenacity/_utils.py",
+      "acquisition": "CONNECTED_GITHUB_FETCH_FILE_UTF8_VERIFIED",
+      "rights_status": "NOT_REVIEWED_FOR_REUSE"
+    },
+    {
+      "repository": "untitaker/python-atomicwrites",
+      "commit": "4183999d9b7e81af85dee070d5311299bdf5164c",
+      "path": "atomicwrites/__init__.py",
+      "git_blob_sha1": "669191bb5fbcc5fca2b8c8f53e9b94c28596274a",
+      "sha256": "9b2bf1bca4416fbbde6cf4d2522028a6c46bbec9ba5688e202f113d71a214fee",
+      "bytes": 6970,
+      "source_url": "https://github.com/untitaker/python-atomicwrites/blob/4183999d9b7e81af85dee070d5311299bdf5164c/atomicwrites/__init__.py",
+      "acquisition": "CONNECTED_GITHUB_FETCH_FILE_UTF8_VERIFIED",
+      "rights_status": "NOT_REVIEWED_FOR_REUSE"
+    },
+    {
+      "repository": "networkx/networkx",
+      "commit": "bd45cfe38f6e4eb3aac1aca073acad24285b87de",
+      "path": "networkx/utils/union_find.py",
+      "git_blob_sha1": "2a07129f5427cd8a3caf30095efee125bc3d853b",
+      "sha256": "3712a5065c92ef50355a59eddbc2fec3266823d13166f26d87fd1ed97495ae2b",
+      "bytes": 3338,
+      "source_url": "https://github.com/networkx/networkx/blob/bd45cfe38f6e4eb3aac1aca073acad24285b87de/networkx/utils/union_find.py",
+      "acquisition": "CONNECTED_GITHUB_FETCH_FILE_UTF8_VERIFIED",
+      "rights_status": "NOT_REVIEWED_FOR_REUSE"
+    }
+  ],
+  "source_bodies_included": false,
+  "entire_repositories_scanned": false,
+  "acquisition_note": "Approved connector reads; text staged verbatim and matched Git blob SHA-1. No whole repository clones. Six complete files, not excerpts.",
+  "selection_note": "Bounded purposive sample."
+}
