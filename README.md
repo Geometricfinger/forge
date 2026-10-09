@@ -10,6 +10,8 @@ It never executes the code it inspects, makes no model calls, and needs no netwo
 
 <sub>The demo above runs `examples/demo/run_demo.py` and `corpus-search` on the bundled synthetic source. A replayable recording is in [`docs/media/forge-demo.cast`](docs/media/forge-demo.cast) (`asciinema play docs/media/forge-demo.cast`).</sub>
 
+**Using an AI coding agent?** Point it at [`AGENTS.md`](AGENTS.md). It has tested, step-by-step instructions for running Forge on a Python codebase and reading the results.
+
 ## Features
 
 - **Static, read-only analysis.** Hound parses Python source and reports a call only when it can bind it to a declared import. It never imports or runs the code it inspects.
