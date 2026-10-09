@@ -34,7 +34,7 @@ Thank you for your interest in improving Forge. This guide explains how to propo
    python3 tools/update_analyzer_manifests.py
    ```
 
-5. Open a pull request using the template. All checks must pass before a change can be merged.
+5. Open a pull request using the template. CI (`.github/workflows/qualification.yml`) re-runs the pre-publish check, `verify.py`, the runner tests and both demos on Python 3.11 and 3.13 against your pull request's head commit, and uploads the evidence as the artifact `forge-verification-<commit-sha>-py<version>`. Every commit on `main` is verified the same way. The `qualify (Python 3.11)` and `qualify (Python 3.13)` checks must pass before a change can be merged.
 
 ## Reporting bugs and requesting features
 

@@ -83,6 +83,10 @@ python3 verify.py --out /tmp/forge-qualification        # Full qualification (al
 
 Output folders must be new and outside the repository.
 
+### Continuous verification
+
+Every push to `main` and every pull request runs the same checks in GitHub Actions ([`.github/workflows/qualification.yml`](.github/workflows/qualification.yml)) on Python 3.11 and 3.13: the pre-publish check over the full git history, the full qualification (`verify.py`), the research-runner tests and both demos. Each run publishes its evidence (the `verify.py` output, test logs, demo output, `provenance.json` and `SHA256SUMS.txt`) as a workflow artifact named `forge-verification-<commit-sha>-py<version>`, bound to the exact commit it checked. Branch protection on `main` requires these checks to pass. CI evidence comes from the project's own pipeline, so it shows the checks ran on that commit; it is not an independent evaluation.
+
 ## Limits
 
 - Results are static observations and lexical leads, not runtime guarantees, quality scores or permission to reuse code. A missing match does not prove a capability is absent.

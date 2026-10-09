@@ -1,0 +1,148 @@
+# Forge qualification CI.
+#
+# Runs the full qualification (verify.py), both demos, the research-runner tests and the
+# pre-publish check on every push to main and every pull request, then publishes the
+# verification evidence as an artifact bound to the exact commit SHA.
+#
+# Pull requests are qualified at the PR head commit itself (not GitHub's synthetic merge
+# commit), so the evidence names the same SHA that lands on main when the branch is
+# fast-forwarded.
+#
+# Only GitHub-official actions are used, each pinned to a full commit SHA (tag in the comment).
+name: Qualification
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash   # bash -eo pipefail, so a failing command piped into tee still fails the step
+
+concurrency:
+  group: qualification-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  qualify:
+    name: qualify (Python ${{ matrix.python }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.13"]
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONHASHSEED: "0"
+    steps:
+      - name: Check out the exact commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0            # prepublish --history scans every commit
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python }}
+
+      # Node is only the independent JSON-canonicalization reference used by verify.py.
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+
+      - name: Prepare evidence folder (outside the checkout)
+        run: |
+          EVIDENCE="$RUNNER_TEMP/forge-evidence"
+          echo "EVIDENCE=$EVIDENCE" >> "$GITHUB_ENV"
+          mkdir -p "$EVIDENCE"
+          python3 -c 'import sqlite3; c=sqlite3.connect(":memory:"); c.execute("create virtual table t using fts5(x)")'
+          python3 --version | tee "$EVIDENCE/python-version.txt"
+          node --version | tee "$EVIDENCE/node-version.txt"
+
+      - name: Pre-publish check (secrets, home paths, optional private denylist)
+        env:
+          DENYLIST: ${{ secrets.FORGE_DENYLIST }}
+        run: |
+          if [ -n "$DENYLIST" ]; then
+            umask 077
+            printf '%s\n' "$DENYLIST" > "$RUNNER_TEMP/denylist.txt"
+            FORGE_DENYLIST="$RUNNER_TEMP/denylist.txt" python3 tools/prepublish_check.py --require-denylist --history
+            rm -f "$RUNNER_TEMP/denylist.txt"
+          else
+            echo "::notice::FORGE_DENYLIST secret not available (for example on fork PRs); running built-in patterns only."
+            python3 tools/prepublish_check.py --history
+          fi
+
+      - name: Full qualification (verify.py)
+        run: python3 verify.py --out "$EVIDENCE/qualification" | tee "$EVIDENCE/verify-stdout.json"
+
+      - name: Research runner tests
+        working-directory: runner
+        run: python3 -m unittest discover -s tests 2>&1 | tee "$EVIDENCE/runner-tests.log"
+
+      - name: Research runner demo
+        run: python3 runner/run_demo.py --out "$EVIDENCE/runner-demo" | tee "$EVIDENCE/runner-demo.json"
+
+      - name: Public demo
+        run: python3 examples/demo/run_demo.py --out "$EVIDENCE/public-demo" | tee "$EVIDENCE/public-demo.json"
+
+      - name: Bind evidence to the commit
+        if: always()
+        env:
+          COMMIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          REF: ${{ github.ref }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$COMMIT_SHA"
+          cd "$EVIDENCE"
+          python3 - <<'PY'
+          import hashlib, json, os, pathlib
+          root = pathlib.Path('.')
+          files = sorted(p for p in root.rglob('*')
+                         if p.is_file() and p.parts[:2] != ('qualification', 'home') and p.name not in ('provenance.json', 'SHA256SUMS.txt'))
+          ver = root / 'qualification' / 'verification.json'
+          provenance = {
+              'commit_sha': os.environ['COMMIT_SHA'],
+              'ref': os.environ['REF'],
+              'run_id': os.environ['RUN_ID'],
+              'run_attempt': os.environ['RUN_ATTEMPT'],
+              'job_status': os.environ['JOB_STATUS'],
+              'python': (root / 'python-version.txt').read_text().strip() if (root / 'python-version.txt').exists() else None,
+              'verification_status': json.loads(ver.read_text()).get('status') if ver.exists() else 'MISSING',
+              'verification_sha256': hashlib.sha256(ver.read_bytes()).hexdigest() if ver.exists() else None,
+              'files': {str(p): hashlib.sha256(p.read_bytes()).hexdigest() for p in files},
+          }
+          (root / 'provenance.json').write_text(json.dumps(provenance, indent=2, sort_keys=True) + '\n')
+          PY
+          find . -type f ! -path './qualification/home/*' ! -name SHA256SUMS.txt -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS.txt
+          {
+            echo "### Forge qualification for \`$COMMIT_SHA\`"
+            echo
+            echo "| Field | Value |"
+            echo "|---|---|"
+            echo "| Python | $(cat python-version.txt 2>/dev/null || echo unknown) |"
+            echo "| verify.py status | $(python3 -c 'import json;print(json.load(open("provenance.json"))["verification_status"])') |"
+            echo "| verification.json sha256 | \`$(python3 -c 'import json;print(json.load(open("provenance.json"))["verification_sha256"])')\` |"
+            echo "| Artifact | \`forge-verification-$COMMIT_SHA-py${{ matrix.python }}\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload verification evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: forge-verification-${{ github.event.pull_request.head.sha || github.sha }}-py${{ matrix.python }}
+          path: |
+            ${{ env.EVIDENCE }}
+            !${{ env.EVIDENCE }}/qualification/home
+          if-no-files-found: error
+          retention-days: 90
