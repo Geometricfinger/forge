@@ -1,0 +1,9 @@
+{
+  "schema": 1,
+  "title": "Reuse review",
+  "objective": "Decide whether a candidate found by this mission can be reused for the stated task, after a person reviews its scope, dependencies and licence.",
+  "requirements": [
+    {"id": "scope", "label": "Candidate does what the mission asked for", "kind": "review", "required": true},
+    {"id": "dependencies", "label": "Dependencies and licence were reviewed", "kind": "review", "required": true}
+  ]
+}

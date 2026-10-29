@@ -112,6 +112,12 @@ def main():
     if a.history and (ROOT / '.git').exists():
         git = lambda *x: subprocess.run(['git', '-C', str(ROOT), *x], capture_output=True, text=True, errors='replace', check=True).stdout
         meta = git('log', '--all', '--format=%H%x00%an%x00%ae%x00%cn%x00%ce%x00%B%x00%x01')
+        # Allowlisted commit identities (path 'git:commit-metadata') are removed before
+        # scanning, so only that exact public identity is exempt; the rest of each
+        # line (other identities, commit messages) is still scanned.
+        for e in allow:
+            if e['path'] == 'git:commit-metadata':
+                meta = meta.replace(e['contains'], '')
         scan_text('git:commit-metadata', meta, patterns, allow, findings)
         objs = git('rev-list', '--all', '--objects').splitlines(); blobs = 0
         for row in objs:

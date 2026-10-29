@@ -1,0 +1,21 @@
+{
+  "files": [
+    {
+      "file_id": "local_754b6dc3f8728b1991298d83",
+      "path": "notes.md",
+      "provider": "local",
+      "sha256": "fc771ea4b49c3b4475d9988e63b9ae90b6b4d5f4d7816769a6b119b56f57b08a",
+      "size": 109,
+      "source_url": "local://notes.md"
+    },
+    {
+      "file_id": "local_ff6e7fa63e5f3e90bbf9e6b5",
+      "path": "pkg/digest.py",
+      "provider": "local",
+      "sha256": "6ab4354033c46965742b7914d9fba93665570248cfa1a17d70f1677c487074af",
+      "size": 455,
+      "source_url": "local://pkg/digest.py"
+    }
+  ],
+  "schema": 1
+}

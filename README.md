@@ -71,10 +71,70 @@ python3 forge.py --home /tmp/forge-home serve          # web UI on 127.0.0.1
 
 See `examples/demo/README.md` for how to point Forge at your own code. A workspace (`--home`) must be outside the repository. The default is `~/.forge-workbench-0.8.4` (a fixed folder name, not the release version).
 
+### Analyse your own folder
+
+Point Forge at a plain folder; no manifest needed:
+
+```sh
+python3 forge.py --home ~/forge-home corpus-run --source-root examples/hello_local --run-id first
+python3 forge.py --home ~/forge-home --human corpus-search --run-id first --query "subprocess.run" --distinct
+python3 forge.py --home ~/forge-home corpus-context --run-id first --definition <definition_id from the search>
+```
+
+Replace `examples/hello_local` with your own folder. Forge reads `.py .pyi .pyw .ipynb .zip .txt .md .markdown .rst` files (hidden files and symlinks are skipped), records their structure and **never runs them**. A `--run-id` is pinned to the exact folder contents, so use a new id after you edit files.
+
+**Output.** Results are one line of JSON by default (good for scripts). Add `--human` for a readable summary or `--pretty` for indented JSON, anywhere on the command line. When Forge refuses something it prints `"status": "BLOCKED"` with a `reason` code; [docs/ERROR_CODES.md](docs/ERROR_CODES.md) explains every code.
+
+#### Manifests (optional)
+
+A manifest pins each file by size and SHA-256 so a run can be reproduced later. Generate one for a folder:
+
+```sh
+python3 forge.py make-manifest examples/hello_local --out ./hello_manifest.json
+python3 forge.py --home ~/forge-home corpus-run --source-root examples/hello_local \
+    --manifest ./hello_manifest.json --run-id hello --profile templates/corpus_profile.json
+```
+
+This is the result, shipped as `examples/hello_local.manifest.json` (the tests check that it still matches the folder):
+
+<!-- manifest-example -->
+```json
+{
+  "files": [
+    {
+      "file_id": "local_754b6dc3f8728b1991298d83",
+      "path": "notes.md",
+      "provider": "local",
+      "sha256": "fc771ea4b49c3b4475d9988e63b9ae90b6b4d5f4d7816769a6b119b56f57b08a",
+      "size": 109,
+      "source_url": "local://notes.md"
+    },
+    {
+      "file_id": "local_ff6e7fa63e5f3e90bbf9e6b5",
+      "path": "pkg/digest.py",
+      "provider": "local",
+      "sha256": "6ab4354033c46965742b7914d9fba93665570248cfa1a17d70f1677c487074af",
+      "size": 455,
+      "source_url": "local://pkg/digest.py"
+    }
+  ],
+  "schema": 1
+}
+```
+
+Each row needs `file_id` (unique, any id), `path` (relative to `--source-root`), `size`, `sha256` and `source_url`. `provider` is one of:
+
+| provider | `source_url` must be | use for |
+|---|---|---|
+| `local` | `local://<path>` | files on your disk |
+| `github` | `https://github.com/OWNER/REPO/tree/COMMIT` | pinned GitHub envelopes |
+| `gdrive` (default) | the Google Drive file view URL for `file_id` | files downloaded from Google Drive |
+| `synthetic` | `fixture://<file_id>` | built-in test fixtures |
+
 ## Running the tests
 
 ```sh
-python3 run_tests.py --out /tmp/forge-tests             # Workbench suite (785 tests)
+python3 run_tests.py --out /tmp/forge-tests             # Workbench suite (797 tests)
 python3 hound/run_tests.py --out /tmp/hound-tests       # Hound suite (483 tests)
 (cd runner && python3 -m unittest discover -s tests)   # Research runner (64 tests)
 python3 runner/run_demo.py --out /tmp/forge-research    # Research runner demo mission
