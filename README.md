@@ -117,3 +117,7 @@ The current release is **0.8.4** (`python3 forge.py --version`). Hound, the add-
 ## License
 
 Apache License 2.0. See `LICENSE` and `NOTICE`. Copyright 2026 Forge contributors.
+
+## Say hi 👋
+
+Thanks for stopping by! It's totally okay to just say hi. If you've tried this project or just read through it, we'd love to hear what you think, so feel free to open an issue and share. Got an idea to make it better? Suggestions and pull requests are very welcome, big or small.
