@@ -45,6 +45,21 @@
       "path": "hound/tests/test_hound.py",
       "contains": "secret=\"DO_NOT_RETAIN_ABC123\"",
       "reason": "Fake literal proving the scanner does not retain secret values."
+    },
+    {
+      "path": "git:commit-metadata",
+      "contains": "296754894+Geometricfinger@users.noreply.github.com",
+      "reason": "Maintainer's public GitHub no-reply commit identity; it is designed to be published and is not a personal mailbox."
+    },
+    {
+      "path": "tools/gen_error_codes.py",
+      "contains": "`gdrive` -> `https://drive.google.com/file/d/<file_id>/view`",
+      "reason": "Generic URL template for the optional Google Drive source provider; no file ID."
+    },
+    {
+      "path": "docs/ERROR_CODES.md",
+      "contains": "`gdrive` -> `https://drive.google.com/file/d/<file_id>/view`",
+      "reason": "Generated from tools/gen_error_codes.py; generic URL template, no file ID."
     }
   ]
 }

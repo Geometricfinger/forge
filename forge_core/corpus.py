@@ -24,8 +24,8 @@ def manifest(value):
         text(row['file_id'],200);path_in_repo(row['path']);integer(row['size'],0,DEFAULTS['max_container_bytes'])
         if not isinstance(row['sha256'],str) or not re.fullmatch('[0-9a-f]{64}',row['sha256']):raise Blocked('CORPUS_SOURCE_SHA')
         provider=row.get('provider','gdrive')
-        if provider not in ('gdrive','synthetic','github'):raise Blocked('CORPUS_PROVIDER')
-        expected=('fixture://'+row['file_id']) if provider=='synthetic' else ('https://drive.google.com/file/d/'+row['file_id']+'/view')
+        if provider not in ('gdrive','synthetic','github','local'):raise Blocked('CORPUS_PROVIDER')
+        expected=('fixture://'+row['file_id']) if provider=='synthetic' else ('local://'+row['path']) if provider=='local' else ('https://drive.google.com/file/d/'+row['file_id']+'/view')
         if provider=='github':
             from .github_corpus import validate_source
             validate_source(row)
@@ -33,6 +33,30 @@ def manifest(value):
         if row['file_id'] in ids or row['path'] in paths:raise Blocked('DUPLICATE_CORPUS_SOURCE')
         ids.add(row['file_id']);paths.add(row['path'])
     return value
+
+LOCAL_SUFFIXES=('.py','.pyi','.pyw','.ipynb','.zip','.txt','.md','.markdown','.rst')
+
+def local_rows(root,limit=500):
+    """Manifest rows (provider 'local') for supported files under a plain folder.
+
+    Hidden files and folders, symlinks and oversized files are skipped. Files are
+    only hashed here; nothing is executed or imported."""
+    root=safe_path(root)
+    if not root.is_dir():raise Blocked('SOURCE_ROOT')
+    rows=[]
+    for p in sorted(root.rglob('*')):
+        rel=p.relative_to(root)
+        if any(part.startswith('.') or part=='__pycache__' for part in rel.parts):continue
+        if p.is_symlink() or not p.is_file() or p.suffix.lower() not in LOCAL_SUFFIXES:continue
+        if p.stat().st_size>DEFAULTS['max_container_bytes']:continue
+        path=rel.as_posix()
+        try:path_in_repo(path)
+        except Blocked:continue
+        b=read(p,DEFAULTS['max_container_bytes'])
+        rows.append({'provider':'local','file_id':'local_'+sha(path.encode())[:24],'path':path,'size':len(b),'sha256':sha(b),'source_url':'local://'+path})
+        if len(rows)>limit:raise Blocked('CORPUS_COUNT')
+    if not rows:raise Blocked('LOCAL_FOLDER_EMPTY')
+    return rows
 
 @contextlib.contextmanager
 def _lock(path):
