@@ -19,7 +19,7 @@ Forge grew in layers. Hound came first, the add-on and loop were built around it
 | Opportunity Lab | `forge_core/opportunit*.py`, `invention_plan.py` | Rule-based hypotheses from reviewed inputs. |
 | Profile improvement cycle | `loop/` | Proposes and evaluates data-only profiles; never edits code or tests. Run via `forge.py cycle-demo` or `loop/run_demo.py`. |
 | Multi-source research missions | `runner/` | Uses the Workbench's corpus pipeline (`forge_core.corpus`) rather than calling Hound directly. |
-| Qualification | `verify.py`, `run_tests.py`, `hound/run_tests.py`, each component's tests | `verify.py` runs all of them. |
+| Qualification | `verify.py`, `run_tests.py`, `hound/run_tests.py`, each component's tests | `verify.py` covers Workbench, Hound, add-on and loop; run `runner/tests` and its demo separately, as CI does. |
 | Release hygiene | `tools/` | Manifest regeneration and the pre-publish check. |
 
 ## Rules of thumb for contributors

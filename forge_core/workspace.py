@@ -11,7 +11,7 @@ def code_binding():
     for base in ('forge_core/_vendor','contracts/interop','third_party/rfc8785'):
         paths += sorted(p for p in (ROOT/base).rglob('*') if p.is_file() and '__pycache__' not in p.parts and p.suffix!='.pyc')
     paths += [ROOT/'tools/interop_reference.cjs',ROOT/'tools/contract_fault_cases.py',ROOT/'tools/run_contract_fault_checks.py']
-    paths += [ROOT/'tools/run_self_recovery_trial.py',*sorted((ROOT/'examples/demo').rglob('*.py'))]
+    paths += [ROOT/'tools/run_self_recovery_trial.py',ROOT/'tools/test_environment.py',*sorted((ROOT/'examples/demo').rglob('*.py'))]
     paths += [ROOT/name/'SHA256SUMS.txt' for name in ('loop','addon','hound')]
     return {p.relative_to(ROOT).as_posix():sha(read(p)) for p in paths}
 

@@ -20,13 +20,22 @@ Thank you for your interest in improving Forge. This guide explains how to propo
 3. Run the checks locally. Output folders must be new and outside the repository:
 
    ```sh
-   python3 run_tests.py --out /tmp/forge-tests
-   python3 hound/run_tests.py --out /tmp/hound-tests
+   CHECKS="$(mktemp -d "${TMPDIR:-/tmp}/forge-checks.XXXXXXXX")"
+   CHECKS="$(cd "$CHECKS" && pwd -P)"
+   mkdir -p "$CHECKS/tmp"
+   export TMPDIR="$CHECKS/tmp" PYTHONDONTWRITEBYTECODE=1
+
+   python3 run_tests.py --out "$CHECKS/workbench"
+   python3 hound/run_tests.py --out "$CHECKS/hound"
    (cd runner && python3 -m unittest discover -s tests)
-   python3 examples/demo/run_demo.py --out /tmp/forge-demo
-   python3 verify.py --out /tmp/forge-qualification
+   python3 examples/demo/run_demo.py --out "$CHECKS/demo"
+   python3 verify.py --out "$CHECKS/qualification"
    python3 tools/prepublish_check.py --history
    ```
+
+   The physical temp path avoids macOS `/tmp` and `/var` symlinks without
+   disabling Forge's path checks. Disabling bytecode writes keeps generated
+   `__pycache__` files out of the checkout and pre-publish scan.
 
 4. If you intentionally changed files under `hound/`, `addon/` or `loop/`, regenerate the analyzer manifests and include the diff in your pull request:
 

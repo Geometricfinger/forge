@@ -21,7 +21,7 @@ What Forge does **not** do:
 - No third-party packages, no `pip install`, no build step. Node.js is optional and only used by `verify.py`.
 
 ```sh
-git clone <this repository URL> forge
+git clone https://github.com/Geometricfinger/forge.git forge
 cd forge
 python3 forge.py --help
 ```
@@ -201,6 +201,9 @@ Output folders must be new and outside the repository. Run from the Forge checko
 
 ```sh
 cd "$FORGE"
+# Test fixtures also need a physical temp directory on macOS.
+mkdir -p "$WORK/tmp"
+export TMPDIR="$(cd "$WORK/tmp" && pwd -P)" PYTHONDONTWRITEBYTECODE=1
 python3 run_tests.py --out "$WORK/tests"                 # Workbench suite
 python3 hound/run_tests.py --out "$WORK/hound-tests"     # Hound suite
 (cd runner && python3 -m unittest discover -s tests)     # Research runner, must run from runner/
