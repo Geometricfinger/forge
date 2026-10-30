@@ -27,7 +27,7 @@ Thank you for your interest in improving Forge. This guide explains how to propo
 
    python3 run_tests.py --out "$CHECKS/workbench"
    python3 hound/run_tests.py --out "$CHECKS/hound"
-   (cd runner && python3 -m unittest discover -s tests)
+   python3 runner/run_tests.py
    python3 examples/demo/run_demo.py --out "$CHECKS/demo"
    python3 verify.py --out "$CHECKS/qualification"
    python3 tools/prepublish_check.py --history

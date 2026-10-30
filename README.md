@@ -150,7 +150,7 @@ export TMPDIR="$CHECKS/tmp" PYTHONDONTWRITEBYTECODE=1
 
 python3 run_tests.py --out "$CHECKS/workbench"         # Workbench suite (798 tests)
 python3 hound/run_tests.py --out "$CHECKS/hound"       # Hound suite (483 tests)
-(cd runner && python3 -m unittest discover -s tests)   # Research runner (64 tests)
+python3 runner/run_tests.py                          # Research runner (64 tests)
 python3 runner/run_demo.py --out "$CHECKS/research"    # Research runner demo mission
 python3 verify.py --out "$CHECKS/qualification"       # Workbench, Hound, add-on, loop, contract and recovery qualification
 ```

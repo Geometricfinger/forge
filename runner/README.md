@@ -22,10 +22,13 @@ A paused run returns a non-zero exit code with a `PAUSED_BUDGET` report. A compl
 ## Tests
 
 ```sh
-python3 -m unittest discover -s tests -v
+python3 run_tests.py
 python3 tools/run_fault_checks.py --out /tmp/forge-runner-fault-checks
 python3 tools/check_package.py
 ```
+
+The test and fault-check entrypoints normalize the temporary fixture directory
+on macOS. The product still rejects symlinked input and workspace paths.
 
 ## Your own inputs
 

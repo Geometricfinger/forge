@@ -3,6 +3,8 @@
 import argparse, hashlib, json, os, shutil, subprocess, sys
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
+sys.path.insert(0,str(ROOT.parent))
+from tools.test_environment import prepare_test_environment
 FAULTS=[
  ('question_coverage','research_runner/core.py',"questions=report.get('queries',[])","questions=report.get('queries',[])[:6]",'test_packet_coverage.PacketCoverage.test_all_short_query_summaries_before_details'),
  ('source_hash','research_runner/core.py',"len(b)!=s['size'] or sha(b)!=s['sha256']","len(b)!=s['size']",'test_contract.Contract.test_source_hash'),
@@ -13,6 +15,7 @@ FAULTS=[
  ('round_robin','research_runner/bridge.py',"forgerows=[row for layer in zip_longest(*lists) for row in layer if row is not None][:10]","forgerows=[row for group in lists for row in group][:10]",'test_second_review.SecondReview.test_both_sources_visible_within_budget'),
 ]
 def main():
+    prepare_test_environment()
     ap=argparse.ArgumentParser();ap.add_argument('--out',type=Path,required=True);args=ap.parse_args()
     out=args.out.resolve();out.mkdir(parents=True,exist_ok=False)
     rows=[]

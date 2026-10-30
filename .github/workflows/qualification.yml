@@ -85,7 +85,7 @@ jobs:
 
       - name: Research runner tests
         working-directory: runner
-        run: python3 -m unittest discover -s tests 2>&1 | tee "$EVIDENCE/runner-tests.log"
+        run: python3 run_tests.py 2>&1 | tee "$EVIDENCE/runner-tests.log"
 
       - name: Research runner demo
         run: python3 runner/run_demo.py --out "$EVIDENCE/runner-demo" | tee "$EVIDENCE/runner-demo.json"

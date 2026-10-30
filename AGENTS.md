@@ -206,7 +206,7 @@ mkdir -p "$WORK/tmp"
 export TMPDIR="$(cd "$WORK/tmp" && pwd -P)" PYTHONDONTWRITEBYTECODE=1
 python3 run_tests.py --out "$WORK/tests"                 # Workbench suite
 python3 hound/run_tests.py --out "$WORK/hound-tests"     # Hound suite
-(cd runner && python3 -m unittest discover -s tests)     # Research runner, must run from runner/
+python3 runner/run_tests.py                            # Research runner suite
 python3 verify.py --out "$WORK/qualification"            # Full qualification (a minute or more)
 ```
 
