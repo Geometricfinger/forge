@@ -11,6 +11,7 @@ Supply them in a file outside the repo, one case-insensitive regex per line ('#'
     python3 tools/prepublish_check.py --denylist /path/outside/repo/denylist.txt
 
 Known intentional matches are listed in tools/prepublish_allowlist.json (path + exact substring).
+Only findings wholly inside an approved substring are exempt, never the rest of the line.
 Exit code 0 = clean, 1 = findings, 2 = usage error. Matched values are never printed in full.
 
 This is accidental-disclosure linting: pattern matching catches common mistakes but cannot
@@ -62,8 +63,17 @@ def load_allowlist():
     return json.loads(p.read_text())['entries'] if p.exists() else []
 
 
-def allowed(path, line, allow):
-    return any(e['path'] == path and e['contains'] in line for e in allow)
+def allowed(path, line, match, allow):
+    for entry in allow:
+        literal = entry['contains']
+        if entry['path'] != path or not literal:
+            continue
+        start = line.find(literal)
+        while start != -1:
+            if start <= match.start() and match.end() <= start + len(literal):
+                return True
+            start = line.find(literal, start + 1)
+    return False
 
 
 def redact(s):
@@ -75,7 +85,7 @@ def scan_text(label, text, patterns, allow, findings, path_for_allow=None):
     for n, line in enumerate(text.splitlines(), 1):
         for name, rx in patterns.items():
             for m in rx.finditer(line):
-                if path_for_allow and allowed(path_for_allow, line, allow):
+                if path_for_allow and allowed(path_for_allow, line, m, allow):
                     continue
                 findings.append({'where': label, 'line': n, 'rule': name, 'match': redact(m.group(0))})
 
@@ -112,13 +122,9 @@ def main():
     if a.history and (ROOT / '.git').exists():
         git = lambda *x: subprocess.run(['git', '-C', str(ROOT), *x], capture_output=True, text=True, errors='replace', check=True).stdout
         meta = git('log', '--all', '--format=%H%x00%an%x00%ae%x00%cn%x00%ce%x00%B%x00%x01')
-        # Allowlisted commit identities (path 'git:commit-metadata') are removed before
-        # scanning, so only that exact public identity is exempt; the rest of each
-        # line (other identities, commit messages) is still scanned.
-        for e in allow:
-            if e['path'] == 'git:commit-metadata':
-                meta = meta.replace(e['contains'], '')
-        scan_text('git:commit-metadata', meta, patterns, allow, findings)
+        # Match the complete finding before applying identity exceptions. Removing
+        # substrings first could conceal a different, longer email address.
+        scan_text('git:commit-metadata', meta, patterns, allow, findings, 'git:commit-metadata')
         objs = git('rev-list', '--all', '--objects').splitlines(); blobs = 0
         for row in objs:
             parts = row.split(' ', 1)

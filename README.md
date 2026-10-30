@@ -1,5 +1,9 @@
 # Forge
 
+Created by **Lane Coulson / [Geometricfinger](https://github.com/Geometricfinger)**.
+
+Public contact: [coulsonlane@gmail.com](mailto:coulsonlane@gmail.com).
+
 Forge is a local, deterministic, model-free static-analysis workbench for **Python source code**. It reads Python files you explicitly give it (plain files, ZIPs, notebooks and Python code blocks in text files), records structure (definitions, classes, imports, calls) and the call sites of APIs you name in a data-only profile, lets you search that metadata, and packages source-identified leads for human review. Files in other languages are listed but not analysed.
 
 It never executes the code it inspects and makes no model calls. The analysis commands below work offline after cloning the repository. The only network feature in Forge is optional, operator-started GitHub discovery of public example code; see [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) for exactly what it sends and its limits.
@@ -148,7 +152,7 @@ CHECKS="$(cd "$CHECKS" && pwd -P)"
 mkdir -p "$CHECKS/tmp"
 export TMPDIR="$CHECKS/tmp" PYTHONDONTWRITEBYTECODE=1
 
-python3 run_tests.py --out "$CHECKS/workbench"         # Workbench suite (799 tests)
+python3 run_tests.py --out "$CHECKS/workbench"         # Workbench suite (809 tests)
 python3 hound/run_tests.py --out "$CHECKS/hound"       # Hound suite (483 tests)
 python3 runner/run_tests.py                          # Research runner (64 tests)
 python3 runner/run_demo.py --out "$CHECKS/research"    # Research runner demo mission
