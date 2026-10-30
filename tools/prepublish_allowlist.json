@@ -28,7 +28,7 @@
     },
     {
       "path": "tests/test_opportunities.py",
-      "contains": "name:password@example.org",
+      "contains": "https://name:password@example.org",
       "reason": "Fake URL proving credentials in URIs are rejected."
     },
     {
@@ -50,6 +50,21 @@
       "path": "git:commit-metadata",
       "contains": "296754894+Geometricfinger@users.noreply.github.com",
       "reason": "Maintainer's public GitHub no-reply commit identity; it is designed to be published and is not a personal mailbox."
+    },
+    {
+      "path": "git:commit-metadata",
+      "contains": "coulsonlane@gmail.com",
+      "reason": "Maintainer explicitly approved this public contact and commit identity; retain existing history."
+    },
+    {
+      "path": "git:commit-metadata",
+      "contains": "noreply@github.com",
+      "reason": "GitHub's public web-flow committer identity used for merges."
+    },
+    {
+      "path": "README.md",
+      "contains": "coulsonlane@gmail.com",
+      "reason": "Maintainer explicitly approved publishing this exact project contact address."
     },
     {
       "path": "tools/gen_error_codes.py",
