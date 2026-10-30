@@ -1,5 +1,5 @@
 """Checks for the portability and robustness patches (multi-envelope ids, parser output cap, killpg EPERM fallback, corpus-run --profile, report read limit)."""
-import errno, io, json, os, signal, subprocess, sys, tempfile, unittest, zipfile
+import errno, io, json, os, shutil, signal, subprocess, sys, tempfile, unittest, zipfile
 from pathlib import Path
 from unittest.mock import patch
 from forge_core import bounded_io
@@ -103,5 +103,21 @@ with tempfile.TemporaryDirectory() as work:
             result = subprocess.run([sys.executable, '-c', code], cwd=root, env=env,
                                     capture_output=True, text=True, timeout=30)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+class ParserCheckoutTest(unittest.TestCase):
+    def test_real_isolated_parser_leaves_its_source_tree_unchanged(self):
+        from forge_core import corpus
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory).resolve()
+            source = base / 'copy' / 'forge_core'
+            original = Path(__file__).resolve().parents[1] / 'forge_core'
+            shutil.copytree(original, source, ignore=shutil.ignore_patterns('__pycache__', '*.pyc'))
+            before = {p.relative_to(source): p.read_bytes() for p in source.rglob('*') if p.is_file()}
+            home = base / 'work'; home.mkdir()
+            with patch.object(corpus, 'ROOT', source.parent):
+                result = corpus._parser(b'def hello():\n    return 1\n', 'sample.py', home)
+            self.assertTrue(any(d['name'] == 'hello' for s in result['segments'] for d in s['definitions']))
+            after = {p.relative_to(source): p.read_bytes() for p in source.rglob('*') if p.is_file()}
+            self.assertEqual(before, after)
 
 if __name__ == '__main__': unittest.main()
