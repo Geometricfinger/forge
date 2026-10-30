@@ -2,7 +2,7 @@
 
 Forge is a local, deterministic, model-free static-analysis workbench for **Python source code**. It reads Python files you explicitly give it (plain files, ZIPs, notebooks and Python code blocks in text files), records structure (definitions, classes, imports, calls) and the call sites of APIs you name in a data-only profile, lets you search that metadata, and packages source-identified leads for human review. Files in other languages are listed but not analysed.
 
-It never executes the code it inspects and makes no model calls. Analysis is fully offline: no command in this README touches the network. The only network feature is optional, operator-started GitHub discovery of public example code; see [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) for exactly what it sends and its limits.
+It never executes the code it inspects and makes no model calls. The analysis commands below work offline after cloning the repository. The only network feature in Forge is optional, operator-started GitHub discovery of public example code; see [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) for exactly what it sends and its limits.
 
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
@@ -48,7 +48,7 @@ The analyzer (`loop/`, `addon/`, `hound/`) ships as plain source. Each component
 There is nothing to install. Clone the repository and run it with Python:
 
 ```sh
-git clone <this repository URL> forge
+git clone https://github.com/Geometricfinger/forge.git forge
 cd forge
 python3 forge.py --help
 ```
@@ -58,16 +58,24 @@ On macOS you can also double-click `Start_FORGE.command` (or run `./Start_FORGE.
 ## Quick start
 
 ```sh
+# Keep work outside the checkout and resolve symlinked parent directories.
+mkdir -p "$HOME/forge-work"
+WORK="$(cd "$HOME/forge-work" && pwd -P)"
+
 # Run the bundled demo end to end (scan, search, opportunity case study)
-python3 examples/demo/run_demo.py --out /tmp/forge-demo
+python3 examples/demo/run_demo.py --out "$WORK/demo"
 
 # Or drive the CLI yourself
-python3 forge.py --home /tmp/forge-home init
-python3 forge.py --home /tmp/forge-home corpus-run --source-root examples/demo/src \
+python3 forge.py --home "$WORK/home" init
+python3 forge.py --home "$WORK/home" corpus-run --source-root examples/demo/src \
     --manifest examples/demo/manifest.json --run-id demo --profile examples/demo/profile.json
-python3 forge.py --home /tmp/forge-home corpus-search --run-id demo --query "pickle load"
-python3 forge.py --home /tmp/forge-home serve          # web UI on 127.0.0.1
+python3 forge.py --home "$WORK/home" corpus-search --run-id demo --query "pickle load"
+python3 forge.py --home "$WORK/home" serve          # web UI on 127.0.0.1
 ```
+
+Use a new demo output folder for another run. On macOS, `/tmp` and `/var` are
+symlinks; passing them directly to workspace commands returns `SYMLINK_PATH`.
+The physical `WORK` path above preserves Forge's symlink checks.
 
 See `examples/demo/README.md` for how to point Forge at your own code. A workspace (`--home`) must be outside the repository. The default is `~/.forge-workbench-0.8.4` (a fixed folder name, not the release version).
 
@@ -134,14 +142,24 @@ Each row needs `file_id` (unique, any id), `path` (relative to `--source-root`),
 ## Running the tests
 
 ```sh
-python3 run_tests.py --out /tmp/forge-tests             # Workbench suite (797 tests)
-python3 hound/run_tests.py --out /tmp/hound-tests       # Hound suite (483 tests)
-(cd runner && python3 -m unittest discover -s tests)   # Research runner (64 tests)
-python3 runner/run_demo.py --out /tmp/forge-research    # Research runner demo mission
-python3 verify.py --out /tmp/forge-qualification        # Full qualification (all of the above plus the controlled cycle, contract trial and self-recovery trial)
+# Fresh external output and a physical temp path also work on macOS.
+CHECKS="$(mktemp -d "${TMPDIR:-/tmp}/forge-checks.XXXXXXXX")"
+CHECKS="$(cd "$CHECKS" && pwd -P)"
+mkdir -p "$CHECKS/tmp"
+export TMPDIR="$CHECKS/tmp" PYTHONDONTWRITEBYTECODE=1
+
+python3 run_tests.py --out "$CHECKS/workbench"         # Workbench suite (799 tests)
+python3 hound/run_tests.py --out "$CHECKS/hound"       # Hound suite (483 tests)
+python3 runner/run_tests.py                          # Research runner (64 tests)
+python3 runner/run_demo.py --out "$CHECKS/research"    # Research runner demo mission
+python3 verify.py --out "$CHECKS/qualification"       # Workbench, Hound, add-on, loop, contract and recovery qualification
 ```
 
-Output folders must be new and outside the repository.
+Output folders must be new and outside the repository. `verify.py` includes the
+Workbench, Hound, add-on and loop suites; the separate runner commands above
+validate the research runner. It does not run them on your behalf.
+`run_tests.py` and `verify.py` also normalize their own temporary fixture root;
+explicit workspace and output paths must still meet the product's path checks.
 
 ### Continuous verification
 

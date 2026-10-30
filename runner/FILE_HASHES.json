@@ -1,5 +1,5 @@
 {
-  "README.md": "c770b2e246d225a34d8fda2ea95c2b063e88779a90f0626aed6bd9b1f2612cc7",
+  "README.md": "ea56f66f02429e3288c5166d239a9d159d147e47eeb9faac6deeb9e541eeb1a0",
   "contracts/COMMITMENT.sha256": "59680c0ee9ba72d00c93cba90df0f1c9f889f5cfa042ceb1f1d1db288382041f",
   "contracts/DEVELOPMENT_EPOCH.json": "38d282f912285177d18a07bdcba853f4c7e4f91cac1ddecd65822404853132b6",
   "contracts/MISSION.json": "a839dc7ba1f7d0e9331ab71b3abaf6d2bcdfde4aeac59ac02d07843cb8edb8e9",
@@ -26,6 +26,7 @@
   "research_runner/core.py": "660f302b8d0255489c00584f28457f7e955b13bf6a490906a2bbc59a3c02c8e6",
   "research_runner/runner.py": "8e8aaebd16ac51839e9db05b0a8d3fee4d63082451a3e7fa4aa5455499c73d61",
   "run_demo.py": "873e49f13c66f35a18330f8acde7213b5a5270da7141a3ad23c66ba8d53e0aff",
+  "run_tests.py": "0cb87b4b6afeca5f7ea7b62d2588ac8103c8bbdc2db429f8a633a424bdad9be6",
   "tests/test_contract.py": "75c4b74b8a58288ec7caa1ff01eefd70d92aac1868922f476e588be7caf5b67b",
   "tests/test_packet_coverage.py": "9304307b4501386c77a514615af3834301d54610c887fcccc777befdf3140201",
   "tests/test_review_paths.py": "c3f0b33a17b951b6b47552933789b8b1fb21b989273d09f5c3580086cff5f374",
@@ -37,6 +38,6 @@
   "third_party/Pluggy_LICENSE.txt": "d6b65e6c213a5d0b577911d34d6e5949b9f59d76c238c5071a2f3fc16cfb2606",
   "tools/check_package.py": "61299e7f0d5bb9e23932e8a18ae2591ece202a817005e25c914671d0e030397b",
   "tools/replay_mission.py": "e8afeb3c36b59f00b4e5cab18ed26682c2a7b3c591cc9118ee1b9643d12ff048",
-  "tools/run_fault_checks.py": "f77f4e39dbcb99f9a362fba16cb9fc2e5d6e1fec2ba0328007be7d195600a23a",
+  "tools/run_fault_checks.py": "88674b192160163eba2d684bd4c7a84d61f5e8648edcec0ea94d9034b788ccfe",
   "tools/summarize_results.py": "5a6e829ccb95cecb6090a9ac798a061e59ee4917134370c0ed7b3fc974baed9a"
 }

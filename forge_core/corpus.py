@@ -85,7 +85,7 @@ def _parser(data,name,home):
     # (about 2x the source) plus structure, so >~100-file envelopes overran the
     # generic 8 MB tool-output cap although the worker itself allows 16 MB.
     from .bounded_io import MAX_PARSER_OUTPUT_BYTES
-    return loads(run_fixed([sys.executable,'-I',str(ROOT/'forge_core/mixed_worker.py'),
+    return loads(run_fixed([sys.executable,'-I','-B',str(ROOT/'forge_core/mixed_worker.py'),
                             '--raw-container',name],home,60,data,MAX_PARSER_OUTPUT_BYTES))
 
 def inspect_one(data,source,home,profile,analyzer,segment_dir=None,job_binding=None):
