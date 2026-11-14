@@ -10,7 +10,7 @@ from pathlib import PurePosixPath
 from .common import Blocked
 from .lexical import counts
 
-VERSION = 'lexical-context-3-declaration-bindings'
+VERSION = 'lexical-context-4-declaration-effects'
 MAX_CALLS = 128
 MAX_DECLARATIONS = 64
 MAX_BINDING_CANDIDATES = 8
@@ -32,7 +32,48 @@ def own_nodes(nodes):
             continue
         stack.extend(reversed(list(ast.iter_child_nodes(node))))
 
-def _scope_syntax(nodes, name, kind, line=1, parameters=(), type_parameters=()):
+def _declaration_inputs(node, annotations=True):
+    """Expressions in the defining scope, never the new function/class body.
+
+    Generic declarations may add annotation scopes; callers keep their effects
+    unresolved. Future annotations do not bind names in the defining scope.
+    """
+    expressions = list(node.decorator_list)
+    if isinstance(node, ast.ClassDef):
+        return expressions + list(node.bases) + [x.value for x in node.keywords]
+    expressions += [*node.args.defaults, *[x for x in node.args.kw_defaults if x is not None]]
+    if annotations:
+        parameters = [*node.args.posonlyargs, *node.args.args, *node.args.kwonlyargs,
+                      *([node.args.vararg] if node.args.vararg else []),
+                      *([node.args.kwarg] if node.args.kwarg else [])]
+        expressions += [x.annotation for x in parameters if x.annotation is not None]
+        if node.returns is not None: expressions.append(node.returns)
+    return expressions
+
+def _declaration_writes(nodes, postponed_annotations=False):
+    """Name-write syntax omitted by own_nodes' nested-body boundary.
+
+    Shadow guards retain these names even when detailed binding capture reaches
+    its limit. Lambda bodies and comprehension loop targets cannot bind here.
+    """
+    for node in own_nodes(nodes):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            stack = _declaration_inputs(node, not postponed_annotations)
+        elif isinstance(node, ast.Lambda):
+            stack = [*node.args.defaults, *[x for x in node.args.kw_defaults if x is not None]]
+        else: continue
+        while stack:
+            expression = stack.pop()
+            if isinstance(expression, ast.Lambda):
+                stack.extend([*expression.args.defaults,
+                              *[x for x in expression.args.kw_defaults if x is not None]])
+                continue
+            if isinstance(expression, ast.NamedExpr) and isinstance(expression.target, ast.Name):
+                yield expression.target.id
+            stack.extend(ast.iter_child_nodes(expression))
+
+def _scope_syntax(nodes, name, kind, line=1, parameters=(), type_parameters=(),
+                  postponed_annotations=False):
     """Bounded binding/read syntax for one scope, never a runtime symbol table."""
     result = {'name': name, 'kind': kind, 'line': line, 'bindings': [], 'reads': [],
               'globals': [], 'nonlocals': [], 'truncated': False, 'bindings_truncated': False, 'omissions': [],
@@ -49,17 +90,23 @@ def _scope_syntax(nodes, name, kind, line=1, parameters=(), type_parameters=()):
             add('bindings', {'name': local_name, 'line': where, 'kind': binding_kind, **extra})
         else: result['truncated'] = result['bindings_truncated'] = True
     for symbol in parameters: binding(symbol, line, 'parameter')
-    stack = [(node, False) for node in reversed(nodes)]
+    stack = [(node, False, False) for node in reversed(nodes)]
     while stack:
-        node, comprehension = stack.pop()
+        node, comprehension, uncertain_declaration = stack.pop()
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
             binding(node.name, node.lineno, 'class' if isinstance(node, ast.ClassDef) else 'function')
+            generic = bool(getattr(node, 'type_params', ()))
+            if generic and 'GENERIC_DECLARATION_SCOPE_NOT_RESOLVED' not in result['omissions']:
+                result['omissions'].append('GENERIC_DECLARATION_SCOPE_NOT_RESOLVED')
+            for expression in reversed(_declaration_inputs(node, not postponed_annotations)):
+                uncertain = generic and expression not in node.decorator_list
+                stack.append((expression, comprehension, uncertain_declaration or uncertain))
             continue
         if isinstance(node, ast.Lambda):
             if 'LAMBDA_BODY_NOT_CAPTURED' not in result['omissions']:
                 result['omissions'].append('LAMBDA_BODY_NOT_CAPTURED')
             # Lambda defaults execute in the containing scope, unlike its body.
-            stack.extend((child, comprehension) for child in reversed(
+            stack.extend((child, comprehension, uncertain_declaration) for child in reversed(
                 [*node.args.defaults, *[x for x in node.args.kw_defaults if x is not None]]))
             continue
         if isinstance(node, (ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp)):
@@ -72,9 +119,11 @@ def _scope_syntax(nodes, name, kind, line=1, parameters=(), type_parameters=()):
                 if not isinstance(node.ctx, ast.Load): result['bindings_truncated'] = True
             elif isinstance(node.ctx, ast.Load):
                 add('reads', {'name': node.id, 'line': node.lineno,
-                              'scope_uncertain': comprehension})
+                              'scope_uncertain': comprehension,
+                              'declaration_scope_uncertain': uncertain_declaration})
             elif not comprehension:
-                binding(node.id, node.lineno, 'delete' if isinstance(node.ctx, ast.Del) else 'assignment')
+                binding(node.id, node.lineno, 'declaration_binding_effect_unresolved' if uncertain_declaration
+                        else 'delete' if isinstance(node.ctx, ast.Del) else 'assignment')
         elif isinstance(node, ast.Import):
             for alias in node.names:
                 binding(alias.asname or alias.name.split('.')[0], node.lineno, 'import',
@@ -91,14 +140,16 @@ def _scope_syntax(nodes, name, kind, line=1, parameters=(), type_parameters=()):
                 if len(symbol) <= 240: add('globals' if isinstance(node, ast.Global) else 'nonlocals', symbol)
                 else: result['truncated'] = result['bindings_truncated'] = True
         elif isinstance(node, ast.NamedExpr) and comprehension and isinstance(node.target, ast.Name):
-            binding(node.target.id, node.target.lineno, 'comprehension_assignment_expression')
+            binding(node.target.id, node.target.lineno, 'declaration_binding_effect_unresolved' if uncertain_declaration
+                    else 'comprehension_assignment_expression')
         elif isinstance(node, ast.ExceptHandler) and node.name:
             binding(node.name, node.lineno, 'exception_target')
         elif isinstance(node, (ast.MatchAs, ast.MatchStar)) and node.name:
             binding(node.name, node.lineno, 'pattern_capture')
         elif isinstance(node, ast.MatchMapping) and node.rest:
             binding(node.rest, node.lineno, 'pattern_capture')
-        stack.extend((child, comprehension) for child in reversed(list(ast.iter_child_nodes(node))))
+        stack.extend((child, comprehension, uncertain_declaration)
+                     for child in reversed(list(ast.iter_child_nodes(node))))
     return result
 
 def _scope_chain(scopes):
@@ -115,6 +166,8 @@ def _read_context(reads, scopes, *, declaration=False, uncertain_names=()):
         explicit_nonlocal = bool(chain and name in chain[0]['nonlocals'])
         if read.get('scope_uncertain'):
             status = 'COMPREHENSION_SCOPE_UNRESOLVED'; chain = []
+        elif read.get('declaration_scope_uncertain'):
+            status = 'DECLARATION_SCOPE_UNRESOLVED'; chain = []
         elif name in uncertain_names or any(name in scope['type_parameters'] for scope in chain):
             status = 'TYPE_PARAMETER_SCOPE_UNRESOLVED'; chain = []
         elif chain and name in chain[0]['globals']:
@@ -156,6 +209,8 @@ def _read_context(reads, scopes, *, declaration=False, uncertain_names=()):
             status = 'LEXICAL_BINDING_CANDIDATE' if len(matches) == 1 else 'AMBIGUOUS_OR_REBOUND_BINDING'
             if any(x['kind'] == 'comprehension_assignment_expression' for x in matches):
                 status = 'COMPREHENSION_BINDING_EFFECT_UNRESOLVED'
+            if any(x['kind'] == 'declaration_binding_effect_unresolved' for x in matches):
+                status = 'DECLARATION_BINDING_EFFECT_UNRESOLVED'
             if declaration and any(x['line'] >= read['line'] for x in matches):
                 status = 'DECLARATION_BINDING_ORDER_UNRESOLVED'
             break
@@ -172,7 +227,7 @@ def _binding_context(scope, scopes):
             'runtime_resolution': 'NOT_ESTABLISHED', 'dependency_closure_complete': False,
             'evidence': 'NAME_LOAD_AND_BINDING_SYNTAX_NOT_RUNTIME_RESOLUTION'}
 
-def _declaration_context(node, scopes):
+def _declaration_context(node, scopes, postponed_annotations=False):
     expressions = []; truncated = False; budget = MAX_CALLS; omissions = set()
     type_parameters = [p.name for p in getattr(node, 'type_params', ())]
     type_parameters += [name for scope in scopes for name in scope['type_parameters']]
@@ -180,6 +235,8 @@ def _declaration_context(node, scopes):
     def add(kind, expression, parameter=None):
         nonlocal truncated, budget
         if expression is None: return
+        if postponed_annotations and 'annotation' in kind:
+            omissions.add('POSTPONED_ANNOTATION_EXPRESSION_NOT_EVALUATED')
         if len(expressions) >= MAX_DECLARATIONS:
             truncated = True; return
         syntax = _scope_syntax([expression], '<declaration>', 'expression')
@@ -218,7 +275,7 @@ def _declaration_context(node, scopes):
             'runtime_resolution': 'NOT_ESTABLISHED', 'dependency_closure_complete': False,
             'evidence': 'DECLARATION_EXPRESSION_SYNTAX_NOT_EVALUATED'}
 
-def metadata(nodes, parameters=()):
+def metadata(nodes, parameters=(), postponed_annotations=False):
     calls, imports, stores = [], [], set(parameters)
     attributes, comparisons = [], []
     for node in own_nodes(nodes):
@@ -258,6 +315,7 @@ def metadata(nodes, parameters=()):
             stores.add(node.id)
         elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
             stores.add(node.name)
+    stores.update(_declaration_writes(nodes, postponed_annotations))
     return {'calls': calls[:MAX_CALLS], 'imports': imports[:MAX_CALLS],
             'shadowed_roots': sorted(stores),
             'attribute_reads': attributes[:MAX_CALLS], 'comparisons': comparisons[:MAX_CALLS],
@@ -265,15 +323,20 @@ def metadata(nodes, parameters=()):
             'runtime_resolution': 'NOT_ESTABLISHED'}
 
 def describe(tree):
-    module = metadata(tree.body)
+    postponed_annotations = any(isinstance(node, ast.ImportFrom) and node.module == '__future__'
+                                and any(alias.name == 'annotations' for alias in node.names)
+                                for node in tree.body)
+    module = metadata(tree.body, postponed_annotations=postponed_annotations)
     module['class_definitions'] = []
-    module_scope = _scope_syntax(tree.body, '<module>', 'module')
+    module_scope = _scope_syntax(tree.body, '<module>', 'module', postponed_annotations=postponed_annotations)
     module['binding_context'] = _binding_context(module_scope, [module_scope])
     bindings={}
     for n in own_nodes(tree.body):
         name=(n.id if isinstance(n,ast.Name) and isinstance(n.ctx,(ast.Store,ast.Del)) else
               n.name if isinstance(n,(ast.ClassDef,ast.FunctionDef,ast.AsyncFunctionDef)) else None)
         if name:bindings[name]=bindings.get(name,0)+1
+    for name in _declaration_writes(tree.body, postponed_annotations):
+        bindings[name]=bindings.get(name,0)+1
     module['top_level_binding_counts']=bindings
     definitions = {}
     class Walker(ast.NodeVisitor):
@@ -293,11 +356,12 @@ def describe(tree):
                       'bases_truncated': len(node.bases) > 8,
                       'decorated': bool(node.decorator_list), 'keywords_present': bool(node.keywords),
                       'top_level_unconditional':node in tree.body,
-                      'declaration_context': _declaration_context(node, self.scopes),
+                      'declaration_context': _declaration_context(node, self.scopes, postponed_annotations),
                       'evidence': 'CLASS_DOCUMENTATION_NOT_BEHAVIOR_PROOF',
                       'runtime_resolution': 'NOT_ESTABLISHED'}
             scope = _scope_syntax(node.body, name, 'class', node.lineno,
-                                  type_parameters=[p.name for p in getattr(node, 'type_params', ())])
+                                  type_parameters=[p.name for p in getattr(node, 'type_params', ())],
+                                  postponed_annotations=postponed_annotations)
             record['binding_context'] = _binding_context(scope, [*self.scopes, scope])
             module['class_definitions'].append(record)
             self.parents.append(node.name); self.classes.append(record); self.kinds.append('class')
@@ -315,12 +379,12 @@ def describe(tree):
                     'CALL_OPERATION' if node.name == '__call__' else 'METHOD') if owner else 'FUNCTION'
             body=[x for x in node.body if not (isinstance(x,ast.Expr) and isinstance(x.value,ast.Constant) and isinstance(x.value.value,str))]
             stub=not body or all(isinstance(x,ast.Pass) or (isinstance(x,ast.Expr) and isinstance(x.value,ast.Constant) and x.value.value is Ellipsis) or (isinstance(x,ast.Raise) and ((isinstance(x.exc,ast.Name) and x.exc.id=='NotImplementedError') or (isinstance(x.exc,ast.Call) and dotted(x.exc.func)=='NotImplementedError'))) for x in body)
-            m = metadata(node.body, params)
+            m = metadata(node.body, params, postponed_annotations)
             scope = _scope_syntax(node.body, name, 'function', node.lineno, params,
-                                  [p.name for p in getattr(node, 'type_params', ())])
+                                  [p.name for p in getattr(node, 'type_params', ())], postponed_annotations)
             m['implementation_kind']='DECLARATION_OR_STUB' if stub else 'BODY_PRESENT_NOT_VERIFIED'
             m.update({'enclosing_functions': list(self.functions),
-                      'declaration_context': _declaration_context(node, self.scopes),
+                      'declaration_context': _declaration_context(node, self.scopes, postponed_annotations),
                       'binding_context': _binding_context(scope, [*self.scopes, scope]),
                       'enclosing_class': self.classes[-1]['name'] if self.classes else None,
                       # The class body context remains on its module record;

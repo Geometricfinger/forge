@@ -46,6 +46,31 @@ def load_base(root):
     return corpus,initialize,Workbench
 
 
+def query_filters(question):
+    filters={'record_kind':'function'}
+    if 'required_api' in question:filters['required_apis']=[question['required_api']]
+    return filters
+
+
+def validate_questions(questions,forge_root):
+    """Use the selected Workbench's query policy before admitting new work.
+
+    Reference-only questions use the runner's separate text search, so their
+    existing manifest contract remains unchanged. An empty metadata index checks
+    the actual backend policy without reading source or producing artifacts.
+    """
+    questions=[q for q in questions if q['intent'] in ('code','mixed')]
+    if not questions:return None
+    corpus,_,_=load_base(forge_root)
+    from forge_core.common import Blocked as WorkbenchBlocked
+    from forge_core.retrieval import SearchIndex
+    index=SearchIndex([],'research-query-admission')
+    for q in questions:
+        try:index.query(q['query'],limit=1,filters=query_filters(q))
+        except WorkbenchBlocked as ex:raise Blocked('RESEARCH_QUERY_'+str(ex)) from ex
+    return corpus
+
+
 def text_chunks(text,source,kind=None):
     lines=text.splitlines();rows=[]
     for start in range(0,len(lines),32):
@@ -182,18 +207,22 @@ def investigate(q,source_results,forge_root):
     gaps=[{'source':r['source']['id'],'state':r['status'],'gaps':r.get('gaps',[])} for r in selected if r['status'] in ('BLOCKED','UNSUPPORTED_BINARY','CODE_INDEXED_WITH_GAPS','TEXT_ONLY_UNSUPPORTED_LANGUAGE')]
     lexical=[];forgerows=[];reference=[]
     if q['intent'] in ('code','mixed'):
-        index=Lexical(records)
+        corpus=validate_questions([q],forge_root)
+        # Use observed API evidence before either channel's top-k cutoff.
+        # Filtering after truncation can hide a valid lower-ranked candidate.
+        required_api=q.get('required_api')
+        eligible=[r for r in records if not required_api or required_api in r.get('observed_apis',[])]
+        index=Lexical(eligible)
         try:lexical=index.search(q['query'],10)
         finally:index.close()
-        by_id={r['id']:r for r in records}
-        corpus,_,_=load_base(forge_root)
+        by_id={r['id']:r for r in eligible}
         lists=[]
         for source in sorted(selected,key=lambda item:item['source']['id']):
             source_rows=[]
             path=source.get('forge_report_path')
             if path:
                 report=corpus.read_report(Path(path).parent)
-                found=corpus.search(report,q['query'],limit=10,distinct=False,filters={'record_kind':'function'})
+                found=corpus.search(report,q['query'],limit=10,distinct=False,filters=query_filters(q))
                 for r in found['results']:
                     original=by_id.get(r['definition_id'])
                     if original is not None:source_rows.append(project(original,q['query']))

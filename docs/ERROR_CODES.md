@@ -67,6 +67,7 @@ If `reason` is a Python exception name instead of a code:
 | <a id="corpus_source_fields"></a>`CORPUS_SOURCE_FIELDS` | Each manifest row needs `file_id`, `path`, `size`, `sha256`, `source_url` (plus optional `provider`). | forge_core/corpus.py |
 | <a id="corpus_source_sha"></a>`CORPUS_SOURCE_SHA` | Row `sha256` must be 64 lowercase hex characters. | forge_core/corpus.py |
 | <a id="corpus_source_url"></a>`CORPUS_SOURCE_URL` | Row `source_url` does not match its provider: `local` -> `local://<path>`, `synthetic` -> `fixture://<file_id>`, `gdrive` -> `https://drive.google.com/file/d/<file_id>/view`. | forge_core/corpus.py |
+| <a id="decorator_source_boundary"></a>`DECORATOR_SOURCE_BOUNDARY` | A source record or file failed validation. | forge_core/mixed_intake.py |
 | <a id="definition_reindex_required"></a>`DEFINITION_REINDEX_REQUIRED` | A required input or precondition is missing. | forge_core/source_inspection.py |
 | <a id="definition_size_limit"></a>`DEFINITION_SIZE_LIMIT` | A safety size/count limit was exceeded. | forge_core/source_inspection.py |
 | <a id="definition_source_binding"></a>`DEFINITION_SOURCE_BINDING` | A stored record is bound to different inputs/code than the current ones (integrity check). | forge_core/source_inspection.py |
@@ -496,6 +497,7 @@ If `reason` is a Python exception name instead of a code:
 | <a id="required_api"></a>`REQUIRED_API` | A required input or precondition is missing. | runner/research_runner/core.py |
 | <a id="research_context_authority"></a>`RESEARCH_CONTEXT_AUTHORITY` | The record claims an authority Forge never grants (e.g. release approval, execution). | verify.py |
 | <a id="research_group_qualification"></a>`RESEARCH_GROUP_QUALIFICATION` | Invalid search query, filter or index. | verify.py |
+| <a id="research_query_"></a>`RESEARCH_QUERY_` | Invalid search query, filter or index. | runner/research_runner/bridge.py |
 | <a id="result_digest"></a>`RESULT_DIGEST` | Input or stored state failed a validation check (see the raising module). | loop/forge_cycle.py |
 | <a id="result_ledger_changed"></a>`RESULT_LEDGER_CHANGED` | A pinned input changed after it was recorded (hash/identity no longer matches). Start a new run/home, or restore the original file. | runner/research_runner/supervise.py |
 | <a id="result_size"></a>`RESULT_SIZE` | Input or stored state failed a validation check (see the raising module). | loop/forge_cycle.py |

@@ -117,6 +117,17 @@ class DefinitionWindows(unittest.TestCase):
         self.assertEqual(report['coverage']['definitions']['discovered'], 2)
         self.assertEqual(report['coverage']['definitions']['inspection_omitted'], 1)
 
+    def test_parenthesized_decorators_keep_complete_outer_and_nested_windows(self):
+        inner = '    @(\r\n        mark\r\n    )\r\n    def inner():\r\n        return 1\r\n'
+        outer = '@(\r\n    decorate\r\n)\r\nasync def outer():\r\n' + inner + '    return inner\r\n'
+        data = ('LABEL = "before\u2028after"\r\n' + outer).encode()
+        result = self.inspect(data)
+        records = {record['name']: record for record in result['records']}
+        self.assert_complete(records['outer'], outer, data)
+        self.assert_complete(records['outer.inner'], inner, data)
+        self.assertEqual((records['outer']['start_line'], records['outer']['end_line']), (2, 11))
+        self.assertEqual((records['outer.inner']['start_line'], records['outer.inner']['end_line']), (6, 10))
+
     def test_changed_original_during_inspection_cannot_return_bound_records(self):
         data = b'def useful():\n    return 1\n'
         source = self.source(data)
