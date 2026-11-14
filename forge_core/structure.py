@@ -10,7 +10,7 @@ from pathlib import PurePosixPath
 from .common import Blocked
 from .lexical import counts
 
-VERSION = 'lexical-context-5-module-envelope'
+VERSION = 'lexical-context-6-call-bindings'
 MAX_CALLS = 128
 MAX_DECLARATIONS = 64
 MAX_BINDING_CANDIDATES = 8
@@ -118,7 +118,7 @@ def _scope_syntax(nodes, name, kind, line=1, parameters=(), type_parameters=(),
                 result['truncated'] = True
                 if not isinstance(node.ctx, ast.Load): result['bindings_truncated'] = True
             elif isinstance(node.ctx, ast.Load):
-                add('reads', {'name': node.id, 'line': node.lineno,
+                add('reads', {'name': node.id, 'line': node.lineno, 'column': node.col_offset,
                               'scope_uncertain': comprehension,
                               'declaration_scope_uncertain': uncertain_declaration})
             elif not comprehension:
@@ -163,6 +163,7 @@ def _read_context(reads, scopes, *, declaration=False, uncertain_names=()):
     for read in reads[:MAX_CALLS]:
         name = read['name']; candidates = []; status = 'UNRESOLVED_OR_BUILTIN_OR_EXTERNAL'
         chain = list(scopes)
+        redirected_effect = False
         explicit_nonlocal = bool(chain and name in chain[0]['nonlocals'])
         if read.get('scope_uncertain'):
             status = 'COMPREHENSION_SCOPE_UNRESOLVED'; chain = []
@@ -170,10 +171,15 @@ def _read_context(reads, scopes, *, declaration=False, uncertain_names=()):
             status = 'DECLARATION_SCOPE_UNRESOLVED'; chain = []
         elif name in uncertain_names or any(name in scope['type_parameters'] for scope in chain):
             status = 'TYPE_PARAMETER_SCOPE_UNRESOLVED'; chain = []
+        elif (chain and (name in chain[0]['globals'] or name in chain[0]['nonlocals'])
+              and chain[0]['bindings_truncated']):
+            status = 'BINDING_CAPTURE_TRUNCATED'; truncated = True; chain = []
         elif chain and name in chain[0]['globals']:
+            redirected_effect = any(site['name'] == name for site in chain[0]['bindings'])
             chain = [scope for scope in chain if scope['kind'] == 'module']
             status = 'GLOBAL_BINDING_NOT_CAPTURED'
         elif chain and name in chain[0]['nonlocals']:
+            redirected_effect = any(site['name'] == name for site in chain[0]['bindings'])
             chain = [scope for scope in chain[1:] if scope['kind'] == 'function']
             status = 'NONLOCAL_BINDING_NOT_CAPTURED'
         for scope in chain:
@@ -184,6 +190,7 @@ def _read_context(reads, scopes, *, declaration=False, uncertain_names=()):
             if any(x['kind'] == 'from_import' and x.get('symbol') == '*' for x in scope['bindings']):
                 status = 'WILDCARD_IMPORT_BINDING_UNRESOLVED'; break
             if name in scope['globals'] and scope['kind'] != 'module':
+                redirected_effect |= any(site['name'] == name for site in scope['bindings'])
                 if explicit_nonlocal:
                     status = 'NONLOCAL_BINDING_NOT_CAPTURED'; break
                 # An enclosing global declaration prevents capture from a
@@ -198,6 +205,7 @@ def _read_context(reads, scopes, *, declaration=False, uncertain_names=()):
                 if not matches:
                     status = 'GLOBAL_BINDING_NOT_CAPTURED'; break
             elif name in scope['nonlocals']:
+                redirected_effect |= any(site['name'] == name for site in scope['bindings'])
                 continue
             else:
                 matches = [x for x in scope['bindings'] if x['name'] == name]
@@ -214,7 +222,13 @@ def _read_context(reads, scopes, *, declaration=False, uncertain_names=()):
             if declaration and any(x['line'] >= read['line'] for x in matches):
                 status = 'DECLARATION_BINDING_ORDER_UNRESOLVED'
             break
-        references.append({'name': name, 'line': read['line'], 'status': status,
+        if redirected_effect and status in ('LEXICAL_BINDING_CANDIDATE', 'AMBIGUOUS_OR_REBOUND_BINDING',
+                                             'GLOBAL_BINDING_NOT_CAPTURED', 'NONLOCAL_BINDING_NOT_CAPTURED',
+                                             'UNRESOLVED_OR_BUILTIN_OR_EXTERNAL'):
+            # Preserve the original binding-location syntax for review, while
+            # refusing to imply a visible redirected write leaves it callable.
+            status = 'REDIRECTED_BINDING_EFFECT_UNRESOLVED'
+        references.append({'name': name, 'line': read['line'], 'column': read['column'], 'status': status,
                            'candidates': candidates, 'runtime_resolution': 'NOT_ESTABLISHED'})
     return references, truncated or len(reads) > MAX_CALLS
 
@@ -296,12 +310,17 @@ def metadata(nodes, parameters=(), postponed_annotations=False):
                                 'evidence': 'COMPARISON_SYNTAX_NOT_ENFORCED_CONTRACT'})
         if isinstance(node, ast.Call):
             name = dotted(node.func)
+            root = node.func
+            while isinstance(root, ast.Attribute): root = root.value
             if (isinstance(node.func,ast.Attribute) and isinstance(node.func.value,ast.Call)
                 and isinstance(node.func.value.func,ast.Name) and node.func.value.func.id=='super'
                 and not node.func.value.args and not node.func.value.keywords):
                 name='super().'+node.func.attr
+                root=node.func.value.func
             if name and len(name) <= 240:
                 calls.append({'name': name, 'line': node.lineno,
+                              'root_position': {'name': root.id, 'line': root.lineno,
+                                                'column': root.col_offset},
                               'evidence': 'CALL_SYNTAX_NOT_RUNTIME_RESOLUTION'})
         elif isinstance(node, ast.Import):
             for alias in node.names:
@@ -428,19 +447,50 @@ def describe(tree, module_context=None):
     Walker().visit(tree)
     return module, definitions
 
+def _call_binding(meta, call):
+    """Use the same lexical evidence for a call and its corresponding name read.
+
+    Columns distinguish same-line calls in different expression scopes. Missing
+    or bounded-out evidence never falls back to a similarly named definition.
+    """
+    position = call.get('root_position')
+    context = meta.get('binding_context')
+    if not isinstance(position, dict) or not isinstance(context, dict):
+        return {'status': 'CALL_ROOT_BINDING_NOT_CAPTURED_REINDEX_REQUIRED', 'candidates': []}
+    references = [row for row in context.get('references', [])
+                  if all(row.get(key) == position.get(key) for key in ('name', 'line', 'column'))]
+    if len(references) != 1:
+        return {'status': 'BINDING_CAPTURE_TRUNCATED' if context.get('truncated') else
+                'CALL_ROOT_BINDING_NOT_CAPTURED_REINDEX_REQUIRED', 'candidates': []}
+    return references[0]
+
+
+def _unique_binding(reference):
+    sites = reference.get('candidates', [])
+    return sites[0] if reference['status'] == 'LEXICAL_BINDING_CANDIDATE' and len(sites) == 1 else None
+
+
+def _call_import(reference):
+    site = _unique_binding(reference)
+    if site is None or site['kind'] not in ('import', 'from_import') or site.get('symbol') == '*':
+        return None
+    return {'alias': site['name'], 'module': site['module'], 'symbol': site['symbol'],
+            'level': site['level'], 'line': site['line'],
+            'kind': 'import' if site['kind'] == 'import' else 'from'}
+
+
 def declared_apis(meta, module):
-    """Unverified import-based leads only; rebinding/ambiguous aliases are withheld."""
+    """Unverified import-based leads only; use the call root's lexical binding."""
     if module.get('structural_context_complete') is False:
         return []
-    by_alias = {}
-    for row in module.get('imports', []) + meta.get('imports', []):
-        by_alias.setdefault(row['alias'], []).append(row)
-    shadow = set(meta.get('shadowed_roots', [])) | set(module.get('shadowed_roots', []))
     output = []
     for call in meta.get('calls', []):
-        pieces = call['name'].split('.'); alias = pieces[0]; rows = by_alias.get(alias, [])
-        if alias in shadow or len(rows) != 1 or rows[0]['symbol'] == '*': continue
-        imp = rows[0]
+        # A method on super()'s result is not an attribute of an imported
+        # callable named super. The inner call has its own ordinary record.
+        if call['name'].startswith('super().'): continue
+        pieces = call['name'].split('.')
+        imp = _call_import(_call_binding(meta, call))
+        if imp is None: continue
         # Local imports appearing after a call are not candidate evidence for it.
         if imp in meta.get('imports', []) and imp['line'] >= call['line']: continue
         if imp['kind'] == 'import' and imp['alias'] == imp['module'].split('.')[0]:
@@ -543,85 +593,87 @@ def context(report, definition_id, max_references=64):
     imports = {}
     for imp in mod.get('imports', []) + meta.get('imports', []):
         imports.setdefault(imp['alias'], []).append(imp)
-    shadows = set(meta.get('shadowed_roots', [])) | set(mod.get('shadowed_roots', []))
     for call in meta.get('calls', [])[:max_references]:
         parts = call['name'].split('.'); root = parts[0]; candidates = []; reason = 'UNRESOLVED_OR_EXTERNAL'
-        ims = imports.get(root, [])
+        binding = _call_binding(meta, call)
+        site = _unique_binding(binding)
+        imp = _call_import(binding)
         if call['name'].startswith('super().'):
-            candidates,reason=_super_leads(call,meta,mod,segment,universe)
-        elif ims:
-            if root in shadows or len(ims) != 1 or ims[0]['symbol'] == '*':
-                reason = 'AMBIGUOUS_OR_REBOUND_IMPORT'
+            if binding['status'] == 'UNRESOLVED_OR_BUILTIN_OR_EXTERNAL':
+                candidates,reason=_super_leads(call,meta,mod,segment,universe)
             else:
-                imp = ims[0]
-                if imp in meta.get('imports', []) and imp['line'] >= call['line']:
-                    reason = 'IMPORT_AFTER_CALL_REQUIRES_REVIEW'
-                else:
-                    # A from-import points at an explicit module and its symbol.
-                    module = imp['module']; target = '.'.join(parts[1:])
-                    if imp['kind'] == 'from':
-                        if not module and target:
-                            module = imp['symbol']
-                        else:
-                            target = '.'.join([imp['symbol'], *parts[1:]])
-                    elif imp['alias'] == module.split('.')[0] and '.' in module:
-                        target = '.'.join(parts[len(module.split('.')):])
-                    candidates_to_check = [(module, target)]
-                    if imp['kind'] == 'from' and imp['module'] and len(parts) > 1:
-                        # ``from pkg import b; b.h()`` may refer to a submodule
-                        # or an exported class/object. Keep both source leads.
-                        candidates_to_check.append((imp['module'] + '.' + imp['symbol'], '.'.join(parts[1:])))
-                    if imp['level'] and (path is None or imp['level'] > len(path.parent.parts)):
-                        candidates_to_check = []
-                    seen_targets = set(); incomplete_target = False
-                    for module_name, target_name in candidates_to_check:
-                        wanted = None
-                        if imp['level']:
-                            parent = path.parent
-                            for _ in range(imp['level'] - 1): parent = parent.parent
-                            wanted = (parent / module_name.replace('.', '/')).as_posix()
-                        suffix = module_name.replace('.', '/')
-                        for src, seg in module_segments:
-                            p = _module_path(seg)
-                            if not p: continue
-                            stem = p.with_suffix('').as_posix()
-                            match = stem in (wanted, (wanted or '') + '/__init__') if wanted is not None else (
-                                stem in (suffix, suffix + '/__init__') or stem.endswith('/' + suffix) or stem.endswith('/' + suffix + '/__init__'))
-                            if not match: continue
-                            # An omitted target unit may rebind a retained name
-                            # or contain the missing definition itself. Check
-                            # module coverage before looking for that name.
-                            if seg.get('module_structure', {}).get('structural_context_complete') is False:
-                                incomplete_target = True
-                                continue
-                            for d in seg['definitions']:
-                                if d['name'] == target_name and d['definition_id'] not in seen_targets:
-                                    candidates.append((src, seg, d)); seen_targets.add(d['definition_id'])
-                    if incomplete_target:
-                        # A package export and a submodule may both be plausible;
-                        # missing structure in either leaves the import unresolved.
-                        candidates = []; reason = 'TARGET_MODULE_CONTEXT_INCOMPLETE'
+                reason = binding['status']
+        elif imp is not None:
+            if imp in meta.get('imports', []) and imp['line'] >= call['line']:
+                reason = 'IMPORT_AFTER_CALL_REQUIRES_REVIEW'
+            else:
+                # A from-import points at an explicit module and its symbol.
+                module = imp['module']; target = '.'.join(parts[1:])
+                if imp['kind'] == 'from':
+                    if not module and target:
+                        module = imp['symbol']
                     else:
-                        reason = 'DECLARED_IMPORT_CANDIDATE' if candidates else 'DECLARED_IMPORT_TARGET_NOT_IN_SNAPSHOT'
-        elif len(parts) == 1:
-            # A stored local/parameter value must not be mistaken for a callable peer.
-            if root in meta.get('parameter_roots', []) or root in meta.get('shadowed_roots', []) and not any(
-                    d['name'] == definition['name'] + '.' + root for _, seg, d in universe if seg['source_id'] == segment['source_id']):
-                reason = 'LOCAL_OR_PARAMETER_BINDING_UNRESOLVED'
-            else:
-                names = [definition['name'] + '.' + root]
-                names += [p + '.' + root for p in reversed(meta.get('enclosing_functions', []))]
-                names.append(root)
-                for name in names:
-                    candidates = [(src, seg, d) for src, seg, d in universe
-                                  if seg['source_id'] == segment['source_id'] and d['name'] == name]
-                    if candidates: break
-                reason = 'LEXICAL_DEFINITION_CANDIDATE' if candidates else reason
-        elif root == 'self' and root in meta.get('parameter_roots', []) and meta.get('enclosing_class'):
+                        target = '.'.join([imp['symbol'], *parts[1:]])
+                elif imp['alias'] == module.split('.')[0] and '.' in module:
+                    target = '.'.join(parts[len(module.split('.')):])
+                candidates_to_check = [(module, target)]
+                if imp['kind'] == 'from' and imp['module'] and len(parts) > 1:
+                    # ``from pkg import b; b.h()`` may refer to a submodule
+                    # or an exported class/object. Keep both source leads.
+                    candidates_to_check.append((imp['module'] + '.' + imp['symbol'], '.'.join(parts[1:])))
+                if imp['level'] and (path is None or imp['level'] > len(path.parent.parts)):
+                    candidates_to_check = []
+                seen_targets = set(); incomplete_target = False
+                for module_name, target_name in candidates_to_check:
+                    wanted = None
+                    if imp['level']:
+                        parent = path.parent
+                        for _ in range(imp['level'] - 1): parent = parent.parent
+                        wanted = (parent / module_name.replace('.', '/')).as_posix()
+                    suffix = module_name.replace('.', '/')
+                    for src, seg in module_segments:
+                        p = _module_path(seg)
+                        if not p: continue
+                        stem = p.with_suffix('').as_posix()
+                        match = stem in (wanted, (wanted or '') + '/__init__') if wanted is not None else (
+                            stem in (suffix, suffix + '/__init__') or stem.endswith('/' + suffix) or stem.endswith('/' + suffix + '/__init__'))
+                        if not match: continue
+                        # An omitted target unit may rebind a retained name
+                        # or contain the missing definition itself. Check
+                        # module coverage before looking for that name.
+                        if seg.get('module_structure', {}).get('structural_context_complete') is False:
+                            incomplete_target = True
+                            continue
+                        for d in seg['definitions']:
+                            if d['name'] == target_name and d['definition_id'] not in seen_targets:
+                                candidates.append((src, seg, d)); seen_targets.add(d['definition_id'])
+                if incomplete_target:
+                    # A package export and a submodule may both be plausible;
+                    # missing structure in either leaves the import unresolved.
+                    candidates = []; reason = 'TARGET_MODULE_CONTEXT_INCOMPLETE'
+                else:
+                    reason = 'DECLARED_IMPORT_CANDIDATE' if candidates else 'DECLARED_IMPORT_TARGET_NOT_IN_SNAPSHOT'
+        elif binding['status'] not in ('LEXICAL_BINDING_CANDIDATE', 'AMBIGUOUS_OR_REBOUND_BINDING',
+                                      'UNRESOLVED_OR_BUILTIN_OR_EXTERNAL'):
+            reason = binding['status']
+        elif site is not None and site['kind'] == 'function' and len(parts) == 1:
+            name = root if site['scope_kind'] == 'module' else site['scope'] + '.' + root
+            candidates = [(src, seg, d) for src, seg, d in universe
+                          if seg['source_id'] == segment['source_id'] and d['name'] == name
+                          and d.get('definition_line', d['start_line']) == site['line']]
+            reason = 'LEXICAL_DEFINITION_CANDIDATE' if candidates else reason
+        elif (root == 'self' and site is not None and site['kind'] == 'parameter'
+              and site['scope'] == definition['name'] and meta.get('enclosing_class')):
             name = meta['enclosing_class'] + '.' + '.'.join(parts[1:])
             candidates = [(src, seg, d) for src, seg, d in universe
                           if seg['source_id'] == segment['source_id'] and d['name'] == name]
             reason = 'SAME_CLASS_CANDIDATE_DYNAMIC_DISPATCH_UNRESOLVED' if candidates else reason
+        elif imports.get(root):
+            reason = 'AMBIGUOUS_OR_REBOUND_IMPORT'
+        elif binding['status'] == 'AMBIGUOUS_OR_REBOUND_BINDING':
+            reason = binding['status']
+        elif site is not None:
+            reason = 'LOCAL_OR_PARAMETER_BINDING_UNRESOLVED'
         refs = [{'definition_id': d['definition_id'], 'name': d['name'],
                  'source_id': seg['source_id'], 'source_sha256': seg['source_sha256'],
                  **({'analysis_view': copy.deepcopy(seg['analysis_view'])} if 'analysis_view' in seg else {}),

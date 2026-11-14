@@ -106,6 +106,19 @@ binding leads to their defining scope without treating nested bodies as part of
 that scope. Postponed annotations do not contribute binding effects; generic
 declaration and comprehension effects retain explicit uncertainty.
 
+Call candidates and imported API leads use the same captured lexical name
+bindings as the surrounding context. Globals, nonlocals, enclosing parameters,
+exception targets and pattern captures cannot silently link to an unrelated
+same-named function or import. Exact line/UTF-8 column positions distinguish
+same-line expression scopes. Ambiguous or budget-limited bindings withhold the
+candidate; older call records without those positions request reindexing.
+Visible writes, imports or deletions through a global/nonlocal declaration keep
+their original binding-location syntax under an explicit unresolved-effect
+status; they do not retain a callable candidate for the original binding.
+These checks do not make the call inventory complete: for example, calls in
+lambda default expressions are not currently captured in call metadata, and
+runtime dispatch and complete dependency closure remain unestablished.
+
 ## Reconstruct the original bytes
 
 `forge_core.source_blocks.deconstruct(data)` divides up to 8 MB of original bytes
