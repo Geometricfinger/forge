@@ -24,6 +24,7 @@ It never executes the code it inspects and makes no model calls. The analysis co
 - **Local search.** BM25 with reciprocal-rank fusion over definitions, imports and call sites, backed by SQLite FTS5.
 - **Local web UI.** `forge.py serve` binds to `127.0.0.1` only.
 - **Declared transfer review.** `opportunity-review` checks source-bound input/output, unit, frame, timing and effect declarations before recommending experiment components. It does not verify the truth of those declarations.
+- **Behavioral evidence review.** `opportunity-plan` binds an operator-completed test contract to one indexed code lead. `opportunity-review` checks actual artifact bytes and recomputes simple assertions from recorded observations, retaining failed and incomplete cases. It never launches a supplied test or authenticates external execution.
 - **Bounded research follow-ups.** `runner/forge_supervise.py` asks new questions and inspects indexed evidence from a completed mission, without another source-intake pass. Replay, cancellation and the original question budget are retained.
 - **Review packets.** Results are packaged as source-identified leads with hashes so a person can check every claim.
 - **Offline and reproducible.** Analysis makes no network requests or model calls, and Forge has no third-party Python dependencies. Analyzer files are hash-pinned and verified on every workspace.
@@ -162,6 +163,19 @@ It starts no model or shell and does not execute the inspected applications.
 To compare explicitly supplied capability contracts, run the
 [synthetic transfer-review example](examples/transfer_review/README.md). Findings
 remain leads until their meaning and behavior are independently checked.
+
+To connect one selected code lead to declared acceptance cases and recorded
+observations, run the [behavioral review example](examples/behavior_review/README.md):
+
+```sh
+python3 examples/behavior_review/run_demo.py --out "$WORK/behavior-review"
+```
+
+The example indexes synthetic source and assesses illustrative passing, failing
+and incomplete records against the same contract. It does not execute that
+source. The [behavioral evidence guide](docs/BEHAVIORAL_EVIDENCE.md) explains
+source identity, positive/negative controls, artifact verification and the
+remaining limits of operator-supplied observations.
 
 ## Running the tests
 

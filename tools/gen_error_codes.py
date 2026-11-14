@@ -9,10 +9,30 @@ from collections import defaultdict
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 PAT=re.compile(r"Blocked\('([A-Z][A-Z0-9_]*)'")
+BEHAVIOR_PAT=re.compile(r"_fail\('([A-Z][A-Z0-9_]*)'")
 SKIP={'third_party','dependencies','history','evidence','review','__pycache__'}
 
 # Hand-written meanings for the codes a newcomer is most likely to hit.
 KNOWN={
+ 'BEHAVIOR_ARGUMENTS':'Use `--behavior-contract` with `--artifact-root`. `--behavior-evidence` is optional after the contract is complete.',
+ 'BEHAVIOR_REQUIRES_EXISTING_CORPUS':'Use the existing `--home` containing the indexed source. Behavioral commands do not create a replacement corpus.',
+ 'BEHAVIOR_CORPUS_SELECTION':'The selected `--corpus` must also be supplied through `--corpus-run`.',
+ 'BEHAVIOR_CORPUS_BINDING':'The selected corpus binding is malformed or disagrees with its report/current workspace. Restore the original run or create a new corpus run.',
+ 'BEHAVIOR_EXTERNAL_OUTPUT_REQUIRED':'Choose a new report file outside the Forge checkout and separate from every input file.',
+ 'BEHAVIOR_SEPARATE_OUTPUT':'Keep reports outside original indexed source roots, artifact inputs and the workspace engine/corpora directories. Keep the artifact root separate from the workspace.',
+ 'BEHAVIOR_TARGET_NOT_SELECTED':'The selected mechanism must have a declared direct/support role and remain an experiment candidate in the current transfer review.',
+ 'BEHAVIOR_CODE_LEAD':'Choose one current, unambiguous source lead from the selected mechanism and corpus.',
+ 'BEHAVIOR_TARGET_BINDING':'The current opportunity, declaration review or selected code lead differs from the contract. Review the change and create a new plan.',
+ 'BEHAVIOR_SUBJECT_ARTIFACT_BINDING':'The designated subject artifact must contain the exact bytes of the indexed source; hashing a changed candidate does not make it the same lead.',
+ 'BEHAVIOR_PROTOCOL_ARTIFACT_BINDING':'The specification, harness and fixture-manifest hashes must each identify a nonempty declared input artifact.',
+ 'BEHAVIOR_REPORT_ARTIFACT_BINDING':'The external report hash must identify a nonempty output artifact in evidence.artifacts, separate from the pre-run contract artifacts.',
+ 'BEHAVIOR_CONTRACT_BINDING':'The recorded evidence belongs to a different canonical contract. Preserve the acceptance conditions and supply the matching evidence.',
+ 'BEHAVIOR_CONTROL_CATEGORIES':'A completed contract needs at least one positive case and one negative case.',
+ 'BEHAVIOR_RESULT_CASE_IDENTITY':'An evidence case is duplicated or is not present in the contract. Missing cases remain incomplete.',
+ 'BEHAVIOR_RESULT_OUTCOME':'Use a string outcome: OBSERVED, ERROR, SKIPPED or NOT_RUN. Do not supply a trusted pass flag.',
+ 'BEHAVIOR_UNEXECUTED_OBSERVATIONS':'ERROR, SKIPPED and NOT_RUN rows must have empty observations; explain the outcome in detail.',
+ 'BEHAVIOR_ASSERTION_OP':'Use only equal or finite_range. Expressions, callbacks and external test commands are not accepted.',
+ 'BEHAVIOR_TRANSFER_':'Raised with the underlying transfer-review error suffix when the supplied opportunity or declaration registry is invalid.',
  'NO_AVAILABLE_REQUEST_CHECK_STATUS':'`packet` has nothing to hand out right now. Either a packet is already out (accept its response or wait ~5 min for the lease to expire), the GitHub provider is cooling down / on hold / out of request budget, or every task is DONE or BLOCKED (e.g. after `run`). The JSON now carries a `detail.explanation` saying which. Check `forge.py status --mission ID`.',
  'INVALID_JSON':'The file is not valid UTF-8 JSON. Commands that take JSON (`--bundle`, `--contract`, `--filters`, `review-note --file`, ...) need a JSON object. `opportunity-draft --file` also accepts plain-text notes; a file whose first character is `{` is parsed as JSON.',
  'REUSE_RECORD_FIELDS':'The `review-new` contract has missing or extra fields. A requirement contract needs exactly `schema` (1), `title`, `objective`, `requirements`. `contracts/reuse_trial.json` is a frozen test fixture, not a contract; use the default `templates/reuse_contract.json` (or omit `--contract`).',
@@ -95,7 +115,12 @@ def collect():
     for p in sorted(ROOT.rglob('*.py')):
         rel=p.relative_to(ROOT)
         if set(rel.parts)&SKIP or any(x.startswith('.') for x in rel.parts):continue
-        for c in PAT.findall(p.read_text(encoding='utf-8',errors='replace')):found[c].add(rel.as_posix())
+        body=p.read_text(encoding='utf-8',errors='replace')
+        for c in PAT.findall(body):found[c].add(rel.as_posix())
+        # This module uses one fixed prefix helper; collect its literal codes
+        # as well as direct Blocked sites, without importing application code.
+        if rel.as_posix()=='forge_core/behavior_review.py':
+            for c in BEHAVIOR_PAT.findall(body):found['BEHAVIOR_'+c].add(rel.as_posix())
     return found
 
 def render(found):
