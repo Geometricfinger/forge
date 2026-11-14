@@ -34,6 +34,15 @@ on macOS. The product still rejects symlinked input and workspace paths.
 
 Use `contracts/MISSION.json` as the source/query schema. Each input has a local relative path, source kind, capture method, origin, family, byte size and SHA-256. GitHub sources additionally need repository, full commit, repository path and Git blob hash. External text cannot add commands or permissions.
 
+Code and mixed questions must also satisfy the selected Workbench's actual search
+policy: at most 200 characters, no control characters, and 1–32 distinct searchable
+terms after its tokenizer. Initial missions validate this before creating their
+workspace. Reference-only questions retain the separate 400-character manifest
+contract. An optional `required_api` uses observed API evidence and is applied
+before either code-search channel's result limit; mentioning an API in prose is
+not an observation. Observations come from the bound corpus, including when a
+source-text query matches a name that is absent from the metadata search fields.
+
 ```sh
 python3 forge_research.py run --manifest my_mission.json --source-root /approved/copies --work /new/mission-work --forge-root ..
 python3 forge_research.py status --work /new/mission-work
@@ -46,6 +55,32 @@ Cancellation is checked between stages. There is no retry daemon, scheduler or m
 
 Example sources from CPython, Blinker and Pluggy are unchanged and accompanied by their licenses under `third_party/`. Research and teaching entries are short summaries, not full publications. The report does not grant permission to execute source, deploy, or claim novelty or demand. A matching term is not a proven behavior.
 
+
+### Callable and module evidence
+
+Research retains both function definitions and the core corpus's supported
+module/script records. Results, compact packets and inspected evidence carry
+`record_kind`: `function` or `source_scope`. A module record uses the core's
+source occurrence identity, has the name `<module>`, and is never presented as a
+function. Source summaries count `definition_count` and `source_scope_count`
+separately. The corpus still determines which module records are available;
+this does not add another parser or infer API calls from source text.
+
+A `source_scope` record contains the complete containing Python segment,
+including surrounding declarations and any nested functions. Its observed APIs
+are the corpus's observations for that module scope. The retained UTF-8 source
+window has exact offsets and hashes, just as function windows do. The existing
+250,000-byte per-window and 25,000,000-character per-source retention budgets
+still apply. Previously supported functions receive retention space first;
+module context that cannot fit receives `SOURCE_SCOPE_RETENTION_LIMIT`.
+Larger eligible modules receive `SOURCE_SCOPE_SIZE_LIMIT` in the source gaps
+instead of a prefix labeled complete. Unsupported languages remain text-only
+references, and retained source remains private in the Runner workspace; the
+core corpus still stores no source bodies.
+
+The added result fields retain report schema 1. Runner code is part of mission
+identity, so existing completed missions must be recreated in a fresh external
+workspace after this update; do not rewrite their binding or checkpoint files.
 
 ## Supervisor continuation
 
@@ -70,13 +105,18 @@ Requests are exact data-only objects (unknown fields are rejected):
 
 `inspect` requires `request_id`, `source_id`, an `evidence_id` returned by the
 existing index, and `max_chars` from 16 to 4096. It does not accept arbitrary file
-paths. `{"action":"status"}` reports consumed/remaining question budget;
+paths. Function and module inspections preserve `record_kind` and the bound
+`source_window`; `truncated` describes the returned excerpt, while the window's
+hash and byte count describe the complete indexed source.
+`{"action":"status"}` reports consumed/remaining question budget;
 `{"action":"cancel"}` stops new continuation requests. A repeated completed
 request replays its saved result, even after cancellation. It does not rerun work.
 An interrupted reservation requires review and is not automatically retried.
 
 The original mission questions count toward `max_questions`; failed/reserved
-follow-ups consume slots too. Inspections have a separate cap equal to that
+follow-ups consume slots too. An invalid code-search query or API filter is
+rejected before a follow-up is reserved, without changing its question budget,
+completed reports or supervision ledger. Inspections have a separate cap equal to that
 original question budget. Request JSON is limited to 16 KiB. Full results stay in
 `work/supervision/`; responses are bounded by the original packet budget. Missing
 inputs or altered source, report, checkpoints, runner code or workbench code block

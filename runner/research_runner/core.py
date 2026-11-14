@@ -145,10 +145,13 @@ def terms(s):
     s=re.sub(r'([a-z0-9])([A-Z])',r'\1 \2',s)
     return [x for x in re.findall('[a-z][a-z0-9]*',s.lower()) if x not in STOP]
 
-def rank_fusion(lexical,forge,limit=5,required_api=None):
+def rank_fusion(lexical,forge,limit=5,required_api=None,forge_observations=None):
     check_int(limit,1,20);merged={}
     # A lexical assertion is not an observed API. Only FORGE contributes those.
     observed={r['id']:r.get('observed_apis',[]) for r in forge}
+    # The bridge can supply the bound corpus's observations independently of
+    # metadata query hits. A lexical text match still contributes no API proof.
+    if forge_observations is not None:observed.update(forge_observations)
     for channel,rows in [('lexical',lexical),('forge',forge)]:
         seen=set()
         for rank,r in enumerate(rows,1):
@@ -197,7 +200,7 @@ def compact_packet(report,max_bytes):
         for xs in queues:
             if index>=len(xs):continue
             entry,field,r=xs[index]
-            keep={k:r[k] for k in ('id','source_id','name','path','start_line','end_line','source_sha256','origin','kind','channels') if k in r}
+            keep={k:r[k] for k in ('id','source_id','name','path','start_line','end_line','source_sha256','origin','kind','record_kind','channels','analysis_view') if k in r}
             keep['excerpt']=str(r.get('snippet',r.get('text','')))[:160]
             entry[field].append(keep)
             if len(canonical(p))+128>max_bytes:entry[field].pop()

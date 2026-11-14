@@ -9,12 +9,11 @@ def canonical(obj): return json.dumps(obj,sort_keys=True,separators=(',',':'),en
 def sha(data): return hashlib.sha256(data).hexdigest()
 def git_sha(data): return hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest()
 def loads(data):
-    if isinstance(data,bytes): data=data.decode('utf-8')
     def pairs(rows):
-        d={}
-        for k,v in rows:
-            if k in d: raise Blocked('DUPLICATE_JSON_KEY')
-            d[k]=v
+        # JSON keys are strings. Native construction preserves their values and
+        # order; a shorter result means at least one decoded key was repeated.
+        d=dict(rows)
+        if len(d)!=len(rows): raise Blocked('DUPLICATE_JSON_KEY')
         return d
     def reject(s):raise Blocked('NONFINITE_JSON')
     def finite(x):
@@ -23,7 +22,9 @@ def loads(data):
             for v in x.values():finite(v)
         elif isinstance(x,list):
             for v in x:finite(v)
-    try:r=json.loads(data,object_pairs_hook=pairs,parse_constant=reject);finite(r);return r
+    try:
+        if isinstance(data,bytes): data=data.decode('utf-8')
+        r=json.loads(data,object_pairs_hook=pairs,parse_constant=reject);finite(r);return r
     except (json.JSONDecodeError,UnicodeError,RecursionError) as e:raise Blocked('INVALID_JSON') from e
 
 def integer(n,low,high):

@@ -44,6 +44,8 @@ It never executes the code it inspects and makes no model calls. The analysis co
 For the complete capability inventory, including separate prototypes and unimplemented requirements, see [docs/CAPABILITIES.md](docs/CAPABILITIES.md).
 
 The layers reflect how Forge grew. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) explains which component owns what.
+For how indented Python fences retain their original bytes while receiving a
+bound analysis view, see [docs/SOURCE_VIEWS.md](docs/SOURCE_VIEWS.md).
 
 The analyzer (`loop/`, `addon/`, `hound/`) ships as plain source. Each component has a `SHA256SUMS.txt`, and `contracts/analyzer_lock.json` pins those manifests. When you create a workspace, Forge copies the analyzer into the workspace and verifies every file. After an intentional analyzer change, run `python3 tools/update_analyzer_manifests.py` and review the diff.
 
@@ -95,6 +97,9 @@ Point Forge at a plain folder; no manifest needed:
 python3 forge.py --home ~/forge-home corpus-run --source-root examples/hello_local --run-id first
 python3 forge.py --home ~/forge-home --human corpus-search --run-id first --query "subprocess.run" --distinct
 python3 forge.py --home ~/forge-home corpus-context --run-id first --definition <definition_id from the search>
+
+# Explicitly inspect a complete definition from the unchanged original sources.
+python3 forge.py --home ~/forge-home corpus-inspect --run-id first --definition <definition_id from the search> --source-root /path/to/sources
 ```
 
 Replace `examples/hello_local` with your own folder. Forge reads `.py .pyi .pyw .ipynb .zip .txt .md .markdown .rst` files (hidden files and symlinks are skipped), records their structure and **never runs them**. A `--run-id` is pinned to the exact folder contents, so use a new id after you edit files.
@@ -167,9 +172,9 @@ CHECKS="$(cd "$CHECKS" && pwd -P)"
 mkdir -p "$CHECKS/tmp"
 export TMPDIR="$CHECKS/tmp" PYTHONDONTWRITEBYTECODE=1
 
-python3 run_tests.py --out "$CHECKS/workbench"         # Workbench suite (893 tests)
-python3 hound/run_tests.py --out "$CHECKS/hound"       # Hound suite (483 tests)
-python3 runner/run_tests.py                          # Research runner and continuation (102 tests)
+python3 run_tests.py --out "$CHECKS/workbench"         # Workbench suite
+python3 hound/run_tests.py --out "$CHECKS/hound"       # Hound suite
+python3 runner/run_tests.py                          # Research runner and continuation
 python3 runner/run_demo.py --out "$CHECKS/research"    # Research runner demo mission
 python3 verify.py --out "$CHECKS/qualification"       # Workbench, Hound, add-on, loop, contract and recovery qualification
 ```
@@ -214,6 +219,10 @@ The upload contains only the workflow's public synthetic fixtures, not user corp
 ```sh
 FORGE_DENYLIST=/path/outside/repo/denylist.txt python3 tools/prepublish_check.py --history
 ```
+
+## Feedback
+
+Tried Forge or just exploring? [Share feedback or ask a usage question](https://github.com/Geometricfinger/forge/issues/new?template=feedback.md). Tell us what helped, what was confusing, or what you would like to do next. For a reproducible bug or a specific feature request, choose the corresponding [issue template](https://github.com/Geometricfinger/forge/issues/new/choose).
 
 ## Contributing
 
