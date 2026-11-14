@@ -30,7 +30,7 @@ python3 forge.py --help
 
 1. **Do not modify Forge** while analysing someone's code. The workspace is bound to the exact Forge source; any change to it invalidates existing workspaces (`WORKBENCH_CODE_CHANGED_NEW_HOME_REQUIRED`).
 2. **Do not modify the target code.** Forge only reads it. Do not write manifests, profiles or workspaces into the target folder.
-3. **Keep the workspace outside both the Forge checkout and the target folder.** Forge refuses a workspace inside its own checkout and refuses run output inside the target, but it may already have created the workspace folder by then. Use the separate `WORK` folder shown below.
+3. **Keep the workspace outside both the Forge checkout and the target folder.** Forge refuses a workspace inside its own checkout and refuses run output inside the target, but the CLI validates this separation before creating its workspace. Use the separate `WORK` folder shown below.
 4. **Do not upload, paste or send the user's code or Forge's output anywhere** (issue trackers, pastebins, chat services, other APIs) unless the user explicitly asks. Everything stays on the local machine.
 5. **Do not run the scanned code** to "confirm" a finding unless the user explicitly asks and understands the risk.
 6. **Report findings as leads, not proven vulnerabilities.** Always give file, line and function, say that the result is static and unverified at runtime, and mention any gaps or unanalysed files.
@@ -58,7 +58,7 @@ If `TARGET` is your home folder or contains `$HOME/forge-work`, choose a `WORK` 
 
 ### 2. Build a manifest
 
-`corpus-run` reads only the files listed in a manifest. Each entry pins the file's relative path, size and SHA-256. For local files use `"provider": "synthetic"` with `"source_url": "fixture://<file_id>"`; this is the local-file provider and does not mean the code is fake. This script lists every Python file and notebook under `TARGET`, skipping VCS, virtualenv, dependency and build folders:
+`corpus-run` reads only the files listed in a manifest. Each entry pins the file's relative path, size and SHA-256. For actual local files use `"provider": "local"` with `"source_url": "local://<path>"`. Reserve `synthetic` / `fixture://<file_id>` for deliberately constructed fixtures. Prefer the built-in `make-manifest` command or omit `--manifest` for a bounded plain-folder scan. This script lists every Python file and notebook under `TARGET`, skipping VCS, virtualenv, dependency and build folders:
 
 ```sh
 python3 - "$TARGET" "$WORK/$RUN-manifest.json" <<'PY'
@@ -77,8 +77,8 @@ for d, dirs, names in os.walk(root):
         data = open(p, 'rb').read()
         if len(data) > 8_000_000:
             continue
-        files.append({'provider': 'synthetic', 'file_id': rel, 'path': rel, 'size': len(data),
-                      'sha256': hashlib.sha256(data).hexdigest(), 'source_url': 'fixture://' + rel})
+        files.append({'provider': 'local', 'file_id': rel, 'path': rel, 'size': len(data),
+                      'sha256': hashlib.sha256(data).hexdigest(), 'source_url': 'local://' + rel})
 if not files:
     sys.exit('No Python files found under ' + root)
 if len(files) > 500:
@@ -193,6 +193,8 @@ The manifest pins file hashes, and a run id is bound to its manifest and profile
 - Bundled demo, end to end: `python3 "$FORGE/examples/demo/run_demo.py" --out "$WORK/demo"` (the folder must not exist). It should print `"scan_status": "COMPLETED_FOR_SELECTED_CONTAINERS"` and exit 0.
 - Local web UI: `python3 "$FORGE/forge.py" --home "$WORK/forge-home" serve` (binds to `127.0.0.1` only; add `--no-browser` to just print the URL). Only start it if the user asks, and stop it afterwards.
 - Opportunity Lab (`opportunity-demo`, `opportunity-run`, etc.), reuse review (`review-*`, `reuse-demo`) and contract trial (`contract-*`): see `python3 forge.py <command> --help` and the code in `forge_core/`. You do not need them for code analysis.
+- Transfer Review: `opportunity-review --bundle FILE --registry FILE` preserves Opportunity Lab output and checks declared contracts. See `examples/transfer_review/README.md`. A compatible declaration is not tested behavior or release approval.
+- Research continuation: `runner/forge_supervise.py` provides data-only `ask`, `inspect`, `status`, and `cancel` for a completed mission; it does not give the caller execution rights. See `runner/README.md`.
 - Research runner (`runner/`): bounded multi-source research missions that produce a review packet. Run its demo with `python3 "$FORGE/runner/run_demo.py" --out "$WORK/research-demo"`. Custom missions need a full mission file in the format of `runner/contracts/MISSION.json`; see `runner/README.md`.
 
 ## Verify the Forge installation
@@ -216,7 +218,7 @@ python3 verify.py --out "$WORK/qualification"            # Full qualification (a
 |---|---|
 | `SYMLINK_PATH` | A path passes through a symlink (on macOS `/tmp` is one). Use `pwd -P` as in step 1, or a folder under `$HOME`. |
 | `SEPARATE_WORKSPACE_REQUIRED` | `--home` is inside the Forge checkout. Use `$WORK/forge-home`. |
-| `CORPUS_SEPARATE_OUTPUT` | The workspace is inside `TARGET` (or the reverse). Move `WORK` elsewhere and delete any workspace folder Forge created inside the target. |
+| `CORPUS_SEPARATE_OUTPUT` | The workspace is inside `TARGET` (or the reverse). Move `WORK` elsewhere. The CLI refuses this overlap before initialization; do not delete source files to work around the refusal. |
 | `SOURCE_ROOT` | `--source-root` is not an existing folder. |
 | `CORPUS_MANIFEST`, `CORPUS_SOURCE_FIELDS`, `CORPUS_SOURCE_URL`, `CORPUS_PROVIDER`, `DUPLICATE_CORPUS_SOURCE`, `REPOSITORY_PATH`, `CORPUS_COUNT` | The manifest is malformed. Regenerate it with step 2. |
 | `SOURCE_VERSION_MISMATCH` in `coverage.blocked` | The file changed after the manifest was built. Rebuild the manifest and use a new run id. |
@@ -243,3 +245,5 @@ Only when the user asks you to change Forge itself (not when analysing their cod
 - Before opening a pull request, `python3 verify.py --out <new folder outside the repo>` and `python3 tools/prepublish_check.py --history` must pass.
 - Never commit secrets, personal data, absolute home-directory paths or real scan output. Use synthetic examples like `examples/demo/`.
 - Report security problems privately as described in [SECURITY.md](SECURITY.md), not in public issues.
+
+See [docs/CAPABILITIES.md](docs/CAPABILITIES.md) before attributing historical prototype capabilities to this checkout. No private corpus is required or licensed by the public repository.

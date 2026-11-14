@@ -1,0 +1,123 @@
+{
+  "schema": 1,
+  "bundle_sha256": "d70e0cf498bb9dc6d62c8faf8f9190c6e3425b1a15f8063622820918f3f3370a",
+  "annotation_basis": "SUPERVISOR_DECLARED_NOT_INDEPENDENTLY_VERIFIED",
+  "mechanisms": {
+    "matching": {
+      "mechanism_sha256": "0f19d009c53a06dcca56364008b4cec956196cdbf3267947e51b6179aa3f78bb",
+      "source_bindings": {
+        "operator": "e3afb5ed6cc172f9334405b88c2270201ab917d9b9fcb27458c80150fe12a7ee"
+      },
+      "contract": {
+        "id": "matching",
+        "domain": "catalog records",
+        "inputs": {
+          "attributes": {
+            "kind": "attributes",
+            "unit": "n/a",
+            "frame": "n/a",
+            "clock": "n/a"
+          },
+          "distinguishing_information": {
+            "kind": "distinguishing_information",
+            "unit": "n/a",
+            "frame": "n/a",
+            "clock": "n/a"
+          }
+        },
+        "outputs": [
+          {
+            "kind": "identity_candidates",
+            "unit": "n/a",
+            "frame": "n/a",
+            "clock": "n/a"
+          }
+        ],
+        "effects": [],
+        "preserves": []
+      }
+    },
+    "record": {
+      "mechanism_sha256": "8345c96718d2fa76627397ee2dd3809e960448a2db845bb88dc1786aa57e9668",
+      "source_bindings": {
+        "operator": "e3afb5ed6cc172f9334405b88c2270201ab917d9b9fcb27458c80150fe12a7ee"
+      },
+      "contract": {
+        "id": "record",
+        "domain": "software provenance",
+        "inputs": {
+          "artifact": {
+            "kind": "artifact",
+            "unit": "n/a",
+            "frame": "n/a",
+            "clock": "n/a"
+          }
+        },
+        "outputs": [
+          {
+            "kind": "identity_evidence",
+            "unit": "n/a",
+            "frame": "n/a",
+            "clock": "n/a"
+          }
+        ],
+        "effects": [],
+        "preserves": []
+      }
+    }
+  },
+  "workflows": {
+    "handoff": {
+      "workflow_sha256": "57d0102fca8fd8f920d3f121c417fa450348df381d6256e43ba78e646fded3b9",
+      "available_contracts": {
+        "artifact": {
+          "kind": "artifact",
+          "unit": "n/a",
+          "frame": "n/a",
+          "clock": "n/a"
+        },
+        "attributes": {
+          "kind": "attributes",
+          "unit": "n/a",
+          "frame": "n/a",
+          "clock": "n/a"
+        },
+        "file": {
+          "kind": "file",
+          "unit": "n/a",
+          "frame": "n/a",
+          "clock": "n/a"
+        }
+      },
+      "need_contracts": {
+        "identity": {
+          "roles": [
+            {
+              "id": "preserved-record",
+              "mode": "support",
+              "contract": {
+                "kind": "identity_evidence",
+                "unit": "n/a",
+                "frame": "n/a",
+                "clock": "n/a"
+              }
+            },
+            {
+              "id": "candidate-list",
+              "mode": "support",
+              "contract": {
+                "kind": "identity_candidates",
+                "unit": "n/a",
+                "frame": "n/a",
+                "clock": "n/a"
+              }
+            }
+          ],
+          "allowed_effects": [],
+          "required_preserves": [],
+          "domain": "engineering"
+        }
+      }
+    }
+  }
+}

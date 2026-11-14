@@ -15,7 +15,7 @@ def verify_base(root):
     The engine pins its analyzer through contracts/analyzer_lock.json and the
     component SHA256SUMS.txt manifests; every listed file is re-hashed here.
     """
-    root=no_links(Path(root).resolve())
+    root=no_links(root)
     if not (root/'forge.py').is_file() or not (root/'forge_core').is_dir():raise Blocked('FORGE_ENGINE_MISSING')
     lock=json.loads((root/'contracts/analyzer_lock.json').read_text())
     count=0
@@ -26,7 +26,13 @@ def verify_base(root):
             h,rel=line.split('  ',1);p=no_links(root/relpath(name)/relpath(rel))
             if not p.is_file() or sha(p.read_bytes())!=h:raise Blocked('FORGE_ANALYZER_CHANGED')
             count+=1
-    return {'analyzer_lock_sha256':sha((root/'contracts/analyzer_lock.json').read_bytes()),'files_verified':count}
+    # Analyzer identity alone does not bind retrieval or opportunity behavior.
+    # Keep this data-only: do not import a second/foreign workbench to hash it.
+    files=[root/'forge.py',*sorted((root/'forge_core').glob('*.py'))]
+    files += [p for folder in ('templates','contracts') for p in sorted((root/folder).glob('*.json'))]
+    code={str(p.relative_to(root)):sha(no_links(p).read_bytes()) for p in files}
+    return {'analyzer_lock_sha256':sha((root/'contracts/analyzer_lock.json').read_bytes()),
+            'files_verified':count,'workbench_code_sha256':digest(code)}
 
 
 def load_base(root):
