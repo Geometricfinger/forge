@@ -172,9 +172,9 @@ CHECKS="$(cd "$CHECKS" && pwd -P)"
 mkdir -p "$CHECKS/tmp"
 export TMPDIR="$CHECKS/tmp" PYTHONDONTWRITEBYTECODE=1
 
-python3 run_tests.py --out "$CHECKS/workbench"         # Workbench suite (964 tests)
-python3 hound/run_tests.py --out "$CHECKS/hound"       # Hound suite (483 tests)
-python3 runner/run_tests.py                          # Research runner and continuation (102 tests)
+python3 run_tests.py --out "$CHECKS/workbench"         # Workbench suite
+python3 hound/run_tests.py --out "$CHECKS/hound"       # Hound suite
+python3 runner/run_tests.py                          # Research runner and continuation
 python3 runner/run_demo.py --out "$CHECKS/research"    # Research runner demo mission
 python3 verify.py --out "$CHECKS/qualification"       # Workbench, Hound, add-on, loop, contract and recovery qualification
 ```
@@ -219,6 +219,10 @@ The upload contains only the workflow's public synthetic fixtures, not user corp
 ```sh
 FORGE_DENYLIST=/path/outside/repo/denylist.txt python3 tools/prepublish_check.py --history
 ```
+
+## Feedback
+
+Tried Forge or just exploring? [Share feedback or ask a usage question](https://github.com/Geometricfinger/forge/issues/new?template=feedback.md). Tell us what helped, what was confusing, or what you would like to do next. For a reproducible bug or a specific feature request, choose the corresponding [issue template](https://github.com/Geometricfinger/forge/issues/new/choose).
 
 ## Contributing
 
