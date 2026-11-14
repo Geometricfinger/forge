@@ -1,8 +1,12 @@
 # Forge
 
+Created by **Lane Coulson / [Geometricfinger](https://github.com/Geometricfinger)**.
+
+Public contact: [coulsonlane@gmail.com](mailto:coulsonlane@gmail.com).
+
 Forge is a local, deterministic, model-free static-analysis workbench for **Python source code**. It reads Python files you explicitly give it (plain files, ZIPs, notebooks and Python code blocks in text files), records structure (definitions, classes, imports, calls) and the call sites of APIs you name in a data-only profile, lets you search that metadata, and packages source-identified leads for human review. Files in other languages are listed but not analysed.
 
-It never executes the code it inspects and makes no model calls. Analysis is fully offline: no command in this README touches the network. The only network feature is optional, operator-started GitHub discovery of public example code; see [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) for exactly what it sends and its limits.
+It never executes the code it inspects and makes no model calls. The analysis commands below work offline after cloning the repository. The only network feature in Forge is optional, operator-started GitHub discovery of public example code; see [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) for exactly what it sends and its limits.
 
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
@@ -19,6 +23,8 @@ It never executes the code it inspects and makes no model calls. Analysis is ful
 - **Mixed-source corpus intake.** Plain files, ZIP archives, notebooks and saved transcripts, each pinned by size and SHA-256 in a manifest.
 - **Local search.** BM25 with reciprocal-rank fusion over definitions, imports and call sites, backed by SQLite FTS5.
 - **Local web UI.** `forge.py serve` binds to `127.0.0.1` only.
+- **Declared transfer review.** `opportunity-review` checks source-bound input/output, unit, frame, timing and effect declarations before recommending experiment components. It does not verify the truth of those declarations.
+- **Bounded research follow-ups.** `runner/forge_supervise.py` asks new questions and inspects indexed evidence from a completed mission, without another source-intake pass. Replay, cancellation and the original question budget are retained.
 - **Review packets.** Results are packaged as source-identified leads with hashes so a person can check every claim.
 - **Offline and reproducible.** Analysis makes no network requests or model calls, and Forge has no third-party Python dependencies. Analyzer files are hash-pinned and verified on every workspace.
 - **Opt-in public discovery.** `forge.py run` (or **Run** in the UI) can search GitHub for public, permissively licensed example code with bounded, GET-only requests. It never runs unless you start it. See [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md).
@@ -35,7 +41,11 @@ It never executes the code it inspects and makes no model calls. Analysis is ful
 | `examples/demo/` | Public demo pack. Synthetic data only. |
 | `tests/`, `tools/`, `contracts/`, `templates/`, `assets/` | Test suite, maintenance tools, frozen test contracts, profile templates and web UI assets. |
 
+For the complete capability inventory, including separate prototypes and unimplemented requirements, see [docs/CAPABILITIES.md](docs/CAPABILITIES.md).
+
 The layers reflect how Forge grew. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) explains which component owns what.
+For how indented Python fences retain their original bytes while receiving a
+bound analysis view, see [docs/SOURCE_VIEWS.md](docs/SOURCE_VIEWS.md).
 
 The analyzer (`loop/`, `addon/`, `hound/`) ships as plain source. Each component has a `SHA256SUMS.txt`, and `contracts/analyzer_lock.json` pins those manifests. When you create a workspace, Forge copies the analyzer into the workspace and verifies every file. After an intentional analyzer change, run `python3 tools/update_analyzer_manifests.py` and review the diff.
 
@@ -48,7 +58,7 @@ The analyzer (`loop/`, `addon/`, `hound/`) ships as plain source. Each component
 There is nothing to install. Clone the repository and run it with Python:
 
 ```sh
-git clone <this repository URL> forge
+git clone https://github.com/Geometricfinger/forge.git forge
 cd forge
 python3 forge.py --help
 ```
@@ -58,16 +68,24 @@ On macOS you can also double-click `Start_FORGE.command` (or run `./Start_FORGE.
 ## Quick start
 
 ```sh
+# Keep work outside the checkout and resolve symlinked parent directories.
+mkdir -p "$HOME/forge-work"
+WORK="$(cd "$HOME/forge-work" && pwd -P)"
+
 # Run the bundled demo end to end (scan, search, opportunity case study)
-python3 examples/demo/run_demo.py --out /tmp/forge-demo
+python3 examples/demo/run_demo.py --out "$WORK/demo"
 
 # Or drive the CLI yourself
-python3 forge.py --home /tmp/forge-home init
-python3 forge.py --home /tmp/forge-home corpus-run --source-root examples/demo/src \
+python3 forge.py --home "$WORK/home" init
+python3 forge.py --home "$WORK/home" corpus-run --source-root examples/demo/src \
     --manifest examples/demo/manifest.json --run-id demo --profile examples/demo/profile.json
-python3 forge.py --home /tmp/forge-home corpus-search --run-id demo --query "pickle load"
-python3 forge.py --home /tmp/forge-home serve          # web UI on 127.0.0.1
+python3 forge.py --home "$WORK/home" corpus-search --run-id demo --query "pickle load"
+python3 forge.py --home "$WORK/home" serve          # web UI on 127.0.0.1
 ```
+
+Use a new demo output folder for another run. On macOS, `/tmp` and `/var` are
+symlinks; passing them directly to workspace commands returns `SYMLINK_PATH`.
+The physical `WORK` path above preserves Forge's symlink checks.
 
 See `examples/demo/README.md` for how to point Forge at your own code. A workspace (`--home`) must be outside the repository. The default is `~/.forge-workbench-0.8.4` (a fixed folder name, not the release version).
 
@@ -79,6 +97,9 @@ Point Forge at a plain folder; no manifest needed:
 python3 forge.py --home ~/forge-home corpus-run --source-root examples/hello_local --run-id first
 python3 forge.py --home ~/forge-home --human corpus-search --run-id first --query "subprocess.run" --distinct
 python3 forge.py --home ~/forge-home corpus-context --run-id first --definition <definition_id from the search>
+
+# Explicitly inspect a complete definition from the unchanged original sources.
+python3 forge.py --home ~/forge-home corpus-inspect --run-id first --definition <definition_id from the search> --source-root /path/to/sources
 ```
 
 Replace `examples/hello_local` with your own folder. Forge reads `.py .pyi .pyw .ipynb .zip .txt .md .markdown .rst` files (hidden files and symlinks are skipped), records their structure and **never runs them**. A `--run-id` is pinned to the exact folder contents, so use a new id after you edit files.
@@ -131,21 +152,58 @@ Each row needs `file_id` (unique, any id), `path` (relative to `--source-root`),
 | `gdrive` (default) | the Google Drive file view URL for `file_id` | files downloaded from Google Drive |
 | `synthetic` | `fixture://<file_id>` | built-in test fixtures |
 
+## Research and reuse review
+
+A completed research mission can be continued through the data-only interface
+in [`runner/forge_supervise.py`](runner/forge_supervise.py). See
+[runner/README.md](runner/README.md#supervisor-continuation) for request formats.
+It starts no model or shell and does not execute the inspected applications.
+
+To compare explicitly supplied capability contracts, run the
+[synthetic transfer-review example](examples/transfer_review/README.md). Findings
+remain leads until their meaning and behavior are independently checked.
+
 ## Running the tests
 
 ```sh
-python3 run_tests.py --out /tmp/forge-tests             # Workbench suite (797 tests)
-python3 hound/run_tests.py --out /tmp/hound-tests       # Hound suite (483 tests)
-(cd runner && python3 -m unittest discover -s tests)   # Research runner (64 tests)
-python3 runner/run_demo.py --out /tmp/forge-research    # Research runner demo mission
-python3 verify.py --out /tmp/forge-qualification        # Full qualification (all of the above plus the controlled cycle, contract trial and self-recovery trial)
+# Fresh external output and a physical temp path also work on macOS.
+CHECKS="$(mktemp -d "${TMPDIR:-/tmp}/forge-checks.XXXXXXXX")"
+CHECKS="$(cd "$CHECKS" && pwd -P)"
+mkdir -p "$CHECKS/tmp"
+export TMPDIR="$CHECKS/tmp" PYTHONDONTWRITEBYTECODE=1
+
+python3 run_tests.py --out "$CHECKS/workbench"         # Workbench suite
+python3 hound/run_tests.py --out "$CHECKS/hound"       # Hound suite
+python3 runner/run_tests.py                          # Research runner and continuation
+python3 runner/run_demo.py --out "$CHECKS/research"    # Research runner demo mission
+python3 verify.py --out "$CHECKS/qualification"       # Workbench, Hound, add-on, loop, contract and recovery qualification
 ```
 
-Output folders must be new and outside the repository.
+Output folders must be new and outside the repository. `verify.py` includes the
+Workbench, Hound, add-on and loop suites; the separate runner commands above
+validate the research runner. It does not run them on your behalf.
+`run_tests.py` and `verify.py` also normalize their own temporary fixture root;
+explicit workspace and output paths must still meet the product's path checks.
 
 ### Continuous verification
 
 Every push to `main` and every pull request runs the same checks in GitHub Actions ([`.github/workflows/qualification.yml`](.github/workflows/qualification.yml)) on Python 3.11 and 3.13: the pre-publish check over the full git history, the full qualification (`verify.py`), the research-runner tests and both demos. Each run publishes its evidence (the `verify.py` output, test logs, demo output, `provenance.json` and `SHA256SUMS.txt`) as a workflow artifact named `forge-verification-<commit-sha>-py<version>`, bound to the exact commit it checked. Branch protection on `main` requires these checks to pass. CI evidence comes from the project's own pipeline, so it shows the checks ran on that commit; it is not an independent evaluation.
+
+### Verify a downloaded CI artifact
+
+After downloading a workflow artifact ZIP, verify its exact file set, both checksum
+records and the intended commit without extracting or executing anything:
+
+```sh
+python3 tools/verify_ci_evidence.py /path/to/evidence.zip --commit <40-character-commit-sha>
+```
+
+Supply `--artifact-sha256 <64-character-digest>` to also compare GitHub's artifact
+digest. The command rejects missing hidden files, unlisted payloads, stale hashes,
+unsafe archive members and inconsistent qualification status. Evidence from a
+failed job can be internally intact: `reported_qualification_passed` stays false.
+Matching receipts are not independent proof of execution or release approval.
+The upload contains only the workflow's public synthetic fixtures, not user corpora.
 
 ## Limits
 
@@ -162,6 +220,10 @@ Every push to `main` and every pull request runs the same checks in GitHub Actio
 FORGE_DENYLIST=/path/outside/repo/denylist.txt python3 tools/prepublish_check.py --history
 ```
 
+## Feedback
+
+Tried Forge or just exploring? [Share feedback or ask a usage question](https://github.com/Geometricfinger/forge/issues/new?template=feedback.md). Tell us what helped, what was confusing, or what you would like to do next. For a reproducible bug or a specific feature request, choose the corresponding [issue template](https://github.com/Geometricfinger/forge/issues/new/choose).
+
 ## Contributing
 
 Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request. In short: keep changes small, add or update tests, run `verify.py` locally, and do not add third-party runtime dependencies.
@@ -177,7 +239,3 @@ The current release is **0.8.4** (`python3 forge.py --version`). Hound, the add-
 ## License
 
 Apache License 2.0. See `LICENSE` and `NOTICE`. Copyright 2026 Forge contributors.
-
-## Say hi 👋
-
-Thanks for stopping by! It's totally okay to just say hi. If you've tried this project or just read through it, we'd love to hear what you think, so feel free to open an issue and share. Got an idea to make it better? Suggestions and pull requests are very welcome, big or small.

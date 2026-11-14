@@ -28,7 +28,7 @@
     },
     {
       "path": "tests/test_opportunities.py",
-      "contains": "name:password@example.org",
+      "contains": "https://name:password@example.org",
       "reason": "Fake URL proving credentials in URIs are rejected."
     },
     {
@@ -52,6 +52,21 @@
       "reason": "Maintainer's public GitHub no-reply commit identity; it is designed to be published and is not a personal mailbox."
     },
     {
+      "path": "git:commit-metadata",
+      "contains": "coulsonlane@gmail.com",
+      "reason": "Maintainer explicitly approved this public contact and commit identity; retain existing history."
+    },
+    {
+      "path": "git:commit-metadata",
+      "contains": "noreply@github.com",
+      "reason": "GitHub's public web-flow committer identity used for merges."
+    },
+    {
+      "path": "README.md",
+      "contains": "coulsonlane@gmail.com",
+      "reason": "Maintainer explicitly approved publishing this exact project contact address."
+    },
+    {
       "path": "tools/gen_error_codes.py",
       "contains": "`gdrive` -> `https://drive.google.com/file/d/<file_id>/view`",
       "reason": "Generic URL template for the optional Google Drive source provider; no file ID."
@@ -60,6 +75,11 @@
       "path": "docs/ERROR_CODES.md",
       "contains": "`gdrive` -> `https://drive.google.com/file/d/<file_id>/view`",
       "reason": "Generated from tools/gen_error_codes.py; generic URL template, no file ID."
+    },
+    {
+      "path": "git:commit-metadata",
+      "contains": "Signed-off-by: dependabot[bot] <support@github.com>",
+      "reason": "Exact public Dependabot sign-off observed in GitHub-generated dependency commit metadata; not a blanket email or source-file exception."
     }
   ]
 }

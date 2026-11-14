@@ -2,7 +2,9 @@
 from pathlib import Path
 import argparse,io,json,sys,time,unittest
 from forge_core.common import *
+from tools.test_environment import prepare_test_environment
 ROOT=Path(__file__).resolve().parent
+prepare_test_environment()
 p=argparse.ArgumentParser();p.add_argument('--out',type=Path,required=True);a=p.parse_args()
 if a.out.exists():raise SystemExit('Choose a new output directory')
 a.out.mkdir(parents=True)

@@ -33,7 +33,17 @@ class CorpusRecheck(unittest.TestCase):
     def test_no_match_status(self):
         q=corpus.search(self.runit(),'unicorn');self.assertEqual(q['search_status'],'NO_METADATA_MATCH')
     def test_ast_node_limit_is_inventory_gap(self):
-        r=mixed_intake.inspect_container(b'def f(x):\n    return x+1\n','x.py',{'max_nodes':1});self.assertEqual(r['gaps'][0]['status'],'AST_LIMIT');self.assertEqual(r['segments'],[])
+        raw=b'def f(x):\n    return x+1\n'
+        r=mixed_intake.inspect_container(raw,'x.py',{'max_nodes':1})
+        self.assertEqual(r['gaps'][0]['status'],'AST_UNIT_LIMIT')
+        segment=r['segments'][0]
+        self.assertEqual(segment['definitions'],[])
+        self.assertEqual(bytes.fromhex(segment['source_hex']),raw)
+        partition=segment['structural_partition']
+        self.assertEqual((partition['units_analyzed'],partition['units_omitted']),(0,1))
+        self.assertEqual(partition['limits']['max_unit_nodes'],1)
+        self.assertFalse(partition['module_context_complete'])
+        self.assertFalse(segment['module_structure']['structural_context_complete'])
     def test_archive_special_mode_rejected(self):
         b=io.BytesIO()
         with zipfile.ZipFile(b,'w') as z:

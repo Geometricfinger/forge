@@ -1,5 +1,5 @@
 """Checks for the portability and robustness patches (multi-envelope ids, parser output cap, killpg EPERM fallback, corpus-run --profile, report read limit)."""
-import errno, io, json, os, signal, subprocess, sys, tempfile, unittest, zipfile
+import errno, io, json, os, shutil, signal, subprocess, sys, tempfile, unittest, zipfile
 from pathlib import Path
 from unittest.mock import patch
 from forge_core import bounded_io
@@ -70,5 +70,54 @@ class CorpusProfileFlagTest(unittest.TestCase):
         root = Path(__file__).resolve().parents[1]
         out = subprocess.run([sys.executable, str(root / 'forge.py'), 'corpus-run', '--help'], capture_output=True, text=True, cwd=root)
         self.assertIn('--profile', out.stdout)
+
+class HarnessTempPathTest(unittest.TestCase):
+    def test_symlinked_temp_root_can_create_guarded_workspace(self):
+        """Exercise the real path guard, including a cached tempfile root."""
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory).resolve()
+            physical = base / 'physical'; physical.mkdir()
+            alias = base / 'alias'; alias.symlink_to(physical, target_is_directory=True)
+            code = '''
+import os, tempfile
+from pathlib import Path
+from forge_core.common import Blocked
+from forge_core.workspace import initialize
+from tools.test_environment import prepare_test_environment
+cached = tempfile.gettempdir()
+assert Path(cached).is_symlink()
+try:
+    initialize(Path(cached) / 'before')
+except Blocked as error:
+    assert str(error) == 'SYMLINK_PATH'
+else:
+    raise AssertionError('The product path guard must remain active')
+prepare_test_environment()
+assert tempfile.gettempdir() == str(Path(cached).resolve())
+assert os.environ['TMPDIR'] == tempfile.gettempdir()
+with tempfile.TemporaryDirectory() as work:
+    initialize(Path(work) / 'home').guard()
+'''
+            env = dict(os.environ, TMPDIR=str(alias), PYTHONDONTWRITEBYTECODE='1')
+            root = Path(__file__).resolve().parents[1]
+            result = subprocess.run([sys.executable, '-c', code], cwd=root, env=env,
+                                    capture_output=True, text=True, timeout=30)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+class ParserCheckoutTest(unittest.TestCase):
+    def test_real_isolated_parser_leaves_its_source_tree_unchanged(self):
+        from forge_core import corpus
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory).resolve()
+            source = base / 'copy' / 'forge_core'
+            original = Path(__file__).resolve().parents[1] / 'forge_core'
+            shutil.copytree(original, source, ignore=shutil.ignore_patterns('__pycache__', '*.pyc'))
+            before = {p.relative_to(source): p.read_bytes() for p in source.rglob('*') if p.is_file()}
+            home = base / 'work'; home.mkdir()
+            with patch.object(corpus, 'ROOT', source.parent):
+                result = corpus._parser(b'def hello():\n    return 1\n', 'sample.py', home)
+            self.assertTrue(any(d['name'] == 'hello' for s in result['segments'] for d in s['definitions']))
+            after = {p.relative_to(source): p.read_bytes() for p in source.rglob('*') if p.is_file()}
+            self.assertEqual(before, after)
 
 if __name__ == '__main__': unittest.main()

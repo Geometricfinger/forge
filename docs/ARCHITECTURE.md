@@ -11,7 +11,7 @@ Forge grew in layers. Hound came first, the add-on and loop were built around it
 | Python parsing and API-call detection | `hound/` | The only analyzer. Everything else calls into it; nothing else parses Python for findings. |
 | Running Hound on one source with a data-only profile | `addon/tool/mission_probe.py` | Validates the Hound files against `addon/contracts/hound_binding.json` before loading them. |
 | Copying and hash-verifying the analyzer; running it in an isolated process | `forge_core/engine.py` | Copies `hound/`, `addon/`, `loop/` into the workspace, checks `contracts/analyzer_lock.json`, then launches `loop/probe_worker.py`, which loads the add-on and Hound. This is why `loop/` is needed even when you never run the improvement cycle. |
-| Local corpus intake (files, ZIPs, notebooks, transcripts) | `forge_core/mixed_intake.py`, `forge_core/mixed_worker.py`, `forge_core/corpus.py` | Offline. `mixed_worker.py` is the fixed parser worker for intake. |
+| Local corpus intake (files, ZIPs, notebooks, transcripts) | `forge_core/mixed_intake.py`, `forge_core/mixed_worker.py`, `forge_core/structural_units.py`, `forge_core/corpus.py` | Offline. Fixed parser worker; complete structural units retain one shared module identity. |
 | Search and dependency context | `forge_core/retrieval.py`, `lexical.py`, `structure.py` | BM25 + RRF over SQLite FTS5. |
 | GitHub discovery (opt-in network) | `forge_core/discovery.py`, `policy.py`, `github.py`, `store.py` | The only network code. See [THREAT_MODEL.md](THREAT_MODEL.md). |
 | Pinned public-source envelopes | `forge_core/github_corpus.py` | No HTTP; checks envelopes produced elsewhere. |
@@ -19,7 +19,7 @@ Forge grew in layers. Hound came first, the add-on and loop were built around it
 | Opportunity Lab | `forge_core/opportunit*.py`, `invention_plan.py` | Rule-based hypotheses from reviewed inputs. |
 | Profile improvement cycle | `loop/` | Proposes and evaluates data-only profiles; never edits code or tests. Run via `forge.py cycle-demo` or `loop/run_demo.py`. |
 | Multi-source research missions | `runner/` | Uses the Workbench's corpus pipeline (`forge_core.corpus`) rather than calling Hound directly. |
-| Qualification | `verify.py`, `run_tests.py`, `hound/run_tests.py`, each component's tests | `verify.py` runs all of them. |
+| Qualification | `verify.py`, `run_tests.py`, `hound/run_tests.py`, each component's tests | `verify.py` covers Workbench, Hound, add-on and loop; run `runner/tests` and its demo separately, as CI does. |
 | Release hygiene | `tools/` | Manifest regeneration and the pre-publish check. |
 
 ## Rules of thumb for contributors

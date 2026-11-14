@@ -85,7 +85,7 @@ def _parser(data,name,home):
     # (about 2x the source) plus structure, so >~100-file envelopes overran the
     # generic 8 MB tool-output cap although the worker itself allows 16 MB.
     from .bounded_io import MAX_PARSER_OUTPUT_BYTES
-    return loads(run_fixed([sys.executable,'-I',str(ROOT/'forge_core/mixed_worker.py'),
+    return loads(run_fixed([sys.executable,'-I','-B',str(ROOT/'forge_core/mixed_worker.py'),
                             '--raw-container',name],home,60,data,MAX_PARSER_OUTPUT_BYTES))
 
 def inspect_one(data,source,home,profile,analyzer,segment_dir=None,job_binding=None):
@@ -97,24 +97,45 @@ def inspect_one(data,source,home,profile,analyzer,segment_dir=None,job_binding=N
     if parsed.get('container_sha256')!=source['sha256'] or parsed.get('upstream_code_executed') is not False:raise Blocked('CORPUS_PARSE_BINDING')
     result={'source':source,'segments':[],'inventory':parsed['inventory'],'gaps':list(parsed['gaps']),
             'upstream_code_executed':False,'analysis_status':'PARSED','hound_errors':[]}
+    from .source_blocks import deconstruct,reconstruct
+    boundaries=[]
+    if len(parsed['segments'])==1:
+        module=parsed['segments'][0]
+        if module['format']=='python_file' and not module['member_chain'] and module['source_sha256']==source['sha256']:
+            boundaries=[n for d in module['definitions'] for n in (d['source_window']['byte_start'],d['source_window']['byte_end']) if 0<n<len(data)]
+    partition=deconstruct(data,preferred_boundaries=boundaries)
+    if reconstruct(partition['manifest'],partition['blocks'])!=data:raise Blocked('SOURCE_ROUNDTRIP_MISMATCH')
+    result['source_reconstruction']={'manifest':partition['manifest'],'verified_exact_bytes':True,
+        'boundary_basis':'DEFINITION_BOUNDARIES_WHEN_POSSIBLE' if boundaries else 'RAW_CONTAINER_BYTES',
+        'blocks_persisted':False,'blocks_are_standalone_programs':False}
     if validation is not None:result['acquisition_validation']=validation
     def analyze(segment):
         segment=__import__('copy').deepcopy(segment)
         payload=bytes.fromhex(segment.pop('source_hex'))
         if sha(payload)!=segment['source_sha256']:raise Blocked('SEGMENT_HASH')
+        from .source_views import analysis_bytes
+        analysis=analysis_bytes(segment,payload)
         sid='source_'+sha(canonical({'file_id':source['file_id'],'container_sha256':source['sha256'],'segment':segment['segment_local_id']}))
         segment['source_id']=sid;segment['definitions_count']=len(segment['definitions'])
         for d in segment['definitions']:
             d['definition_id']='definition_'+sha(canonical([sid,d['name'],d['start_line'],d['end_line']]))
             d['member_start_line']=segment['start_line']+d['start_line']-1
             d['member_end_line']=segment['start_line']+d['end_line']-1
+        if max(len(payload),len(analysis))>DEFAULTS['max_source_bytes']:
+            # A full structural module is retained, but it is not a smaller
+            # executable program. Do not spend or misreport an analyzer attempt.
+            segment['hound']={};segment['hound_status']='BLOCKED';segment['hound_reason']='SOURCE_LIMIT'
+            return segment
         key={'job':job_binding,'source':source['sha256'],'source_id':sid,'profile':sha(canonical(profile))}
+        if 'analysis_view' in segment:key['analysis_view']=segment['analysis_view']
         cache=(segment_dir/(sid+'.json')) if segment_dir is not None else None
         journal=analysis_recovery.Journal(segment_dir.parent/'analysis_attempts'/sid,key) if segment_dir is not None else None
         if cache is not None and cache.exists():
             saved=_load_checkpoint(cache,key)
-            if saved['segment']['source_id']!=sid or saved['segment']['source_sha256']!=sha(payload):raise Blocked('SEGMENT_CHECKPOINT_BINDING')
+            cached=saved['segment']
+            if cached['source_id']!=sid or cached['source_sha256']!=sha(payload) or canonical(cached.get('analysis_view'))!=canonical(segment.get('analysis_view')):raise Blocked('SEGMENT_CHECKPOINT_BINDING')
             if saved['segment'].get('hound_status')!='INSPECTED':raise Blocked('SEGMENT_CHECKPOINT_STATUS')
+            if 'analysis_view' in segment and (cached.get('hound',{}).get('source_sha256')!=sha(analysis) or cached.get('hound',{}).get('source_id')!=sid):raise Blocked('SEGMENT_CHECKPOINT_BINDING')
             if journal is not None:journal.cached_success(sha(canonical(saved)))
             return saved['segment']
         if journal is not None and not journal.begin():
@@ -122,8 +143,8 @@ def inspect_one(data,source,home,profile,analyzer,segment_dir=None,job_binding=N
             segment['hound_reason']=journal.history[-1]['reason']
             return segment
         try:
-            observed=analyzer.scan(payload,sid,profile)
-            if observed.get('source_sha256')!=sha(payload) or observed.get('source_id')!=sid or observed.get('upstream_code_executed') is not False:raise Blocked('HOUND_BINDING')
+            observed=analyzer.scan(analysis,sid,profile)
+            if observed.get('source_sha256')!=sha(analysis) or observed.get('source_id')!=sid or observed.get('upstream_code_executed') is not False:raise Blocked('HOUND_BINDING')
             segment['hound']=observed;segment['hound_status']='INSPECTED'
         except Exception as e:
             reason=str(e) if isinstance(e,Blocked) else type(e).__name__
@@ -190,6 +211,7 @@ def run(workbench,source_root,manifest_file,out,profile=None,max_containers=20,a
                     for segment in cached_segments:
                         sid=segment['source_id']
                         key={'job':sha(canonical(binding)),'source':row['sha256'],'source_id':sid,'profile':sha(canonical(profile))}
+                        if 'analysis_view' in segment:key['analysis_view']=segment['analysis_view']
                         journal=analysis_recovery.Journal(out/'analysis_attempts'/sid,key)
                         if segment['hound_status']=='INSPECTED':
                             journal.cached_success(sha(canonical({'segment':segment,'upstream_code_executed':False})))
@@ -200,7 +222,8 @@ def run(workbench,source_root,manifest_file,out,profile=None,max_containers=20,a
                             # publication. Recover its exact cached result, no rerun.
                             saved=_load_checkpoint(segment_cache,key)
                             found=saved.get('segment',{})
-                            if found.get('source_id')!=sid or found.get('source_sha256')!=segment['source_sha256'] or found.get('hound_status')!='INSPECTED':raise Blocked('RECOVERY_CACHE_DISAGREEMENT')
+                            if found.get('source_id')!=sid or found.get('source_sha256')!=segment['source_sha256'] or found.get('hound_status')!='INSPECTED' or canonical(found.get('analysis_view'))!=canonical(segment.get('analysis_view')):raise Blocked('RECOVERY_CACHE_DISAGREEMENT')
+                            if 'analysis_view' in segment and found.get('hound',{}).get('source_sha256')!=segment['analysis_view']['analysis_sha256']:raise Blocked('RECOVERY_CACHE_DISAGREEMENT')
                             journal.cached_success(sha(canonical(saved)));retry=True
                         else:
                             if journal.history and journal.history[-1]['state']=='STARTED':journal.finish('FAILED','ATTEMPT_INTERRUPTED')
@@ -235,6 +258,27 @@ def run(workbench,source_root,manifest_file,out,profile=None,max_containers=20,a
                 'cache':{'reused_containers':cached,'new_containers':used},'sources':results,'gaps':gaps,
                 'equivalent_text_groups':{k:v for k,v in occurrences.items() if len(v)>1},'elapsed_seconds':time.monotonic()-start,
                 'source_bodies_retained':False,'upstream_code_executed':False,'model_calls':0,'release_approved':False,'independent_evaluation':False}
+        report['coverage']['definitions']={
+            'discovered':len(definitions),
+            'inspection_available':sum(d.get('source_window',{}).get('status')=='AVAILABLE' for d in definitions),
+            'inspection_omitted':sum(d.get('source_window',{}).get('status')=='DEFINITION_SIZE_LIMIT' for d in definitions),
+            'api_analyzed':sum(len(s['definitions']) for s in segments if s['hound_status']=='INSPECTED'),
+            'large_modules':sum(s.get('large_module',False) for s in segments),
+            'discovery_complete':not unread and not blocked and not any(
+                g.get('status') not in ('SOURCE_SIZE_LIMIT','DEFINITION_SIZE_LIMIT') and 'source_id' not in g for g in gaps),
+            'omitted_definition_count_known':not unread and not blocked and not any(
+                g.get('status') not in ('SOURCE_SIZE_LIMIT','DEFINITION_SIZE_LIMIT') and 'source_id' not in g for g in gaps),
+            'count_basis':'Definition occurrences; nested spans overlap and are not summed as source-byte coverage'}
+        partitions=[s['structural_partition'] for s in segments if 'structural_partition' in s]
+        report['coverage']['structural_partitions']={
+            'modules':len(partitions),
+            'units_total':sum(p['units_total'] for p in partitions),
+            'units_analyzed':sum(p['units_analyzed'] for p in partitions),
+            'units_omitted':sum(p['units_omitted'] for p in partitions),
+            'incomplete_module_contexts':sum(not p['module_context_complete'] for p in partitions),
+            'syntax_unvalidated_modules':sum(not p['syntax_validation_complete'] for p in partitions),
+            'scope':'Complete top-level units of the same original module; not standalone programs'}
+        report['summary']['source_roundtrips_verified']=sum(r.get('source_reconstruction',{}).get('verified_exact_bytes') is True for r in results)
         report['recovery']=analysis_recovery.summary(out/'analysis_attempts')
         report['summary']['source_scope_records']=sum(1 for _ in source_rows(report))
         workbench.guard()  # Reject publication if the qualified tools changed mid-run.
@@ -274,6 +318,11 @@ def rows(report):
                        'attribute_reads':d.get('structure',{}).get('attribute_reads',[]),
                        'comparison_operators':sorted({op for cmp in d.get('structure',{}).get('comparisons',[]) for op in cmp['operators']}),
                        'structure_truncated':d.get('structure',{}).get('truncated',False),
+                       **_partition_status(s),
+                       'source_window':d.get('source_window'),
+                       **({'analysis_view':s['analysis_view']} if 'analysis_view' in s else {}),
+                       'api_analysis_status':s.get('hound_status','NOT_CAPTURED'),
+                       'api_analysis_reason':s.get('hound_reason'),
                        'declared_calls':[c['name'] for c in d.get('structure',{}).get('calls',[])],
                        'declared_api_leads':[c['name'] for c in d.get('structure',{}).get('declared_api_leads',[])],
                        'context_status':'CAPTURED' if 'structure' in d else 'REINDEX_REQUIRED',
@@ -299,10 +348,19 @@ def source_rows(report):
                    'attribute_reads':s.get('module_structure',{}).get('attribute_reads',[]),
                    'comparison_operators':sorted({op for c in s.get('module_structure',{}).get('comparisons',[]) for op in c['operators']}),
                    'structure_truncated':s.get('module_structure',{}).get('truncated',False),
+                   **_partition_status(s),
+                   **({'analysis_view':s['analysis_view']} if 'analysis_view' in s else {}),
                    'declared_calls':[c['name'] for c in s.get('module_structure',{}).get('calls',[])],
                    'context_status':'CAPTURED' if 'module_structure' in s else 'REINDEX_REQUIRED',
                    'search_terms':tokens((s['logical_path_hint'] or s['path'])+' '+' '.join(s['imports']+apis)),
                    'runtime_status':'NOT_RUN','rights_status':'NOT_REVIEWED','evidence':'SOURCE_STRUCTURE_AND_DECLARED_IMPORTS'}
+
+def _partition_status(segment):
+    partition=segment.get('structural_partition')
+    if partition is None:return {}
+    complete=(partition['module_context_complete'] and partition['syntax_validation_complete']
+              and partition['units_omitted']==0)
+    return {'structural_partition_status':'COMPLETE' if complete else 'PARTIAL'}
 
 def all_rows(report):
     yield from rows(report)
@@ -343,6 +401,11 @@ def dependency_context(report, definition_id):
         raise Blocked('CONTEXT_DEFINITION_ID')
     from .structure import context
     return context(report, definition_id)
+
+def inspect_definition(report,definition_id,source_root,max_bytes=250_000):
+    """Explicit, hash-bound source inspection; bodies are never saved to corpus."""
+    from .source_inspection import inspect_definition as inspect
+    return inspect(report,definition_id,source_root,max_bytes)
 
 
 def render(report):

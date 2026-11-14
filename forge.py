@@ -104,6 +104,7 @@ def main():
     a=s.add_parser('contract-verify');a.add_argument('folder',type=Path)
     a=s.add_parser('interop-fingerprint');a.add_argument('--input',type=Path,required=True);a.add_argument('--out',type=Path,required=True)
     a=s.add_parser('interop-verify');a.add_argument('--input',type=Path,required=True);a.add_argument('--receipt',type=Path,required=True)
+    a=s.add_parser('opportunity-review',help='review declared transfer contracts; no execution or truth certification');a.add_argument('--bundle',type=Path,required=True);a.add_argument('--registry',type=Path,required=True);a.add_argument('--corpus-run',action='append',default=[]);a.add_argument('--out',type=Path)
     s.add_parser('opportunity-demo')
     s.add_parser('opportunity-list')
     a=s.add_parser('opportunity-verify');a.add_argument('folder',type=Path)
@@ -117,6 +118,7 @@ def main():
     a=s.add_parser('corpus-search');a.add_argument('--run-id',required=True);a.add_argument('--query',required=True);a.add_argument('--include-tests',action='store_true');a.add_argument('--out',type=Path)
     a.add_argument('--distinct',action='store_true');a.add_argument('--filters',type=Path)
     a=s.add_parser('corpus-context');a.add_argument('--run-id',required=True);a.add_argument('--definition',required=True);a.add_argument('--out',type=Path)
+    a=s.add_parser('corpus-inspect',help='read one complete, hash-bound definition; never execute it');a.add_argument('--run-id',required=True);a.add_argument('--definition',required=True);a.add_argument('--source-root',type=Path,required=True);a.add_argument('--max-bytes',type=int,default=250_000)
     s.add_parser('corpus-list')
     a=s.add_parser('make-manifest',help='write a provider "local" manifest for a plain folder');a.add_argument('folder',type=Path);a.add_argument('--out',type=Path,required=True)
     s.add_parser('reuse-demo')
@@ -131,6 +133,15 @@ def main():
     a.human='--human' in argv;a.pretty='--pretty' in argv
     OUTPUT_MODE='human' if a.human else 'pretty' if a.pretty else 'json'
     home=a.home.absolute()
+    # Validate before initialize() or automatic manifest creation. Otherwise a
+    # refused scan can already have populated the target with workspace files.
+    if a.command in ('corpus-run','corpus-inspect'):
+        source=safe_path(a.source_root);checked_home=safe_path(home)
+        if not source.is_dir():raise Blocked('SOURCE_ROOT')
+        if source==checked_home or source.is_relative_to(checked_home) or checked_home.is_relative_to(source):
+            raise Blocked('CORPUS_SEPARATE_OUTPUT')
+        if a.command=='corpus-inspect' and not checked_home.is_dir():raise Blocked('CORPUS_INSPECTION_REQUIRES_EXISTING_RUN')
+
     if a.command=='make-manifest':
         out=safe_path(a.out)
         if out.exists():raise Blocked('OUTPUT_CONFLICT')
@@ -158,7 +169,7 @@ def main():
     if a.command=='verify-packet':
         from forge_core.reuse import verify_packet
         emit(verify_packet(a.folder));return 0
-    if a.command in ('init','serve','reuse-demo','corpus-demo','corpus-run','opportunity-demo','opportunity-run','opportunity-draft','new','contract-trial') and not home.exists():w=initialize(home)
+    if a.command in ('init','serve','reuse-demo','corpus-demo','corpus-run','opportunity-demo','opportunity-run','opportunity-review','opportunity-draft','new','contract-trial') and not home.exists():w=initialize(home)
     else:w=Workbench(home)
     w.guard()
     if a.command=='init':value={'status':'INITIALIZED','home':str(home)}
@@ -178,6 +189,12 @@ def main():
         elif a.command=='opportunity-run':
             reports=[(name,corpus.get(w,name)) for name in a.corpus_run]
             value=book.run(loads(read(a.bundle,MAX_INPUT)),reports)
+        elif a.command=='opportunity-review':
+            from forge_core.transfer_review import evaluate_with_contracts,ContractError,MAX_BYTES
+            reports=[(name,corpus.get(w,name)) for name in a.corpus_run]
+            try:value=evaluate_with_contracts(loads(read(a.bundle,MAX_INPUT)),reports,loads(read(a.registry,MAX_BYTES)))
+            except ContractError as ex:raise Blocked(str(ex)) from ex
+            if a.out:write(a.out,canonical(value),new=True)
         elif a.command=='opportunity-export':value=book.export(a.run_id,a.out)
         elif a.command=='opportunity-feedback':value=book.feedback(a.run_id,loads(read(a.file,5000)))
         elif a.command=='opportunity-draft':value=draft(draft_source(read(a.file,30000),a.file.name))
@@ -228,6 +245,10 @@ def main():
         from forge_core import corpus
         value=corpus.dependency_context(corpus.get(w,a.run_id),a.definition)
         if a.out:write(a.out,canonical(value),new=True)
+    elif a.command=='corpus-inspect':
+        from forge_core import corpus
+        value=corpus.inspect_definition(corpus.get(w,a.run_id),a.definition,a.source_root,a.max_bytes)
+        w.guard()
     elif a.command=='review-new':
         from forge_core.engine import ROOT
         value=w.casebook().create(a.mission,loads(read(a.contract or ROOT/'templates/reuse_contract.json',16000)))

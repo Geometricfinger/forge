@@ -6,6 +6,7 @@ from datetime import datetime,timezone
 from forge_core.common import *
 from forge_core.workspace import initialize,code_binding
 from forge_core import demo
+from tools.test_environment import prepare_test_environment
 ROOT=Path(__file__).resolve().parent
 
 def command(cmd,cwd,log,timeout=360):
@@ -20,13 +21,14 @@ def command(cmd,cwd,log,timeout=360):
     if code:raise Blocked('QUALIFICATION_COMMAND_FAILED')
 
 def main():
+    prepare_test_environment()
     a=argparse.ArgumentParser(description=__doc__);a.add_argument('--out',type=Path,required=True);args=a.parse_args();out=safe_path(args.out)
     if out.exists() or out.is_relative_to(ROOT):raise Blocked('NEW_EXTERNAL_OUTPUT_REQUIRED')
     out.mkdir(parents=True);report={'started_utc':datetime.now(timezone.utc).isoformat(),'status':'RUNNING','model_calls':0,'live_network_requests':0,'release_approved':False,'independent_evaluation':False};before=code_binding()
     try:
         command([sys.executable,str(ROOT/'run_tests.py'),'--out',str(out/'workbench-tests')],ROOT,out/'workbench-tests.log',150)
         t=loads(read(out/'workbench-tests/tests.json'))
-        if t['tests_run']!=797 or any(t[k] for k in ('failures','errors','skips')):raise Blocked('WORKBENCH_TESTS_FAILED')
+        if t['tests_run']!=1041 or any(t[k] for k in ('failures','errors','skips')):raise Blocked('WORKBENCH_TESTS_FAILED')
         report['workbench_tests']=t
         w=initialize(out/'home')
         from forge_core import corpus,corpus_demo
@@ -37,6 +39,29 @@ def main():
         context=corpus.dependency_context(mixed_report,grouped['results'][0]['definition_id'])
         if context['dependency_closure_complete'] is not False or context['source_code_executed'] is not False:raise Blocked('RESEARCH_CONTEXT_AUTHORITY')
         report['research_retrieval']={'ranker':grouped['ranker_version'],'matching_occurrences':2,'displayed_groups':1,'context_status':context['status'],'no_runtime_promotion':True}
+        # One real pipeline pass over a large synthetic module. Full structure
+        # stays together; Hound's source cap remains an explicit coverage gap.
+        large_root=out/'large-module-source';large_root.mkdir()
+        large_source=(b'#'+b'x'*250_000+b'\nVALUE = 3\ndef helper(x): return x + VALUE\n'
+                      b'def use(x): return helper(x)\n')
+        write(large_root/'module.py',large_source,new=True)
+        large_manifest=out/'large-module-manifest.json'
+        write(large_manifest,canonical({'schema':1,'files':corpus.local_rows(large_root)}),new=True)
+        large=corpus.run(w,large_root,large_manifest,w.home/'corpora'/'large-module')
+        selected=next(row for row in corpus.rows(large) if row['name']=='use')
+        inspected=corpus.inspect_definition(large,selected['definition_id'],large_root)
+        repeated=corpus.run(w,large_root,large_manifest,w.home/'corpora'/'large-module')
+        if (large['status']!='COMPLETED_WITH_GAPS' or large['summary']['definitions']!=2 or
+                large['summary']['hound_segments']!=0 or large['recovery']['attempts_charged']!=0 or
+                inspected['source_text']!='def use(x): return helper(x)\n' or
+                inspected['context']['references'][0]['candidates'][0]['name']!='helper' or
+                repeated['cache']!={'reused_containers':1,'new_containers':0} or
+                read(large_root/'module.py')!=large_source or
+                not large['sources'][0]['source_reconstruction']['verified_exact_bytes']):
+            raise Blocked('LARGE_MODULE_QUALIFICATION')
+        report['large_module']={'status':'STRUCTURE_INSPECTION_AND_EXACT_RECONSTRUCTION_VERIFIED',
+            'definitions':2,'source_bytes':len(large_source),'api_analysis':'SOURCE_LIMIT',
+            'reused_containers':1,'source_code_executed':False}
         packet=corpus.export_search(mixed_report,'digest',out/'corpus-packet')
         from forge_core.opportunity_demo import run as opportunity_run
         from forge_core.opportunities import OpportunityStore,verify_export
