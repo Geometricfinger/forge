@@ -157,6 +157,12 @@ def main():
     s.add_parser('contract-show')
     a=s.add_parser('contract-trial');a.add_argument('--out',type=Path,required=True)
     a=s.add_parser('contract-verify');a.add_argument('folder',type=Path)
+    a=s.add_parser('reviewed-trial-prepare',help='freeze the fixed RFC 8785 trial and indexed source leads; do not execute the trial')
+    a.add_argument('--out',type=Path,required=True)
+    a=s.add_parser('reviewed-trial-run',help='execute only the prepared, bundled RFC 8785 trial once and retain raw outcomes')
+    a.add_argument('--prepared',type=Path,required=True);a.add_argument('--out',type=Path,required=True)
+    a=s.add_parser('reviewed-trial-verify',help='verify the prepared trial and recorded result without executing the trial')
+    a.add_argument('--prepared',type=Path,required=True);a.add_argument('--result',type=Path,required=True)
     a=s.add_parser('interop-fingerprint');a.add_argument('--input',type=Path,required=True);a.add_argument('--out',type=Path,required=True)
     a=s.add_parser('interop-verify');a.add_argument('--input',type=Path,required=True);a.add_argument('--receipt',type=Path,required=True)
     a=s.add_parser('opportunity-review',help='review declared transfer contracts; no execution or truth certification');a.add_argument('--bundle',type=Path,required=True);a.add_argument('--registry',type=Path,required=True);a.add_argument('--corpus-run',action='append',default=[]);a.add_argument('--out',type=Path)
@@ -198,6 +204,14 @@ def main():
     a.human='--human' in argv;a.pretty='--pretty' in argv
     OUTPUT_MODE='human' if a.human else 'pretty' if a.pretty else 'json'
     home=a.home.absolute()
+    if a.command=='reviewed-trial-verify':
+        from forge_core.reviewed_evaluator import verify
+        emit(verify(a.prepared,a.result));return 0
+    if a.command in ('reviewed-trial-prepare','reviewed-trial-run'):
+        from forge_core.reviewed_evaluator import preflight
+        preflight(home,a.out,prepared=a.prepared if a.command=='reviewed-trial-run' else None)
+        if a.command=='reviewed-trial-run' and not safe_path(home).is_dir():
+            raise Blocked('REVIEWED_TRIAL_EXISTING_HOME_REQUIRED')
     behavioral=None;review_inputs=None
     if a.command=='opportunity-review':
         behavioral=behavior_inputs(a,home)
@@ -259,10 +273,17 @@ def main():
     if a.command=='verify-packet':
         from forge_core.reuse import verify_packet
         emit(verify_packet(a.folder));return 0
-    if a.command in ('init','serve','reuse-demo','corpus-demo','corpus-run','opportunity-demo','opportunity-run','opportunity-review','opportunity-draft','new','contract-trial') and not home.exists():w=initialize(home)
+    if a.command in ('init','serve','reuse-demo','corpus-demo','corpus-run','opportunity-demo','opportunity-run','opportunity-review','opportunity-draft','new','contract-trial','reviewed-trial-prepare') and not home.exists():w=initialize(home)
     else:w=Workbench(home)
     w.guard()
     if a.command=='init':value={'status':'INITIALIZED','home':str(home)}
+    elif a.command=='reviewed-trial-prepare':
+        from forge_core.reviewed_evaluator import prepare
+        value=prepare(w,a.out)
+    elif a.command=='reviewed-trial-run':
+        from forge_core.reviewed_evaluator import run
+        value=run(w,a.prepared,a.out)
+        emit(value);return 0 if value['status']=='REVIEWED_TRIAL_COMPLETED' else 2
     elif a.command=='contract-trial':
         from forge_core.contract_trial import run
         value=run(w,a.out)

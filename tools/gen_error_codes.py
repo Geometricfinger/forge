@@ -14,6 +14,13 @@ SKIP={'third_party','dependencies','history','evidence','review','__pycache__'}
 
 # Hand-written meanings for the codes a newcomer is most likely to hit.
 KNOWN={
+ 'REVIEWED_TRIAL_SEPARATE_OUTPUT':'Keep the checkout, workspace, prepared packet and result packet separate in both containment directions. Keep outputs away from original indexed source roots. Reject an unsafe layout before initialization or execution.',
+ 'REVIEWED_TRIAL_OUTPUT_EXISTS':'Use a new prepared/result directory. Existing evidence is never overwritten and a completed run is never silently retried.',
+ 'REVIEWED_TRIAL_EXISTING_HOME_REQUIRED':'Run with the existing `--home` used during preparation; execution does not initialize a replacement workspace.',
+ 'REVIEWED_TRIAL_PREPARED_RUNTIME_CHANGED':'Required source bytes or the actual runtime changed after preparation. Review the change and create a new prepared packet in a fresh matching workspace.',
+ 'REVIEWED_TRIAL_RAW_FLAG_DISAGREEMENT':'A producer pass flag disagrees with its raw output or declared domain error. The fixed adapter does not trust that flag.',
+ 'REVIEWED_TRIAL_RAW_TOTAL_DISAGREEMENT':'The raw report total disagrees with the complete per-case comparison. Preserve the report and inspect the mismatching records.',
+ 'REVIEWED_TRIAL_TRANSLATION_BINDING':'Saved behavioral evidence or review differs from the observations recomputed from the fixed raw report.',
  'BEHAVIOR_ARGUMENTS':'Use `--behavior-contract` with `--artifact-root`. `--behavior-evidence` is optional after the contract is complete.',
  'BEHAVIOR_REQUIRES_EXISTING_CORPUS':'Use the existing `--home` containing the indexed source. Behavioral commands do not create a replacement corpus.',
  'BEHAVIOR_CORPUS_SELECTION':'The selected `--corpus` must also be supplied through `--corpus-run`.',
@@ -119,8 +126,10 @@ def collect():
         for c in PAT.findall(body):found[c].add(rel.as_posix())
         # This module uses one fixed prefix helper; collect its literal codes
         # as well as direct Blocked sites, without importing application code.
-        if rel.as_posix()=='forge_core/behavior_review.py':
-            for c in BEHAVIOR_PAT.findall(body):found['BEHAVIOR_'+c].add(rel.as_posix())
+        prefixes={'forge_core/behavior_review.py':'BEHAVIOR_',
+                  'forge_core/reviewed_evaluator.py':'REVIEWED_TRIAL_'}
+        if rel.as_posix() in prefixes:
+            for c in BEHAVIOR_PAT.findall(body):found[prefixes[rel.as_posix()]+c].add(rel.as_posix())
     return found
 
 def render(found):

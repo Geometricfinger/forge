@@ -28,7 +28,7 @@ def main():
     try:
         command([sys.executable,str(ROOT/'run_tests.py'),'--out',str(out/'workbench-tests')],ROOT,out/'workbench-tests.log',150)
         t=loads(read(out/'workbench-tests/tests.json'))
-        if t['tests_run']!=1095 or any(t[k] for k in ('failures','errors','skips')):raise Blocked('WORKBENCH_TESTS_FAILED')
+        if t['tests_run']!=1150 or any(t[k] for k in ('failures','errors','skips')):raise Blocked('WORKBENCH_TESTS_FAILED')
         report['workbench_tests']=t
         w=initialize(out/'home')
         from forge_core import corpus,corpus_demo
@@ -80,6 +80,24 @@ def main():
                 not behavioral['original_opportunity_and_transfer_preserved']):
             raise Blocked('BEHAVIOR_QUALIFICATION')
         report['behavioral_review']=behavioral
+        from forge_core.reviewed_evaluator import prepare as prepare_reviewed,run as run_reviewed,verify as verify_reviewed
+        prepared=prepare_reviewed(w,out/'reviewed-prepared')
+        reviewed=run_reviewed(w,out/'reviewed-prepared',out/'reviewed-result')
+        checked=verify_reviewed(out/'reviewed-prepared',out/'reviewed-result')
+        if (prepared['status']!='REVIEWED_TRIAL_PREPARED' or prepared['executed'] is not False or
+                prepared['cases_per_subject']!=28 or prepared['positive_cases']!=26 or prepared['negative_cases']!=2 or
+                reviewed['status']!='REVIEWED_TRIAL_COMPLETED' or not reviewed['complete_raw_report'] or
+                reviewed['collector_calls']!=1 or not reviewed['source_preserved'] or
+                checked['status']!='REVIEWED_TRIAL_VERIFIED' or checked['qualification']!='COMPLETED' or
+                checked['executed'] is not False or checked['results']!=reviewed['results'] or
+                checked['counts']!=reviewed['counts'] or
+                set(reviewed['counts'])!={'baseline','candidate'} or
+                any(row['cases']!=28 or row['passed']+row['failed']!=28 for row in reviewed['counts'].values()) or
+                any(reviewed[key] for key in ('execution_authenticated','independent_evaluation','release_approved'))):
+            raise Blocked('REVIEWED_TRIAL_QUALIFICATION')
+        # This gate checks collection and translation, retaining actual failing
+        # cases. It does not hard-code a winner or turn integrity into approval.
+        report['reviewed_evaluator']={'prepared':prepared,'execution':reviewed,'verification':checked}
         report['mixed_corpus']={'demo':mixed,'matching_definitions':matched['full_match_count'],'packet':packet,'actual_hound':True,'provider':'synthetic'}
         r=demo.run(w)
         report['discovery_demo']={'status':r['status'],'source_count':len(r['candidates']),'requests':r['counts']['DONE'],'findings':sum(len(c['findings']) for c in r['candidates']),'transport':'synthetic_fixture','actual_hound':True}
