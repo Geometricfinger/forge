@@ -1,0 +1,96 @@
+name: Apply reviewed candidate
+on:
+  push:
+    branches: [forge/capability-drift-review-20261113]
+    paths: [.github/workflows/apply-reviewed-candidate.yml]
+permissions:
+  contents: write
+jobs:
+  apply:
+    if: github.repository == 'Geometricfinger/forge' && github.ref == 'refs/heads/forge/capability-drift-review-20261113'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          submodules: false
+          lfs: false
+      - name: Apply only reviewed public changes and verify exact candidate bytes
+        run: |
+          python3 -B - <<'PY'
+          import hashlib, json, pathlib, shutil, subprocess, sys
+          root=pathlib.Path.cwd()
+          transport=root/'.github/review_changes'
+          expected=json.loads((transport/'expected.json').read_text())
+          assert len(expected)==23
+          names={r['path'] for r in expected}
+          assert len(names)==23
+          for name in names:
+              p=pathlib.PurePosixPath(name)
+              assert not p.is_absolute() and '..' not in p.parts and '.github' not in p.parts
+          hashes={
+            '01.patch':'c308fdb12393e19d5432c8c79e3643ce9eb28aa74c8b613ea7608ed3b60c4cbe',
+            '02.patch':'0a884ee29fe67615f0255e6f4666862f66c5f448112dcb15a9ce66f66e529bc8',
+            '03.patch':'bfbb2de32ce65b66545918d854f227c7cb22ac509028e4c7e7156a8bfb31b24c',
+            '04.patch':'c6b7f8432cfa0f8696a216dbb5fb6f0949f2f16fbcbedc08fd27759d2b97b33e',
+            '05.patch':'16155cfe0fff5cecf7187a2311455e1f2df943b531b679bdf54cdfae2b1f08c9',
+            '06.patch':'49974273ee33a685faadd276394dcbbdb08e0b97668493855991d1d136fec7f8',
+            '07.patch':'66259f2ffe56545781808cacb66869cf658ba1b6926803a7c6c8f4b4d5658e04'}
+          for name,digest in hashes.items():
+              assert hashlib.sha256((transport/name).read_bytes()).hexdigest()==digest,name
+          base='ea4abb028cf9e120291f9127ffa70a6d55e0455f'
+          subprocess.run(['git','merge-base','--is-ancestor',base,'HEAD'],check=True)
+          before=subprocess.check_output(['git','diff','--name-only',base,'HEAD'],text=True).splitlines()
+          assert all(n.startswith('.github/review_changes/') or n in {
+              '.github/workflows/review-source-snapshot.yml',
+              '.github/workflows/review-public-target.yml',
+              '.github/workflows/apply-reviewed-candidate.yml'} for n in before),before
+          patches=[str(transport/n) for n in sorted(hashes)]
+          subprocess.run(['git','apply','--check',*patches],check=True)
+          subprocess.run(['git','apply',*patches],check=True)
+          from forge_core.transfer_example import example
+          bundle,registry=example()
+          for name,value in [('bundle',bundle),('registry',registry)]:
+              (root/'examples/transfer_review'/f'{name}.json').write_text(json.dumps(value,indent=2)+'\n')
+          subprocess.run([sys.executable,'-B','tools/gen_error_codes.py'],check=True)
+          manifest=root/'runner/FILE_HASHES.json'
+          rows=json.loads(manifest.read_text())
+          for p in [root/'runner/forge_supervise.py',*sorted((root/'runner/research_runner').glob('*.py')),
+                    *sorted((root/'runner/tests').glob('test_supervisor*.py'))]:
+              rows[p.relative_to(root/'runner').as_posix()]=hashlib.sha256(p.read_bytes()).hexdigest()
+          for name in rows:
+              rows[name]=hashlib.sha256((root/'runner'/name).read_bytes()).hexdigest()
+          manifest.write_text(json.dumps(rows,indent=2,sort_keys=True)+'\n')
+          for row in expected:
+              data=(root/row['path']).read_bytes()
+              assert len(data)==row['bytes'] and hashlib.sha256(data).hexdigest()==row['sha256'],row['path']
+          (root/'.github/workflows/review-source-snapshot.yml').unlink()
+          (root/'.github/workflows/review-public-target.yml').unlink()
+          (root/'.github/workflows/apply-reviewed-candidate.yml').unlink()
+          shutil.rmtree(transport)
+          subprocess.run(['git','add','--all'],check=True)
+          actual=set(subprocess.check_output(['git','diff','--cached','--name-only',base],text=True).splitlines())
+          assert actual==names,{'unexpected':sorted(actual-names),'missing':sorted(names-actual)}
+          print(json.dumps({'verified_changed_files':len(names),'baseline':base,'private_data_included':False}))
+          PY
+      - name: Commit only to this review branch, never force-push
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'feat: integrate transfer review and bounded supervision; preserve read-only intake'
+          git push origin HEAD:refs/heads/forge/capability-drift-review-20261113
+          mkdir -p "$RUNNER_TEMP/applied-candidate"
+          git archive --format=zip --output="$RUNNER_TEMP/applied-candidate/source.zip" HEAD
+          git rev-parse HEAD > "$RUNNER_TEMP/applied-candidate/commit.txt"
+          git ls-tree -rl HEAD > "$RUNNER_TEMP/applied-candidate/git-tree.txt"
+          sha256sum "$RUNNER_TEMP/applied-candidate/source.zip" > "$RUNNER_TEMP/applied-candidate/SHA256SUMS.txt"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: forge-applied-reviewed-candidate
+          path: ${{ runner.temp }}/applied-candidate/
+          retention-days: 14
+          if-no-files-found: error
