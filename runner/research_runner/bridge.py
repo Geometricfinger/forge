@@ -99,23 +99,50 @@ def inspect_source(s,root,work,forge_root):
     staged,mf,payload,row=prepare_manifest(data,s,work)
     report_dir=work/'corpora'/s['id'];report=corpus.run(w,staged,mf,report_dir)
     parsed=corpus._parser(payload,row['path'],w.home)
-    indexed=list(corpus.rows(report)); lookup={(r['path'],r['name'],r['start_line'],r['end_line'],r.get('cell_index')):r for r in indexed}
+    if parsed.get('container_sha256')!=row['sha256'] or parsed.get('upstream_code_executed') is not False:
+        raise Blocked('BRIDGE_CORPUS_BINDING')
+    def location(path,name,start,end,cell,chain):
+        return (path,name,start,end,cell,tuple((member['path'],member['sha256']) for member in chain))
+    indexed=list(corpus.rows(report)); lookup={location(r['path'],r['name'],r['start_line'],r['end_line'],r.get('cell_index'),r['member_chain']):r for r in indexed}
+    if len(lookup)!=len(indexed):raise Blocked('BRIDGE_DEFINITION_NOT_UNIQUE')
     records=[];retained_chars=0
     for seg in parsed['segments']:
-        raw=bytes.fromhex(seg['source_hex']);lines=raw.decode('utf-8').splitlines()
+        raw=bytes.fromhex(seg['source_hex']);segment_hash=sha(raw)
+        if segment_hash!=seg['source_sha256']:raise Blocked('BRIDGE_SOURCE_BINDING')
         for d in seg['definitions']:
             start=seg['start_line']+d['start_line']-1;end=seg['start_line']+d['end_line']-1
-            key=(seg['path'],d['name'],start,end,seg.get('cell_index'));mr=lookup.get(key)
+            key=location(seg['path'],d['name'],start,end,seg.get('cell_index'),seg['member_chain']);mr=lookup.get(key)
             if mr is None:continue
-            body='\n'.join(lines[d['start_line']-1:d['end_line']]);retained_chars+=len(body)
+            # AST lines do not treat U+2028 as a newline. Rebuilding from
+            # str.splitlines() can attach unrelated text to a valid definition
+            # ID; the core's byte window preserves complete original source.
+            window=d.get('source_window')
+            if (not isinstance(window,dict) or window!=mr.get('source_window') or
+                    mr['source_sha256']!=segment_hash or window.get('module_sha256')!=segment_hash or
+                    window.get('complete') is not True or window.get('byte_basis')!='UTF8_SEGMENT_SOURCE' or
+                    any(type(window.get(k)) is not int for k in ('byte_start','byte_end','bytes')) or
+                    not 0<=window['byte_start']<window['byte_end']<=len(raw)):
+                raise Blocked('BRIDGE_DEFINITION_WINDOW_BINDING')
+            selected=raw[window['byte_start']:window['byte_end']]
+            if len(selected)!=window['bytes'] or sha(selected)!=window.get('sha256'):
+                raise Blocked('BRIDGE_DEFINITION_WINDOW_BINDING')
+            if window.get('status')=='DEFINITION_SIZE_LIMIT':
+                # The corpus inventory retains this occurrence and its gap.
+                # Do not turn an unavailable definition into a partial record.
+                continue
+            if window.get('status')!='AVAILABLE' or len(selected)>corpus.DEFAULTS['max_source_bytes']:
+                raise Blocked('BRIDGE_DEFINITION_WINDOW_BINDING')
+            body=selected.decode('utf-8');retained_chars+=len(body)
             if retained_chars>25000000:raise Blocked('LEXICAL_EXPANSION_LIMIT')
             owner=d.get('structure',{}).get('class_context') or {};classdoc=owner.get('documentation','')
             records.append({'id':mr['definition_id'],'source_id':s['id'],'source_sha256':mr['source_sha256'],
              'container_sha256':s['sha256'],'origin':s['origin'],'capture':s['capture'],'family':s['family'],
              'name':d['name'],'path':seg['path'],'start_line':start,'end_line':end,'kind':'implementation',
-             'text':body,'class_documentation':classdoc,'test_path':seg['test_path'],'cell_index':seg.get('cell_index'),
+             'text':body,'text_complete':True,'text_sha256':sha(selected),'source_window':window,
+             'class_documentation':classdoc,'test_path':seg['test_path'],'cell_index':seg.get('cell_index'),
              'runtime_validation':'NOT_RUN','observed_apis':mr.get('observed_apis',[])})
     if data!=read_source(root,s):raise Blocked('SOURCE_CHANGED_DURING_INSPECTION')
+    w.guard()
     return {'status':'CODE_INDEXED' if report['status']=='COMPLETED_FOR_SELECTED_CONTAINERS' else 'CODE_INDEXED_WITH_GAPS',
       'source':s,'records':records,'references':[],'gaps':report['gaps']+report['coverage']['blocked'],
       'forge_report_path':str(report_dir/'corpus.json'),'forge_summary':report['summary'], 'source_code_executed':False}

@@ -63,7 +63,7 @@ If `reason` is a Python exception name instead of a code:
 | <a id="corpus_running"></a>`CORPUS_RUNNING` | Corpus run input or stored state failed validation. | forge_core/corpus.py |
 | <a id="corpus_run_id"></a>`CORPUS_RUN_ID` | `--run-id` must be 1-80 characters of A-Z a-z 0-9 _ -. | forge.py, forge_core/corpus.py |
 | <a id="corpus_selection"></a>`CORPUS_SELECTION` | Corpus run input or stored state failed validation. | forge_core/opportunities.py, forge_core/server.py |
-| <a id="corpus_separate_output"></a>`CORPUS_SEPARATE_OUTPUT` | The corpus output must be outside the Forge package and outside `--source-root`. Use a `--home` outside both. | forge.py, forge_core/corpus.py |
+| <a id="corpus_separate_output"></a>`CORPUS_SEPARATE_OUTPUT` | The corpus output must be outside the Forge package and outside `--source-root`. Use a `--home` outside both. | forge.py, forge_core/corpus.py, forge_core/source_inspection.py |
 | <a id="corpus_source_fields"></a>`CORPUS_SOURCE_FIELDS` | Each manifest row needs `file_id`, `path`, `size`, `sha256`, `source_url` (plus optional `provider`). | forge_core/corpus.py |
 | <a id="corpus_source_sha"></a>`CORPUS_SOURCE_SHA` | Row `sha256` must be 64 lowercase hex characters. | forge_core/corpus.py |
 | <a id="corpus_source_url"></a>`CORPUS_SOURCE_URL` | Row `source_url` does not match its provider: `local` -> `local://<path>`, `synthetic` -> `fixture://<file_id>`, `gdrive` -> `https://drive.google.com/file/d/<file_id>/view`. | forge_core/corpus.py |
@@ -386,6 +386,10 @@ If `reason` is a Python exception name instead of a code:
 | <a id="baseline_already_satisfies_mission"></a>`BASELINE_ALREADY_SATISFIES_MISSION` | Mission record invalid or changed. | loop/forge_cycle.py |
 | <a id="baseline_incomplete"></a>`BASELINE_INCOMPLETE` | Input or stored state failed a validation check (see the raising module). | loop/forge_cycle.py |
 | <a id="baseline_not_evaluated"></a>`BASELINE_NOT_EVALUATED` | Input or stored state failed a validation check (see the raising module). | loop/forge_cycle.py |
+| <a id="bridge_corpus_binding"></a>`BRIDGE_CORPUS_BINDING` | A stored record is bound to different inputs/code than the current ones (integrity check). | runner/research_runner/bridge.py |
+| <a id="bridge_definition_not_unique"></a>`BRIDGE_DEFINITION_NOT_UNIQUE` | Input or stored state failed a validation check (see the raising module). | runner/research_runner/bridge.py |
+| <a id="bridge_definition_window_binding"></a>`BRIDGE_DEFINITION_WINDOW_BINDING` | A stored record is bound to different inputs/code than the current ones (integrity check). | runner/research_runner/bridge.py |
+| <a id="bridge_source_binding"></a>`BRIDGE_SOURCE_BINDING` | A stored record is bound to different inputs/code than the current ones (integrity check). | runner/research_runner/bridge.py |
 | <a id="budget_fields"></a>`BUDGET_FIELDS` | A JSON object has missing or unexpected fields. | runner/research_runner/core.py |
 | <a id="candidate_budget_exhausted"></a>`CANDIDATE_BUDGET_EXHAUSTED` | Input or stored state failed a validation check (see the raising module). | loop/forge_cycle.py |
 | <a id="candidate_state"></a>`CANDIDATE_STATE` | Input or stored state failed a validation check (see the raising module). | loop/forge_cycle.py |
