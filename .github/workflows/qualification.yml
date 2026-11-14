@@ -22,7 +22,7 @@ permissions:
 
 defaults:
   run:
-    shell: bash   # bash -eo pipefail, so a failing command piped into tee still fails the step
+    shell: bash   # bash -eo pipefail; raw generated output stays in files until checked
 
 concurrency:
   group: qualification-${{ github.ref }}
@@ -61,17 +61,20 @@ jobs:
         run: |
           EVIDENCE="$RUNNER_TEMP/forge-evidence"
           echo "EVIDENCE=$EVIDENCE" >> "$GITHUB_ENV"
+          echo "PUBLIC_EVIDENCE=$RUNNER_TEMP/forge-public-evidence" >> "$GITHUB_ENV"
           mkdir -p "$EVIDENCE"
           python3 -c 'import sqlite3; c=sqlite3.connect(":memory:"); c.execute("create virtual table t using fts5(x)")'
           python3 --version | tee "$EVIDENCE/python-version.txt"
           node --version | tee "$EVIDENCE/node-version.txt"
 
       - name: Pre-publish check (secrets, home paths, optional private denylist)
+        id: source_publication
         env:
           DENYLIST: ${{ secrets.FORGE_DENYLIST }}
         run: |
           if [ -n "$DENYLIST" ]; then
             umask 077
+            trap 'rm -f "$RUNNER_TEMP/denylist.txt"' EXIT
             printf '%s\n' "$DENYLIST" > "$RUNNER_TEMP/denylist.txt"
             FORGE_DENYLIST="$RUNNER_TEMP/denylist.txt" python3 tools/prepublish_check.py --require-denylist --history
             rm -f "$RUNNER_TEMP/denylist.txt"
@@ -81,19 +84,20 @@ jobs:
           fi
 
       - name: Full qualification (verify.py)
-        run: python3 verify.py --out "$EVIDENCE/qualification" | tee "$EVIDENCE/verify-stdout.json"
+        run: python3 verify.py --out "$EVIDENCE/qualification" > "$EVIDENCE/verify-stdout.json" 2> "$EVIDENCE/verify-stderr.log"
 
       - name: Research runner tests
         working-directory: runner
-        run: python3 run_tests.py 2>&1 | tee "$EVIDENCE/runner-tests.log"
+        run: python3 run_tests.py > "$EVIDENCE/runner-tests.log" 2>&1
 
       - name: Research runner demo
-        run: python3 runner/run_demo.py --out "$EVIDENCE/runner-demo" | tee "$EVIDENCE/runner-demo.json"
+        run: python3 runner/run_demo.py --out "$EVIDENCE/runner-demo" > "$EVIDENCE/runner-demo.json" 2> "$EVIDENCE/runner-demo-stderr.log"
 
       - name: Public demo
-        run: python3 examples/demo/run_demo.py --out "$EVIDENCE/public-demo" | tee "$EVIDENCE/public-demo.json"
+        run: python3 examples/demo/run_demo.py --out "$EVIDENCE/public-demo" > "$EVIDENCE/public-demo.json" 2> "$EVIDENCE/public-demo-stderr.log"
 
       - name: Bind evidence to the commit
+        id: evidence_binding
         if: always()
         env:
           COMMIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -103,6 +107,9 @@ jobs:
           JOB_STATUS: ${{ job.status }}
         run: |
           set -euo pipefail
+          # A binding failure can mention an unreviewed filename. Keep these
+          # diagnostics outside both the console and the self-hashed evidence.
+          exec > "$RUNNER_TEMP/forge-evidence-binding.stdout" 2> "$RUNNER_TEMP/forge-evidence-binding.stderr"
           test "$(git rev-parse HEAD)" = "$COMMIT_SHA"
           cd "$EVIDENCE"
           python3 - <<'PY'
@@ -125,27 +132,53 @@ jobs:
           (root / 'provenance.json').write_text(json.dumps(provenance, indent=2, sort_keys=True) + '\n')
           PY
           find . -type f ! -path './qualification/home/*' ! -path './SHA256SUMS.txt' -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS.txt
+      - name: Prepare checked public evidence
+        id: public_evidence
+        if: ${{ always() && steps.source_publication.outcome == 'success' && steps.evidence_binding.outcome == 'success' }}
+        env:
+          COMMIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          DENYLIST: ${{ secrets.FORGE_DENYLIST }}
+        run: |
+          set -euo pipefail
+          FORGE_SCAN_ARGS=()
+          if [ -n "$DENYLIST" ]; then
+            umask 077
+            FORGE_SCAN_DENYLIST="$RUNNER_TEMP/forge-publication-denylist.txt"
+            trap 'rm -f "$FORGE_SCAN_DENYLIST"' EXIT
+            printf '%s\n' "$DENYLIST" > "$FORGE_SCAN_DENYLIST"
+            FORGE_SCAN_ARGS=(--denylist "$FORGE_SCAN_DENYLIST")
+          fi
+          python3 tools/prepare_public_evidence.py --source "$EVIDENCE" --out "$PUBLIC_EVIDENCE" \
+            --expected-commit "$COMMIT_SHA" --ci-runner-paths "${FORGE_SCAN_ARGS[@]}"
+
+      - name: Summarize checked evidence
+        if: ${{ always() && steps.public_evidence.outcome == 'success' }}
+        env:
+          COMMIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
           {
             echo "### Forge qualification for \`$COMMIT_SHA\`"
             echo
             echo "| Field | Value |"
             echo "|---|---|"
-            echo "| Python | $(cat python-version.txt 2>/dev/null || echo unknown) |"
-            echo "| verify.py status | $(python3 -c 'import json;print(json.load(open("provenance.json"))["verification_status"])') |"
-            echo "| verification.json sha256 | \`$(python3 -c 'import json;print(json.load(open("provenance.json"))["verification_sha256"])')\` |"
+            echo "| Python matrix | ${{ matrix.python }} |"
+            echo "| CI job before upload | ${{ job.status }} |"
+            echo "| Evidence publication check | Passed |"
             echo "| Artifact | \`forge-verification-$COMMIT_SHA-py${{ matrix.python }}\` |"
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Explain withheld evidence
+        if: ${{ always() && steps.public_evidence.outcome != 'success' }}
+        run: echo "Evidence was withheld because the publication checks did not all pass." >> "$GITHUB_STEP_SUMMARY"
+
       - name: Upload verification evidence
-        if: always()
+        if: ${{ always() && steps.public_evidence.outcome == 'success' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: forge-verification-${{ github.event.pull_request.head.sha || github.sha }}-py${{ matrix.python }}
-          path: |
-            ${{ env.EVIDENCE }}
-            !${{ env.EVIDENCE }}/qualification/home
-          # Evidence is generated from public synthetic fixtures only. Its manifest
-          # includes hidden lock files; omitting them makes downloaded evidence unverifiable.
+          path: ${{ env.PUBLIC_EVIDENCE }}
+          # Only the exact scanned/staged bytes are eligible for publication.
+          # Hidden lock files remain covered by the scan and integrity manifests.
           include-hidden-files: true
           if-no-files-found: error
           retention-days: 90

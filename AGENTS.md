@@ -245,6 +245,7 @@ Only when the user asks you to change Forge itself (not when analysing their cod
 - If you change `hound/`, `addon/` or `loop/`, run `python3 tools/update_analyzer_manifests.py` and include the diff.
 - Before opening a pull request, `python3 verify.py --out <new folder outside the repo>` and `python3 tools/prepublish_check.py --history` must pass.
 - Never commit secrets, personal data, absolute home-directory paths or real scan output. Use synthetic examples like `examples/demo/`.
+- Public proof of work must pass both the source/history check and the generated-evidence publication gate. Keep combined private review packages out of GitHub; inspect PR text and logs too. See [docs/PUBLICATION_SAFETY.md](docs/PUBLICATION_SAFETY.md). Never publish matched credential values in diagnostics.
 - Report security problems privately as described in [SECURITY.md](SECURITY.md), not in public issues.
 
 See [docs/CAPABILITIES.md](docs/CAPABILITIES.md) before attributing historical prototype capabilities to this checkout. No private corpus is required or licensed by the public repository.
