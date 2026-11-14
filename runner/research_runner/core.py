@@ -200,7 +200,7 @@ def compact_packet(report,max_bytes):
         for xs in queues:
             if index>=len(xs):continue
             entry,field,r=xs[index]
-            keep={k:r[k] for k in ('id','source_id','name','path','start_line','end_line','source_sha256','origin','kind','record_kind','channels') if k in r}
+            keep={k:r[k] for k in ('id','source_id','name','path','start_line','end_line','source_sha256','origin','kind','record_kind','channels','analysis_view') if k in r}
             keep['excerpt']=str(r.get('snippet',r.get('text','')))[:160]
             entry[field].append(keep)
             if len(canonical(p))+128>max_bytes:entry[field].pop()

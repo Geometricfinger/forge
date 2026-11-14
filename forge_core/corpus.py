@@ -113,24 +113,29 @@ def inspect_one(data,source,home,profile,analyzer,segment_dir=None,job_binding=N
         segment=__import__('copy').deepcopy(segment)
         payload=bytes.fromhex(segment.pop('source_hex'))
         if sha(payload)!=segment['source_sha256']:raise Blocked('SEGMENT_HASH')
+        from .source_views import analysis_bytes
+        analysis=analysis_bytes(segment,payload)
         sid='source_'+sha(canonical({'file_id':source['file_id'],'container_sha256':source['sha256'],'segment':segment['segment_local_id']}))
         segment['source_id']=sid;segment['definitions_count']=len(segment['definitions'])
         for d in segment['definitions']:
             d['definition_id']='definition_'+sha(canonical([sid,d['name'],d['start_line'],d['end_line']]))
             d['member_start_line']=segment['start_line']+d['start_line']-1
             d['member_end_line']=segment['start_line']+d['end_line']-1
-        if len(payload)>DEFAULTS['max_source_bytes']:
+        if max(len(payload),len(analysis))>DEFAULTS['max_source_bytes']:
             # A full structural module is retained, but it is not a smaller
             # executable program. Do not spend or misreport an analyzer attempt.
             segment['hound']={};segment['hound_status']='BLOCKED';segment['hound_reason']='SOURCE_LIMIT'
             return segment
         key={'job':job_binding,'source':source['sha256'],'source_id':sid,'profile':sha(canonical(profile))}
+        if 'analysis_view' in segment:key['analysis_view']=segment['analysis_view']
         cache=(segment_dir/(sid+'.json')) if segment_dir is not None else None
         journal=analysis_recovery.Journal(segment_dir.parent/'analysis_attempts'/sid,key) if segment_dir is not None else None
         if cache is not None and cache.exists():
             saved=_load_checkpoint(cache,key)
-            if saved['segment']['source_id']!=sid or saved['segment']['source_sha256']!=sha(payload):raise Blocked('SEGMENT_CHECKPOINT_BINDING')
+            cached=saved['segment']
+            if cached['source_id']!=sid or cached['source_sha256']!=sha(payload) or canonical(cached.get('analysis_view'))!=canonical(segment.get('analysis_view')):raise Blocked('SEGMENT_CHECKPOINT_BINDING')
             if saved['segment'].get('hound_status')!='INSPECTED':raise Blocked('SEGMENT_CHECKPOINT_STATUS')
+            if 'analysis_view' in segment and (cached.get('hound',{}).get('source_sha256')!=sha(analysis) or cached.get('hound',{}).get('source_id')!=sid):raise Blocked('SEGMENT_CHECKPOINT_BINDING')
             if journal is not None:journal.cached_success(sha(canonical(saved)))
             return saved['segment']
         if journal is not None and not journal.begin():
@@ -138,8 +143,8 @@ def inspect_one(data,source,home,profile,analyzer,segment_dir=None,job_binding=N
             segment['hound_reason']=journal.history[-1]['reason']
             return segment
         try:
-            observed=analyzer.scan(payload,sid,profile)
-            if observed.get('source_sha256')!=sha(payload) or observed.get('source_id')!=sid or observed.get('upstream_code_executed') is not False:raise Blocked('HOUND_BINDING')
+            observed=analyzer.scan(analysis,sid,profile)
+            if observed.get('source_sha256')!=sha(analysis) or observed.get('source_id')!=sid or observed.get('upstream_code_executed') is not False:raise Blocked('HOUND_BINDING')
             segment['hound']=observed;segment['hound_status']='INSPECTED'
         except Exception as e:
             reason=str(e) if isinstance(e,Blocked) else type(e).__name__
@@ -206,6 +211,7 @@ def run(workbench,source_root,manifest_file,out,profile=None,max_containers=20,a
                     for segment in cached_segments:
                         sid=segment['source_id']
                         key={'job':sha(canonical(binding)),'source':row['sha256'],'source_id':sid,'profile':sha(canonical(profile))}
+                        if 'analysis_view' in segment:key['analysis_view']=segment['analysis_view']
                         journal=analysis_recovery.Journal(out/'analysis_attempts'/sid,key)
                         if segment['hound_status']=='INSPECTED':
                             journal.cached_success(sha(canonical({'segment':segment,'upstream_code_executed':False})))
@@ -216,7 +222,8 @@ def run(workbench,source_root,manifest_file,out,profile=None,max_containers=20,a
                             # publication. Recover its exact cached result, no rerun.
                             saved=_load_checkpoint(segment_cache,key)
                             found=saved.get('segment',{})
-                            if found.get('source_id')!=sid or found.get('source_sha256')!=segment['source_sha256'] or found.get('hound_status')!='INSPECTED':raise Blocked('RECOVERY_CACHE_DISAGREEMENT')
+                            if found.get('source_id')!=sid or found.get('source_sha256')!=segment['source_sha256'] or found.get('hound_status')!='INSPECTED' or canonical(found.get('analysis_view'))!=canonical(segment.get('analysis_view')):raise Blocked('RECOVERY_CACHE_DISAGREEMENT')
+                            if 'analysis_view' in segment and found.get('hound',{}).get('source_sha256')!=segment['analysis_view']['analysis_sha256']:raise Blocked('RECOVERY_CACHE_DISAGREEMENT')
                             journal.cached_success(sha(canonical(saved)));retry=True
                         else:
                             if journal.history and journal.history[-1]['state']=='STARTED':journal.finish('FAILED','ATTEMPT_INTERRUPTED')
@@ -313,6 +320,7 @@ def rows(report):
                        'structure_truncated':d.get('structure',{}).get('truncated',False),
                        **_partition_status(s),
                        'source_window':d.get('source_window'),
+                       **({'analysis_view':s['analysis_view']} if 'analysis_view' in s else {}),
                        'api_analysis_status':s.get('hound_status','NOT_CAPTURED'),
                        'api_analysis_reason':s.get('hound_reason'),
                        'declared_calls':[c['name'] for c in d.get('structure',{}).get('calls',[])],
@@ -341,6 +349,7 @@ def source_rows(report):
                    'comparison_operators':sorted({op for c in s.get('module_structure',{}).get('comparisons',[]) for op in c['operators']}),
                    'structure_truncated':s.get('module_structure',{}).get('truncated',False),
                    **_partition_status(s),
+                   **({'analysis_view':s['analysis_view']} if 'analysis_view' in s else {}),
                    'declared_calls':[c['name'] for c in s.get('module_structure',{}).get('calls',[])],
                    'context_status':'CAPTURED' if 'module_structure' in s else 'REINDEX_REQUIRED',
                    'search_terms':tokens((s['logical_path_hint'] or s['path'])+' '+' '.join(s['imports']+apis)),
