@@ -36,7 +36,7 @@ def inspect_definition(report,definition_id,source_root,max_bytes=250_000):
     payload=bytes.fromhex(fresh.pop('source_hex'))
     sid='source_'+sha(canonical({'file_id':source['file_id'],'container_sha256':source['sha256'],
                                'segment':fresh['segment_local_id']}))
-    if sid!=segment['source_id'] or sha(payload)!=segment['source_sha256']:
+    if sid!=segment['source_id'] or sha(payload)!=segment['source_sha256'] or canonical(fresh.get('analysis_view'))!=canonical(segment.get('analysis_view')):
         raise Blocked('DEFINITION_SOURCE_BINDING')
     found=[d for d in fresh['definitions'] if (d['name'],d['start_line'],d['end_line'])==
            (definition['name'],definition['start_line'],definition['end_line'])]
@@ -52,5 +52,6 @@ def inspect_definition(report,definition_id,source_root,max_bytes=250_000):
             'file_id':source['file_id'],'path':segment['path'],'member_chain':segment['member_chain'],
             'start_line':definition['member_start_line'],'end_line':definition['member_end_line'],
             'source_window':window,'source_text':excerpt.decode('utf-8'),'context':context,
+            **({'analysis_view':segment['analysis_view']} if 'analysis_view' in segment else {}),
             'source_code_executed':False,'source_bodies_persisted':False,'dependency_closure_complete':False,
             'interpretation':'Original definition text with its module context; not a standalone executable component'}

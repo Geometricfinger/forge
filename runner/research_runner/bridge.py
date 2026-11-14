@@ -132,6 +132,8 @@ def inspect_source(s,root,work,forge_root):
     def location(path,name,start,end,cell,chain):
         return (path,name,start,end,cell,tuple((member['path'],member['sha256']) for member in chain))
     from forge_core.retrieval import occurrence_id
+    from forge_core.source_views import analysis_bytes
+    from forge_core.common import Blocked as WorkbenchBlocked
     indexed=list(corpus.rows(report)); lookup={location(r['path'],r['name'],r['start_line'],r['end_line'],r.get('cell_index'),r['member_chain']):r for r in indexed}
     if len(lookup)!=len(indexed):raise Blocked('BRIDGE_DEFINITION_NOT_UNIQUE')
     scope_rows=list(corpus.source_rows(report))
@@ -141,11 +143,18 @@ def inspect_source(s,root,work,forge_root):
     for seg in parsed['segments']:
         raw=bytes.fromhex(seg['source_hex']);segment_hash=sha(raw)
         if segment_hash!=seg['source_sha256']:raise Blocked('BRIDGE_SOURCE_BINDING')
+        # The normalized parser/Hound view is interpretation metadata. Keep its
+        # identity alongside original source bytes, and verify the second parse
+        # cannot silently use a different transformation from the corpus.
+        try:analysis_bytes(seg,raw)
+        except WorkbenchBlocked as ex:raise Blocked('BRIDGE_ANALYSIS_VIEW_BINDING') from ex
+        view=seg.get('analysis_view');view_fields={'analysis_view':view} if view is not None else {}
         scope=scopes.get(location(seg['path'],'<module>',seg['start_line'],seg['end_line'],seg.get('cell_index'),seg['member_chain']))
         if scope is not None:
             sid=occurrence_id(scope);seen_scopes.add(sid)
             if scope['source_sha256']!=segment_hash or scope['record_kind']!='source_scope':
                 raise Blocked('BRIDGE_SOURCE_SCOPE_BINDING')
+            if canonical(scope.get('analysis_view'))!=canonical(view):raise Blocked('BRIDGE_ANALYSIS_VIEW_BINDING')
             # Keep the complete containing segment, including surrounding code.
             # It is non-callable evidence. Oversized modules remain an explicit
             # omission rather than a prefix labeled as a complete source window.
@@ -163,11 +172,12 @@ def inspect_source(s,root,work,forge_root):
                   'name':'<module>','path':seg['path'],'start_line':seg['start_line'],'end_line':seg['end_line'],
                   'kind':'implementation','text':body,'text_complete':True,'text_sha256':segment_hash,'source_window':window,
                   'class_documentation':'','test_path':seg['test_path'],'cell_index':seg.get('cell_index'),
-                  'runtime_validation':'NOT_RUN','observed_apis':scope.get('observed_apis',[])})
+                  'runtime_validation':'NOT_RUN','observed_apis':scope.get('observed_apis',[]),**view_fields})
         for d in seg['definitions']:
             start=seg['start_line']+d['start_line']-1;end=seg['start_line']+d['end_line']-1
             key=location(seg['path'],d['name'],start,end,seg.get('cell_index'),seg['member_chain']);mr=lookup.get(key)
             if mr is None:continue
+            if canonical(mr.get('analysis_view'))!=canonical(view):raise Blocked('BRIDGE_ANALYSIS_VIEW_BINDING')
             # AST lines do not treat U+2028 as a newline. Rebuilding from
             # str.splitlines() can attach unrelated text to a valid definition
             # ID; the core's byte window preserves complete original source.
@@ -195,7 +205,7 @@ def inspect_source(s,root,work,forge_root):
              'name':d['name'],'path':seg['path'],'start_line':start,'end_line':end,'kind':'implementation',
              'text':body,'text_complete':True,'text_sha256':sha(selected),'source_window':window,
              'class_documentation':classdoc,'test_path':seg['test_path'],'cell_index':seg.get('cell_index'),
-             'runtime_validation':'NOT_RUN','observed_apis':mr.get('observed_apis',[])})
+             'runtime_validation':'NOT_RUN','observed_apis':mr.get('observed_apis',[]),**view_fields})
     if seen_scopes!={occurrence_id(row) for row in scope_rows}:raise Blocked('BRIDGE_SOURCE_SCOPE_BINDING')
     # Added module context must not evict the previously supported functions.
     # Admit it against the same cumulative character budget after definitions.
@@ -238,7 +248,8 @@ class Lexical:
 
 def project(r,query,matched=None):
     qt=set(terms(query));matched=matched if matched is not None else sorted(qt & set(terms(r['name']+' '+r.get('class_documentation','')+' '+r['text'])))
-    return {k:r[k] for k in ('id','source_id','source_sha256','origin','capture','family','name','path','start_line','end_line','kind','observed_apis','runtime_validation')}|{'record_kind':r.get('record_kind','function'),'matched_terms':matched,'term_count':len(qt),'snippet':r['text'][:1600]}
+    view={'analysis_view':r['analysis_view']} if 'analysis_view' in r else {}
+    return {k:r[k] for k in ('id','source_id','source_sha256','origin','capture','family','name','path','start_line','end_line','kind','observed_apis','runtime_validation')}|view|{'record_kind':r.get('record_kind','function'),'matched_terms':matched,'term_count':len(qt),'snippet':r['text'][:1600]}
 
 
 def investigate(q,source_results,forge_root):
@@ -265,7 +276,8 @@ def investigate(q,source_results,forge_root):
                     rid=occurrence_id(metadata);original=by_id.get(rid)
                     if original is not None:
                         if (original['source_sha256']!=metadata['source_sha256'] or
-                                original.get('record_kind','function')!=metadata['record_kind']):
+                                original.get('record_kind','function')!=metadata['record_kind'] or
+                                canonical(original.get('analysis_view'))!=canonical(metadata.get('analysis_view'))):
                             raise Blocked('BRIDGE_EVIDENCE_BINDING')
                         observations[rid]=metadata.get('observed_apis',[])
                 found=corpus.search(report,q['query'],limit=10,distinct=False,filters=query_filters(q))

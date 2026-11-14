@@ -9,7 +9,7 @@ import ast,bisect,collections,hashlib,io,json,re,stat,tokenize,zipfile
 from pathlib import PurePosixPath
 from .common import Blocked,canonical,sha,loads
 
-VERSION='mixed-intake-5-structural-units'
+VERSION='mixed-intake-6-fence-analysis-view'
 DEFAULTS={'max_container_bytes':8_000_000,'max_member_bytes':2_000_000,'max_source_bytes':250_000,
           'max_module_bytes':2_000_000,'max_total_bytes':25_000_000,'max_entries':2500,'max_depth':2,'max_segments':400,'max_ratio':200,'max_nodes':60_000}
 GAP_STATES={'CONTAINER_SIZE_LIMIT','MEMBER_SIZE_LIMIT','SOURCE_SIZE_LIMIT','MODULE_SIZE_LIMIT','DEFINITION_SIZE_LIMIT','EXPANSION_LIMIT','ENTRY_LIMIT','DEPTH_LIMIT','RATIO_LIMIT','SEGMENT_LIMIT','UNSAFE_MEMBER','AMBIGUOUS_MEMBER','INVALID_ARCHIVE','ENCRYPTED_MEMBER','UNSUPPORTED_COMPRESSION','UNSUPPORTED_ENCODING','UNCLOSED_FENCE','PYTHON_SYNTAX_ERROR','AST_LIMIT','AST_UNIT_LIMIT','MODULE_CONTEXT_LIMIT','STRUCTURAL_UNIT_COUNT_LIMIT','NOTEBOOK_LANGUAGE_UNSUPPORTED','NOTEBOOK_INVALID','READ_ERROR','LANGUAGE_NOT_ANALYZED','UNSUPPORTED_FORMAT'}
@@ -119,35 +119,46 @@ class Reader:
             if type(v) is not int or not 1<=v<=DEFAULTS[k]:raise Blocked('INVALID_INTAKE_LIMIT')
     def note(self,path,status,chain,**extra):
         self.inventory.append({'path':path,'status':status,'member_chain':chain,**extra})
-    def add(self,code,path,chain,fmt,start_line=1,end_line=None,hint=None,cell=None,encoding='utf-8'):
+    def add(self,code,path,chain,fmt,start_line=1,end_line=None,hint=None,cell=None,encoding='utf-8',fence_indent=0):
         b=code.encode('utf-8')
         # Preserve one module identity and AST context. Large modules are not
         # rewritten as standalone function programs and never sent to Hound.
         if len(b)>self.limits['max_module_bytes']:
             self.note(path,'MODULE_SIZE_LIMIT',chain,stage='structural_parsing',source_bytes=len(b),start_line=start_line);return
-        large=len(b)>self.limits['max_source_bytes']
-        if large:self.note(path,'SOURCE_SIZE_LIMIT',chain,stage='api_analysis',source_bytes=len(b),start_line=start_line,structural_analysis='ATTEMPTED')
+        analysis=b;analysis_view=None
+        if fence_indent:
+            if fmt!='python_fence':raise Blocked('FENCE_ANALYSIS_VIEW')
+            from .source_views import fence_view
+            analysis,analysis_view=fence_view(b,fence_indent)
+            if len(analysis)>self.limits['max_module_bytes']:
+                self.note(path,'MODULE_SIZE_LIMIT',chain,stage='structural_parsing',source_bytes=len(b),
+                          analysis_bytes=len(analysis),start_line=start_line);return
+        analysis_code=analysis.decode('utf-8')
+        large=max(len(b),len(analysis))>self.limits['max_source_bytes']
+        if large:self.note(path,'SOURCE_SIZE_LIMIT',chain,stage='api_analysis',source_bytes=len(b),
+                           **({'analysis_bytes':len(analysis)} if analysis_view else {}),start_line=start_line,structural_analysis='ATTEMPTED')
         if len(self.segments)>=self.limits['max_segments']:self.note(path,'SEGMENT_LIMIT',chain);return
         from .structure import describe, declared_apis, prepare_module
         from .structural_units import FAST_MODULE_BYTES, admitted_trees, node_count, plan
         planned=None
         try:
             tree=None
-            # Large modules never allocate one whole-module AST. Keep the old
-            # single-parse path for ordinary bounded-size modules when admitted.
-            if len(b)<=FAST_MODULE_BYTES:
-                tree=ast.parse(code)
+            # Complete units avoid a combined AST across distinct units. An
+            # indivisible unit may span the file under fixed worker limits.
+            # Keep the single-parse path for admitted ordinary-size modules.
+            if max(len(b),len(analysis))<=FAST_MODULE_BYTES:
+                tree=ast.parse(analysis_code)
                 if node_count(tree,self.limits['max_nodes'])>self.limits['max_nodes']:tree=None
             if tree is None:
-                planned=plan(code,self.limits['max_nodes'])
+                planned=plan(analysis_code,self.limits['max_nodes'])
                 module_context=prepare_module(planned['envelope'],planned['metadata']['module_context_complete'])
                 module_structure=module_context[0]
                 definition_structure={};definitions=[];imports=[]
-                decorators=_decorator_statements(code)
-                for tree in admitted_trees(code,planned):
+                decorators=_decorator_statements(analysis_code)
+                for tree in admitted_trees(analysis_code,planned):
                     _,details=describe(tree,module_context)
                     definition_structure.update(details)
-                    definitions.extend(_definitions(tree,code,decorators))
+                    definitions.extend(_definitions(tree,analysis_code,decorators))
                     for n in ast.walk(tree):
                         if isinstance(n,ast.Import):imports.extend(a.name for a in n.names)
                         elif isinstance(n,ast.ImportFrom):imports.extend('.'*n.level+(n.module+'.' if n.module else '')+a.name for a in n.names)
@@ -156,7 +167,7 @@ class Reader:
             else:
                 meaningful=any(isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef,ast.ClassDef,ast.Import,ast.ImportFrom,ast.Assign,ast.AnnAssign,ast.AugAssign,ast.Call)) for n in ast.walk(tree))
                 module_structure,definition_structure=describe(tree)
-                definitions=_definitions(tree,code)
+                definitions=_definitions(tree,analysis_code)
                 imports=[]
                 for n in ast.walk(tree):
                     if isinstance(n,ast.Import):imports.extend(a.name for a in n.names)
@@ -167,6 +178,9 @@ class Reader:
             self.note(path,status,chain,start_line=start_line,syntax_line=getattr(e,'lineno',None));return
         if fmt=='python_text' and not meaningful:self.note(path,'CONTEXT_ONLY',chain);return
         if planned is not None:
+            if analysis_view is not None:
+                from .source_views import partition_source_windows
+                planned['metadata']=partition_source_windows(planned['metadata'],b,analysis,analysis_view)
             for unit in planned['metadata']['units']:
                 if unit['status']=='ANALYZED':continue
                 extra={k:v for k,v in unit.items() if k not in ('status','start_line','end_line','index')}
@@ -196,6 +210,7 @@ class Reader:
              'dependency_scope':'isolated_segment; adjacent blocks are NOT concatenated',
              'test_path':any(p.lower() in ('test','tests') for p in PurePosixPath(hint or path).parts) or PurePosixPath(hint or path).name.lower().startswith('test_')}
         if planned is not None:seg['structural_partition']=planned['metadata']
+        if analysis_view is not None:seg['analysis_view']=analysis_view
         self.segments.append(seg);self.note(path,'PYTHON_SEGMENT',chain,segment_local_id=seg['segment_local_id'],start_line=start_line,end_line=end_line,cell_index=cell)
     def text(self,data,path,chain,ext):
         try:t,enc=_decode(data)
@@ -206,13 +221,13 @@ class Reader:
         # Fences are explicit source boundaries, not instructions to execute.
         lines=[line for line in re.findall(r'[^\r\n]*(?:\r\n|\r|\n|$)',t) if line];active=None;seen_fence=False
         for i,line in enumerate(lines):
-            match=re.match(r'^ {0,3}(`{3,}|~{3,})([^\r\n]*)[\r\n]*$',line)
+            match=re.match(r'^( {0,3})(`{3,}|~{3,})([^\r\n]*)[\r\n]*$',line)
             if not match:continue
-            mark,info=match.groups();info=info.strip()
+            indentation,mark,info=match.groups();info=info.strip()
             if active:
                 if mark[0]==active['char'] and len(mark)>=active['length'] and not info:
                     if active['python']:
-                        self.add(''.join(lines[active['line']+1:i]),path,chain,'python_fence',active['line']+2,i,active['hint'],encoding=enc)
+                        self.add(''.join(lines[active['line']+1:i]),path,chain,'python_fence',active['line']+2,i,active['hint'],encoding=enc,fence_indent=active['indent'])
                     else:self.note(path,'LANGUAGE_NOT_ANALYZED' if active['language'] not in ('','text','txt') else 'NON_CODE_BLOCK',chain,start_line=active['line']+2,end_line=i,declared_language=active['language'])
                     active=None
                 continue
@@ -223,7 +238,7 @@ class Reader:
             h=re.fullmatch(r'(?:#{1,6}\s*)?(?:[0-9]+[.)]\s*)?`?([\w./-]+\.(?:py|pyi|pyw))`?(?:\s*\([^\r\n]*\))?\s*:?',preceding)
             hint=h.group(1) if h and _path_ok(h.group(1)) else None
             language=info.lower().split()[0] if info else ''
-            active={'line':i,'char':mark[0],'length':len(mark),'language':language,'hint':hint,'python':language in ('python','py','python3') or (not language and hint is not None)}
+            active={'line':i,'char':mark[0],'length':len(mark),'language':language,'hint':hint,'indent':len(indentation),'python':language in ('python','py','python3') or (not language and hint is not None)}
         if active:self.note(path,'UNCLOSED_FENCE',chain,start_line=active['line']+2)
         if not seen_fence:
             # Classification uses the same bounded path; do not pre-parse a

@@ -505,6 +505,7 @@ def context(report, definition_id, max_references=64):
             'limitations': ['Lexical candidate edges, not a call graph proven at runtime.',
                             'No cross-container, cross-notebook-cell or installed dependency inference.',
                             'Decorators, conditional bindings, inheritance and dynamic dispatch need review.']}
+    if 'analysis_view' in segment:base['analysis_view'] = copy.deepcopy(segment['analysis_view'])
     if 'structure' not in definition:
         return base | {'status': 'STRUCTURAL_CONTEXT_NOT_CAPTURED_REINDEX_REQUIRED'}
     meta = definition['structure']; mod = segment.get('module_structure', {})
@@ -623,6 +624,7 @@ def context(report, definition_id, max_references=64):
             reason = 'SAME_CLASS_CANDIDATE_DYNAMIC_DISPATCH_UNRESOLVED' if candidates else reason
         refs = [{'definition_id': d['definition_id'], 'name': d['name'],
                  'source_id': seg['source_id'], 'source_sha256': seg['source_sha256'],
+                 **({'analysis_view': copy.deepcopy(seg['analysis_view'])} if 'analysis_view' in seg else {}),
                  'file_id': src['file_id'], 'path': str(_module_path(seg) or seg['path']),
                  'start_line': d.get('member_start_line', d['start_line']),
                  'end_line': d.get('member_end_line', d['end_line'])} for src, seg, d in candidates]

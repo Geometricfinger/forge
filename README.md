@@ -44,6 +44,8 @@ It never executes the code it inspects and makes no model calls. The analysis co
 For the complete capability inventory, including separate prototypes and unimplemented requirements, see [docs/CAPABILITIES.md](docs/CAPABILITIES.md).
 
 The layers reflect how Forge grew. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) explains which component owns what.
+For how indented Python fences retain their original bytes while receiving a
+bound analysis view, see [docs/SOURCE_VIEWS.md](docs/SOURCE_VIEWS.md).
 
 The analyzer (`loop/`, `addon/`, `hound/`) ships as plain source. Each component has a `SHA256SUMS.txt`, and `contracts/analyzer_lock.json` pins those manifests. When you create a workspace, Forge copies the analyzer into the workspace and verifies every file. After an intentional analyzer change, run `python3 tools/update_analyzer_manifests.py` and review the diff.
 

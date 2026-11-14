@@ -103,6 +103,9 @@ If `reason` is a Python exception name instead of a code:
 | <a id="feedback_changed"></a>`FEEDBACK_CHANGED` | A pinned input changed after it was recorded (hash/identity no longer matches). Start a new run/home, or restore the original file. | forge_core/opportunities.py |
 | <a id="feedback_decision"></a>`FEEDBACK_DECISION` | Input or stored state failed a validation check (see the raising module). | forge_core/opportunities.py |
 | <a id="feedback_hypothesis"></a>`FEEDBACK_HYPOTHESIS` | Input or stored state failed a validation check (see the raising module). | forge_core/opportunities.py |
+| <a id="fence_analysis_binding"></a>`FENCE_ANALYSIS_BINDING` | A stored record is bound to different inputs/code than the current ones (integrity check). | forge_core/source_views.py |
+| <a id="fence_analysis_view"></a>`FENCE_ANALYSIS_VIEW` | Input or stored state failed a validation check (see the raising module). | forge_core/mixed_intake.py, forge_core/source_views.py |
+| <a id="fence_partition_binding"></a>`FENCE_PARTITION_BINDING` | A stored record is bound to different inputs/code than the current ones (integrity check). | forge_core/source_views.py |
 | <a id="file_identity"></a>`FILE_IDENTITY` | Input or stored state failed a validation check (see the raising module). | forge_core/discovery.py |
 | <a id="file_size_changed"></a>`FILE_SIZE_CHANGED` | A pinned input changed after it was recorded (hash/identity no longer matches). Start a new run/home, or restore the original file. | forge_core/discovery.py |
 | <a id="finding_api"></a>`FINDING_API` | Input or stored state failed a validation check (see the raising module). | forge_core/reuse.py |
@@ -389,6 +392,7 @@ If `reason` is a Python exception name instead of a code:
 | <a id="baseline_already_satisfies_mission"></a>`BASELINE_ALREADY_SATISFIES_MISSION` | Mission record invalid or changed. | loop/forge_cycle.py |
 | <a id="baseline_incomplete"></a>`BASELINE_INCOMPLETE` | Input or stored state failed a validation check (see the raising module). | loop/forge_cycle.py |
 | <a id="baseline_not_evaluated"></a>`BASELINE_NOT_EVALUATED` | Input or stored state failed a validation check (see the raising module). | loop/forge_cycle.py |
+| <a id="bridge_analysis_view_binding"></a>`BRIDGE_ANALYSIS_VIEW_BINDING` | A stored record is bound to different inputs/code than the current ones (integrity check). | runner/research_runner/bridge.py |
 | <a id="bridge_corpus_binding"></a>`BRIDGE_CORPUS_BINDING` | A stored record is bound to different inputs/code than the current ones (integrity check). | runner/research_runner/bridge.py |
 | <a id="bridge_definition_not_unique"></a>`BRIDGE_DEFINITION_NOT_UNIQUE` | Input or stored state failed a validation check (see the raising module). | runner/research_runner/bridge.py |
 | <a id="bridge_definition_window_binding"></a>`BRIDGE_DEFINITION_WINDOW_BINDING` | A stored record is bound to different inputs/code than the current ones (integrity check). | runner/research_runner/bridge.py |
