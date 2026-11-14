@@ -202,6 +202,20 @@ class CallBindingContextTests(unittest.TestCase):
         for context, _ in self.contexts(code, 'Owner.helper'):
             self.assert_targets(context, 'super().helper', ['Base.helper'])
 
+    def test_shadowed_super_result_is_not_an_imported_api_chain(self):
+        fixtures = [
+            ('from provider import factory as super\ndef use(): return super().helper()\n', 'use'),
+            ('def use():\n    from provider import factory as super\n'
+             '    return super().helper()\n', 'use'),
+            ('def outer():\n    from provider import factory as super\n'
+             '    def use(): return super().helper()\n    return use\n', 'outer.use'),
+        ]
+        for code, name in fixtures:
+            for context, meta in self.contexts(code, name):
+                self.assert_targets(context, 'super().helper', [])
+                self.assertEqual([row['name'] for row in meta['declared_api_leads']],
+                                 ['provider.factory'])
+
     def test_legacy_call_positions_request_reindex_without_mutation(self):
         report = report_from([('module.py', 'def helper(): return 1\ndef use(): return helper()\n')])
         definition = next(d for d in report['sources'][0]['segments'][0]['definitions'] if d['name'] == 'use')

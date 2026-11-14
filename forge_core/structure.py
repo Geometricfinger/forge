@@ -485,6 +485,9 @@ def declared_apis(meta, module):
         return []
     output = []
     for call in meta.get('calls', []):
+        # A method on super()'s result is not an attribute of an imported
+        # callable named super. The inner call has its own ordinary record.
+        if call['name'].startswith('super().'): continue
         pieces = call['name'].split('.')
         imp = _call_import(_call_binding(meta, call))
         if imp is None: continue
