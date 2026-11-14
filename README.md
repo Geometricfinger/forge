@@ -167,7 +167,7 @@ CHECKS="$(cd "$CHECKS" && pwd -P)"
 mkdir -p "$CHECKS/tmp"
 export TMPDIR="$CHECKS/tmp" PYTHONDONTWRITEBYTECODE=1
 
-python3 run_tests.py --out "$CHECKS/workbench"         # Workbench suite (867 tests)
+python3 run_tests.py --out "$CHECKS/workbench"         # Workbench suite (872 tests)
 python3 hound/run_tests.py --out "$CHECKS/hound"       # Hound suite (483 tests)
 python3 runner/run_tests.py                          # Research runner and continuation (102 tests)
 python3 runner/run_demo.py --out "$CHECKS/research"    # Research runner demo mission

@@ -75,6 +75,11 @@
       "path": "docs/ERROR_CODES.md",
       "contains": "`gdrive` -> `https://drive.google.com/file/d/<file_id>/view`",
       "reason": "Generated from tools/gen_error_codes.py; generic URL template, no file ID."
+    },
+    {
+      "path": "git:commit-metadata",
+      "contains": "Signed-off-by: dependabot[bot] <support@github.com>",
+      "reason": "Exact public Dependabot sign-off observed in GitHub-generated dependency commit metadata; not a blanket email or source-file exception."
     }
   ]
 }
