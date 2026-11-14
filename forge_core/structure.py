@@ -10,7 +10,7 @@ from pathlib import PurePosixPath
 from .common import Blocked
 from .lexical import counts
 
-VERSION = 'lexical-context-4-declaration-effects'
+VERSION = 'lexical-context-5-module-envelope'
 MAX_CALLS = 128
 MAX_DECLARATIONS = 64
 MAX_BINDING_CANDIDATES = 8
@@ -229,6 +229,8 @@ def _binding_context(scope, scopes):
 
 def _declaration_context(node, scopes, postponed_annotations=False):
     expressions = []; truncated = False; budget = MAX_CALLS; omissions = set()
+    if any('MODULE_STRUCTURE_INCOMPLETE' in scope['omissions'] for scope in scopes):
+        omissions.add('MODULE_STRUCTURE_INCOMPLETE')
     type_parameters = [p.name for p in getattr(node, 'type_params', ())]
     type_parameters += [name for scope in scopes for name in scope['type_parameters']]
     if type_parameters: omissions.add('TYPE_PARAMETER_SCOPE_NOT_RESOLVED')
@@ -322,13 +324,19 @@ def metadata(nodes, parameters=(), postponed_annotations=False):
             'truncated': any(len(x) > MAX_CALLS for x in (calls, imports, attributes, comparisons)),
             'runtime_resolution': 'NOT_ESTABLISHED'}
 
-def describe(tree):
+def prepare_module(tree, complete=True):
+    """Prepare one shared module scope from a complete declaration envelope."""
     postponed_annotations = any(isinstance(node, ast.ImportFrom) and node.module == '__future__'
                                 and any(alias.name == 'annotations' for alias in node.names)
                                 for node in tree.body)
     module = metadata(tree.body, postponed_annotations=postponed_annotations)
     module['class_definitions'] = []
     module_scope = _scope_syntax(tree.body, '<module>', 'module', postponed_annotations=postponed_annotations)
+    if not complete:
+        module_scope['bindings_truncated'] = module_scope['truncated'] = True
+        module_scope['omissions'].append('MODULE_STRUCTURE_INCOMPLETE')
+        module['structural_context_complete'] = False
+        module['truncated'] = True
     module['binding_context'] = _binding_context(module_scope, [module_scope])
     bindings={}
     for n in own_nodes(tree.body):
@@ -338,6 +346,13 @@ def describe(tree):
     for name in _declaration_writes(tree.body, postponed_annotations):
         bindings[name]=bindings.get(name,0)+1
     module['top_level_binding_counts']=bindings
+    return module, module_scope, postponed_annotations
+
+
+def describe(tree, module_context=None):
+    # A partitioned module prepares this context once, then supplies each
+    # complete original top-level unit. Nested scopes remain within that unit.
+    module, module_scope, postponed_annotations = module_context or prepare_module(tree)
     definitions = {}
     class Walker(ast.NodeVisitor):
         def __init__(self):
@@ -362,6 +377,9 @@ def describe(tree):
             scope = _scope_syntax(node.body, name, 'class', node.lineno,
                                   type_parameters=[p.name for p in getattr(node, 'type_params', ())],
                                   postponed_annotations=postponed_annotations)
+            if module.get('structural_context_complete') is False:
+                scope['bindings_truncated'] = scope['truncated'] = True
+                scope['omissions'].append('MODULE_STRUCTURE_INCOMPLETE')
             record['binding_context'] = _binding_context(scope, [*self.scopes, scope])
             module['class_definitions'].append(record)
             self.parents.append(node.name); self.classes.append(record); self.kinds.append('class')
@@ -382,6 +400,9 @@ def describe(tree):
             m = metadata(node.body, params, postponed_annotations)
             scope = _scope_syntax(node.body, name, 'function', node.lineno, params,
                                   [p.name for p in getattr(node, 'type_params', ())], postponed_annotations)
+            if module.get('structural_context_complete') is False:
+                scope['bindings_truncated'] = scope['truncated'] = True
+                scope['omissions'].append('MODULE_STRUCTURE_INCOMPLETE')
             m['implementation_kind']='DECLARATION_OR_STUB' if stub else 'BODY_PRESENT_NOT_VERIFIED'
             m.update({'enclosing_functions': list(self.functions),
                       'declaration_context': _declaration_context(node, self.scopes, postponed_annotations),
@@ -409,6 +430,8 @@ def describe(tree):
 
 def declared_apis(meta, module):
     """Unverified import-based leads only; rebinding/ambiguous aliases are withheld."""
+    if module.get('structural_context_complete') is False:
+        return []
     by_alias = {}
     for row in module.get('imports', []) + meta.get('imports', []):
         by_alias.setdefault(row['alias'], []).append(row)
@@ -497,13 +520,23 @@ def context(report, definition_id, max_references=64):
             'status': 'NOT_CAPTURED_REINDEX_REQUIRED', 'dependency_closure_complete': False}))
     base['additional_context_line_basis'] = 'SEGMENT_LOCAL'
     base['additional_context_member_start_line'] = segment['start_line']
+    if mod.get('structural_context_complete') is False:
+        base['limitations'].append('A complete structural unit or module context exceeded its budget; shared bindings are unknown.')
+        base['references'] = [
+            {'call': call['name'], 'line': segment['start_line'] + call['line'] - 1,
+             'status': 'MODULE_CONTEXT_INCOMPLETE', 'candidates': [],
+             'callee_execution_proven': False}
+            for call in meta.get('calls', [])[:max_references]]
+        return base | {'status': 'MODULE_CONTEXT_INCOMPLETE',
+                       'references_truncated': meta.get('truncated', False) or len(meta.get('calls', [])) > max_references}
     path = _module_path(segment)
-    universe = []
+    universe = []; module_segments = []
     for source_row in report['sources']:
         src = source_row['source']
         for seg in source_row['segments']:
             if _namespace(src, seg) != _namespace(source, segment): continue
             if seg.get('format') == 'notebook_cell' and seg['source_id'] != segment['source_id']: continue
+            module_segments.append((src, seg))
             for d in seg['definitions']:
                 universe.append((src, seg, d))
     imports = {}
@@ -539,7 +572,7 @@ def context(report, definition_id, max_references=64):
                         candidates_to_check.append((imp['module'] + '.' + imp['symbol'], '.'.join(parts[1:])))
                     if imp['level'] and (path is None or imp['level'] > len(path.parent.parts)):
                         candidates_to_check = []
-                    seen_targets = set()
+                    seen_targets = set(); incomplete_target = False
                     for module_name, target_name in candidates_to_check:
                         wanted = None
                         if imp['level']:
@@ -547,15 +580,28 @@ def context(report, definition_id, max_references=64):
                             for _ in range(imp['level'] - 1): parent = parent.parent
                             wanted = (parent / module_name.replace('.', '/')).as_posix()
                         suffix = module_name.replace('.', '/')
-                        for src, seg, d in universe:
+                        for src, seg in module_segments:
                             p = _module_path(seg)
-                            if not p or d['name'] != target_name: continue
+                            if not p: continue
                             stem = p.with_suffix('').as_posix()
                             match = stem in (wanted, (wanted or '') + '/__init__') if wanted is not None else (
                                 stem in (suffix, suffix + '/__init__') or stem.endswith('/' + suffix) or stem.endswith('/' + suffix + '/__init__'))
-                            if match and d['definition_id'] not in seen_targets:
-                                candidates.append((src, seg, d)); seen_targets.add(d['definition_id'])
-                    reason = 'DECLARED_IMPORT_CANDIDATE' if candidates else 'DECLARED_IMPORT_TARGET_NOT_IN_SNAPSHOT'
+                            if not match: continue
+                            # An omitted target unit may rebind a retained name
+                            # or contain the missing definition itself. Check
+                            # module coverage before looking for that name.
+                            if seg.get('module_structure', {}).get('structural_context_complete') is False:
+                                incomplete_target = True
+                                continue
+                            for d in seg['definitions']:
+                                if d['name'] == target_name and d['definition_id'] not in seen_targets:
+                                    candidates.append((src, seg, d)); seen_targets.add(d['definition_id'])
+                    if incomplete_target:
+                        # A package export and a submodule may both be plausible;
+                        # missing structure in either leaves the import unresolved.
+                        candidates = []; reason = 'TARGET_MODULE_CONTEXT_INCOMPLETE'
+                    else:
+                        reason = 'DECLARED_IMPORT_CANDIDATE' if candidates else 'DECLARED_IMPORT_TARGET_NOT_IN_SNAPSHOT'
         elif len(parts) == 1:
             # A stored local/parameter value must not be mistaken for a callable peer.
             if root in meta.get('parameter_roots', []) or root in meta.get('shadowed_roots', []) and not any(

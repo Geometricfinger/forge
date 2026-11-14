@@ -262,6 +262,15 @@ def run(workbench,source_root,manifest_file,out,profile=None,max_containers=20,a
             'omitted_definition_count_known':not unread and not blocked and not any(
                 g.get('status') not in ('SOURCE_SIZE_LIMIT','DEFINITION_SIZE_LIMIT') and 'source_id' not in g for g in gaps),
             'count_basis':'Definition occurrences; nested spans overlap and are not summed as source-byte coverage'}
+        partitions=[s['structural_partition'] for s in segments if 'structural_partition' in s]
+        report['coverage']['structural_partitions']={
+            'modules':len(partitions),
+            'units_total':sum(p['units_total'] for p in partitions),
+            'units_analyzed':sum(p['units_analyzed'] for p in partitions),
+            'units_omitted':sum(p['units_omitted'] for p in partitions),
+            'incomplete_module_contexts':sum(not p['module_context_complete'] for p in partitions),
+            'syntax_unvalidated_modules':sum(not p['syntax_validation_complete'] for p in partitions),
+            'scope':'Complete top-level units of the same original module; not standalone programs'}
         report['summary']['source_roundtrips_verified']=sum(r.get('source_reconstruction',{}).get('verified_exact_bytes') is True for r in results)
         report['recovery']=analysis_recovery.summary(out/'analysis_attempts')
         report['summary']['source_scope_records']=sum(1 for _ in source_rows(report))
@@ -302,6 +311,7 @@ def rows(report):
                        'attribute_reads':d.get('structure',{}).get('attribute_reads',[]),
                        'comparison_operators':sorted({op for cmp in d.get('structure',{}).get('comparisons',[]) for op in cmp['operators']}),
                        'structure_truncated':d.get('structure',{}).get('truncated',False),
+                       **_partition_status(s),
                        'source_window':d.get('source_window'),
                        'api_analysis_status':s.get('hound_status','NOT_CAPTURED'),
                        'api_analysis_reason':s.get('hound_reason'),
@@ -330,10 +340,18 @@ def source_rows(report):
                    'attribute_reads':s.get('module_structure',{}).get('attribute_reads',[]),
                    'comparison_operators':sorted({op for c in s.get('module_structure',{}).get('comparisons',[]) for op in c['operators']}),
                    'structure_truncated':s.get('module_structure',{}).get('truncated',False),
+                   **_partition_status(s),
                    'declared_calls':[c['name'] for c in s.get('module_structure',{}).get('calls',[])],
                    'context_status':'CAPTURED' if 'module_structure' in s else 'REINDEX_REQUIRED',
                    'search_terms':tokens((s['logical_path_hint'] or s['path'])+' '+' '.join(s['imports']+apis)),
                    'runtime_status':'NOT_RUN','rights_status':'NOT_REVIEWED','evidence':'SOURCE_STRUCTURE_AND_DECLARED_IMPORTS'}
+
+def _partition_status(segment):
+    partition=segment.get('structural_partition')
+    if partition is None:return {}
+    complete=(partition['module_context_complete'] and partition['syntax_validation_complete']
+              and partition['units_omitted']==0)
+    return {'structural_partition_status':'COMPLETE' if complete else 'PARTIAL'}
 
 def all_rows(report):
     yield from rows(report)

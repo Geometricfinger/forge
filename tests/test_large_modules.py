@@ -199,8 +199,18 @@ class LargeModuleIntakeTests(unittest.TestCase):
 
     def test_node_limit_still_applies_to_large_modules(self):
         result = inspect_container(padded(), 'module.py', limits={'max_nodes': 10})
-        self.assertFalse(result['segments'])
-        self.assertIn('AST_LIMIT', {g['status'] for g in result['gaps']})
+        segment = result['segments'][0]
+        self.assertEqual([d['name'] for d in segment['definitions']], ['decorate'])
+        partition = segment['structural_partition']
+        self.assertEqual(partition['limits']['max_unit_nodes'], 10)
+        self.assertEqual(partition['units_omitted'], 4)
+        self.assertFalse(partition['module_context_complete'])
+        for unit in partition['units']:
+            if unit['status'] == 'ANALYZED':
+                self.assertLessEqual(unit['node_count'], 10)
+        self.assertTrue({'AST_UNIT_LIMIT', 'MODULE_CONTEXT_LIMIT'} <=
+                        {g['status'] for g in result['gaps']})
+        self.assertEqual(segment['definitions'][0]['structure']['declared_api_leads'], [])
 
     def test_syntax_error_at_end_does_not_publish_valid_prefix(self):
         result = inspect_container(padded() + b'def broken(:\n', 'module.py')

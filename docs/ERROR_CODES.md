@@ -21,7 +21,6 @@ If `reason` is a Python exception name instead of a code:
 | <a id="analyzer_component_missing"></a>`ANALYZER_COMPONENT_MISSING` | Input or stored state failed a validation check (see the raising module). | forge_core/engine.py |
 | <a id="analyzer_link"></a>`ANALYZER_LINK` | Input or stored state failed a validation check (see the raising module). | forge_core/engine.py |
 | <a id="analyzer_lock_changed"></a>`ANALYZER_LOCK_CHANGED` | A pinned input changed after it was recorded (hash/identity no longer matches). Start a new run/home, or restore the original file. | forge_core/engine.py |
-| <a id="ast_limit"></a>`AST_LIMIT` | A safety size/count limit was exceeded. | forge_core/mixed_intake.py |
 | <a id="auth_required"></a>`AUTH_REQUIRED` | The local console request lacked the session token from the console URL. | forge_core/server.py |
 | <a id="body_length"></a>`BODY_LENGTH` | Input or stored state failed a validation check (see the raising module). | forge_core/server.py |
 | <a id="branch"></a>`BRANCH` | Input or stored state failed a validation check (see the raising module). | forge_core/policy.py |
@@ -340,6 +339,9 @@ If `reason` is a Python exception name instead of a code:
 | <a id="stale_claim"></a>`STALE_CLAIM` | The packet token no longer matches (it expired or was re-issued). Run `packet` again. | forge_core/store.py |
 | <a id="stale_evidence_head"></a>`STALE_EVIDENCE_HEAD` | An evidence citation is invalid, stale or points at the wrong target. | forge_core/reuse.py, tools/reproduce_fault_controls.py |
 | <a id="stale_source_review_required"></a>`STALE_SOURCE_REVIEW_REQUIRED` | A required input or precondition is missing. | forge_core/reuse.py |
+| <a id="structural_node_limit"></a>`STRUCTURAL_NODE_LIMIT` | A safety size/count limit was exceeded. | forge_core/structural_units.py |
+| <a id="structural_unit_binding"></a>`STRUCTURAL_UNIT_BINDING` | A stored record is bound to different inputs/code than the current ones (integrity check). | forge_core/structural_units.py |
+| <a id="structural_unit_limit"></a>`STRUCTURAL_UNIT_LIMIT` | A safety size/count limit was exceeded. | forge_core/structural_units.py |
 | <a id="symlink_path"></a>`SYMLINK_PATH` | Input or stored state failed a validation check (see the raising module). | forge_core/common.py |
 | <a id="target_count"></a>`TARGET_COUNT` | Wrong number of items for this field. | forge_core/policy.py |
 | <a id="target_schema"></a>`TARGET_SCHEMA` | Wrong or missing `schema` version. | forge_core/policy.py |
