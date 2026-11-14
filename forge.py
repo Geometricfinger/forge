@@ -84,6 +84,61 @@ def emit(value):
     elif mode=='pretty':print(json.dumps(value,sort_keys=True,indent=2))
     else:print(json.dumps(value,sort_keys=True))
 
+def review_output_path(out,inputs=(),artifact_root=None,home=None):
+    """Check a new report destination before creating any workspace files."""
+    if out is None:return None
+    from forge_core.engine import ROOT
+    dest=safe_path(out)
+    if dest.exists():raise Blocked('OUTPUT_CONFLICT')
+    if dest.is_relative_to(ROOT) or any(dest==safe_path(p) for p in inputs):
+        raise Blocked('BEHAVIOR_EXTERNAL_OUTPUT_REQUIRED')
+    if artifact_root is not None and dest.is_relative_to(safe_path(artifact_root)):
+        raise Blocked('BEHAVIOR_SEPARATE_OUTPUT')
+    if home is not None and any(dest.is_relative_to(safe_path(home)/name) for name in ('engine','corpora')):
+        raise Blocked('BEHAVIOR_SEPARATE_OUTPUT')
+    return dest
+
+def review_corpora(workbench,names,out):
+    """Read current corpora and protect their recorded original source roots."""
+    from forge_core import corpus
+    reports=[(name,corpus.get(workbench,name)) for name in names]
+    if out is None:return reports
+    dest=review_output_path(out,home=workbench.home)
+    for name,report in reports:
+        # corpus.get validated the run ID and report receipt. The local run
+        # binding supplies its original input directory, which the report omits.
+        binding=loads(read(workbench.home/'corpora'/name/'binding.json',2_000_000))
+        if (not isinstance(binding,dict) or
+                set(binding)!={'schema','code','manifest_sha256','source_root','profile_sha256'} or
+                type(binding['schema']) is not int or binding['schema']!=report['schema'] or
+                binding['code']!=workbench.store.binding() or
+                binding['manifest_sha256']!=report['corpus_manifest_sha256'] or
+                binding['profile_sha256']!=sha(canonical(report['profile'])) or
+                not isinstance(binding['source_root'],str) or not Path(binding['source_root']).is_absolute()):
+            raise Blocked('BEHAVIOR_CORPUS_BINDING')
+        source=safe_path(binding['source_root'])
+        if dest.is_relative_to(source):raise Blocked('BEHAVIOR_SEPARATE_OUTPUT')
+    return reports
+
+def behavior_inputs(args,home):
+    """Read and verify declared evidence without running it or writing a home."""
+    from forge_core.behavior_review import MAX_BYTES,preflight_artifacts
+    supplied=any((args.behavior_contract,args.behavior_evidence,args.artifact_root))
+    if not supplied:return None
+    if not args.behavior_contract or not args.artifact_root:
+        raise Blocked('BEHAVIOR_ARGUMENTS')
+    root=safe_path(args.artifact_root);checked_home=safe_path(home)
+    if not root.is_dir():raise Blocked('BEHAVIOR_ARTIFACT_ROOT')
+    if root==checked_home or root.is_relative_to(checked_home) or checked_home.is_relative_to(root):
+        raise Blocked('BEHAVIOR_SEPARATE_OUTPUT')
+    review_output_path(args.out,[args.bundle,args.registry,args.behavior_contract,
+                       *([args.behavior_evidence] if args.behavior_evidence else [])],root,home)
+    contract=loads(read(args.behavior_contract,MAX_BYTES))
+    evidence=loads(read(args.behavior_evidence,MAX_BYTES)) if args.behavior_evidence else None
+    preflight_artifacts(contract,root,evidence)
+    if not checked_home.is_dir():raise Blocked('BEHAVIOR_REQUIRES_EXISTING_CORPUS')
+    return contract,evidence,root
+
 OUTPUT_MODE='json'
 
 def main():
@@ -105,6 +160,16 @@ def main():
     a=s.add_parser('interop-fingerprint');a.add_argument('--input',type=Path,required=True);a.add_argument('--out',type=Path,required=True)
     a=s.add_parser('interop-verify');a.add_argument('--input',type=Path,required=True);a.add_argument('--receipt',type=Path,required=True)
     a=s.add_parser('opportunity-review',help='review declared transfer contracts; no execution or truth certification');a.add_argument('--bundle',type=Path,required=True);a.add_argument('--registry',type=Path,required=True);a.add_argument('--corpus-run',action='append',default=[]);a.add_argument('--out',type=Path)
+    a.add_argument('--behavior-contract',type=Path,help='completed source-bound behavioral contract JSON')
+    a.add_argument('--behavior-evidence',type=Path,help='externally recorded observations; never a command to execute')
+    a.add_argument('--artifact-root',type=Path,help='read-only folder containing declared contract/report artifacts')
+    a=s.add_parser('opportunity-plan',help='draft a behavioral contract for one current component/code lead; no execution')
+    a.add_argument('--bundle',type=Path,required=True);a.add_argument('--registry',type=Path,required=True)
+    a.add_argument('--corpus-run',action='append',required=True);a.add_argument('--hypothesis',required=True)
+    a.add_argument('--mechanism',required=True);a.add_argument('--corpus',required=True);a.add_argument('--candidate',required=True)
+    a.add_argument('--out',type=Path)
+    a=s.add_parser('behavior-result-template',help='write NOT_RUN case records for an external evaluator; no execution')
+    a.add_argument('--contract',type=Path,required=True);a.add_argument('--out',type=Path,required=True)
     s.add_parser('opportunity-demo')
     s.add_parser('opportunity-list')
     a=s.add_parser('opportunity-verify');a.add_argument('folder',type=Path)
@@ -133,6 +198,31 @@ def main():
     a.human='--human' in argv;a.pretty='--pretty' in argv
     OUTPUT_MODE='human' if a.human else 'pretty' if a.pretty else 'json'
     home=a.home.absolute()
+    behavioral=None;review_inputs=None
+    if a.command=='opportunity-review':
+        behavioral=behavior_inputs(a,home)
+        review_output_path(a.out,[a.bundle,a.registry],home=home)
+    if a.command=='opportunity-plan':
+        review_output_path(a.out,[a.bundle,a.registry],home=home)
+        if a.corpus not in a.corpus_run:raise Blocked('BEHAVIOR_CORPUS_SELECTION')
+        if not safe_path(home).is_dir():raise Blocked('BEHAVIOR_REQUIRES_EXISTING_CORPUS')
+    if a.command in ('opportunity-review','opportunity-plan'):
+        from forge_core.opportunities import MAX_INPUT
+        from forge_core.transfer_review import evaluate_with_contracts,ContractError,MAX_BYTES
+        review_inputs=(loads(read(a.bundle,MAX_INPUT)),loads(read(a.registry,MAX_BYTES)))
+        # Validate supplied annotations before initialize(). Corpus-dependent
+        # selection is recomputed later against the requested verified runs.
+        try:evaluate_with_contracts(review_inputs[0],[],review_inputs[1])
+        except ContractError as ex:raise Blocked(str(ex)) from ex
+        if a.corpus_run and not safe_path(home).is_dir():raise Blocked('BEHAVIOR_REQUIRES_EXISTING_CORPUS')
+    if a.command=='behavior-result-template':
+        from forge_core.behavior_review import MAX_BYTES,result_template
+        out=review_output_path(a.out,[a.contract],home=home)
+        contract=loads(read(a.contract,MAX_BYTES));value=result_template(contract)
+        if not safe_path(home).is_dir():raise Blocked('BEHAVIOR_REQUIRES_EXISTING_CORPUS')
+        current=Workbench(home);current.guard()
+        review_corpora(current,[contract['target']['code_lead']['corpus']],out)
+        write(out,canonical(value),new=True);emit(value);return 0
     # Validate before initialize() or automatic manifest creation. Otherwise a
     # refused scan can already have populated the target with workspace files.
     if a.command in ('corpus-run','corpus-inspect'):
@@ -189,10 +279,20 @@ def main():
         elif a.command=='opportunity-run':
             reports=[(name,corpus.get(w,name)) for name in a.corpus_run]
             value=book.run(loads(read(a.bundle,MAX_INPUT)),reports)
-        elif a.command=='opportunity-review':
+        elif a.command in ('opportunity-review','opportunity-plan'):
             from forge_core.transfer_review import evaluate_with_contracts,ContractError,MAX_BYTES
-            reports=[(name,corpus.get(w,name)) for name in a.corpus_run]
-            try:value=evaluate_with_contracts(loads(read(a.bundle,MAX_INPUT)),reports,loads(read(a.registry,MAX_BYTES)))
+            reports=review_corpora(w,a.corpus_run,a.out)
+            try:
+                bundle,registry=review_inputs
+                if a.command=='opportunity-plan':
+                    from forge_core.behavior_review import draft
+                    value=draft(bundle,reports,registry,{'hypothesis':a.hypothesis,'mechanism':a.mechanism,
+                                                        'corpus':a.corpus,'candidate_id':a.candidate})
+                elif behavioral is not None:
+                    from forge_core.behavior_review import evaluate
+                    contract,evidence,artifact_root=behavioral
+                    value=evaluate(bundle,reports,registry,contract,evidence,artifact_root=artifact_root)
+                else:value=evaluate_with_contracts(bundle,reports,registry)
             except ContractError as ex:raise Blocked(str(ex)) from ex
             if a.out:write(a.out,canonical(value),new=True)
         elif a.command=='opportunity-export':value=book.export(a.run_id,a.out)

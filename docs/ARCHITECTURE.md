@@ -17,6 +17,7 @@ Forge grew in layers. Hound came first, the add-on and loop were built around it
 | Pinned public-source envelopes | `forge_core/github_corpus.py` | No HTTP; checks envelopes produced elsewhere. |
 | Reuse review, contract trial, interop | `forge_core/reuse*.py`, `contract_trial.py`, `interop.py` | |
 | Opportunity Lab | `forge_core/opportunit*.py`, `invention_plan.py` | Rule-based hypotheses from reviewed inputs. |
+| Declared transfer and behavioral evidence review | `forge_core/transfer_review.py`, `behavior_review.py` | Recomputes current applicability, binds one exact source lead, hashes selected artifacts and compares recorded observations. No supplied harness is executed; existing opportunity and declaration results are preserved. |
 | Profile improvement cycle | `loop/` | Proposes and evaluates data-only profiles; never edits code or tests. Run via `forge.py cycle-demo` or `loop/run_demo.py`. |
 | Multi-source research missions | `runner/` | Uses the Workbench's corpus pipeline (`forge_core.corpus`) rather than calling Hound directly. |
 | Qualification | `verify.py`, `run_tests.py`, `hound/run_tests.py`, each component's tests | `verify.py` covers Workbench, Hound, add-on and loop; run `runner/tests` and its demo separately, as CI does. |

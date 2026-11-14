@@ -28,7 +28,7 @@ def main():
     try:
         command([sys.executable,str(ROOT/'run_tests.py'),'--out',str(out/'workbench-tests')],ROOT,out/'workbench-tests.log',150)
         t=loads(read(out/'workbench-tests/tests.json'))
-        if t['tests_run']!=1041 or any(t[k] for k in ('failures','errors','skips')):raise Blocked('WORKBENCH_TESTS_FAILED')
+        if t['tests_run']!=1095 or any(t[k] for k in ('failures','errors','skips')):raise Blocked('WORKBENCH_TESTS_FAILED')
         report['workbench_tests']=t
         w=initialize(out/'home')
         from forge_core import corpus,corpus_demo
@@ -73,6 +73,13 @@ def main():
         repeated=opportunity_run(w)
         if repeated!=opportunity or book.get(opp['id'])!=opp:raise Blocked('OPPORTUNITY_REPEATABILITY')
         report['opportunity_case_study']=opportunity
+        from forge_core.behavior_example import run as behavior_run
+        behavioral=behavior_run(w,out/'behavioral-review')
+        if (behavioral['results']!={'pass':'REPORTED_PASS','fail':'REPORTED_FAIL','incomplete':'REPORTED_INCOMPLETE'} or
+                not behavioral['same_contract_for_all_outcomes'] or behavioral['source_code_executed'] is not False or
+                not behavioral['original_opportunity_and_transfer_preserved']):
+            raise Blocked('BEHAVIOR_QUALIFICATION')
+        report['behavioral_review']=behavioral
         report['mixed_corpus']={'demo':mixed,'matching_definitions':matched['full_match_count'],'packet':packet,'actual_hound':True,'provider':'synthetic'}
         r=demo.run(w)
         report['discovery_demo']={'status':r['status'],'source_count':len(r['candidates']),'requests':r['counts']['DONE'],'findings':sum(len(c['findings']) for c in r['candidates']),'transport':'synthetic_fixture','actual_hound':True}

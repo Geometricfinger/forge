@@ -17,6 +17,7 @@ private application source, data, corpus metadata and credentials do not.
 | Source-linked reuse review | review-* | Requirements and notes; no automatic license clearance |
 | Rule-based opportunity analysis and feedback | opportunity-* | Reviewed annotations; not autonomous invention or customer validation |
 | Declared contract transfer review | opportunity-review | Generic later adapter integrated here; preserves raw result, no authority |
+| Source-bound behavioral plans and recorded evidence review | opportunity-plan, opportunity-review, behavior-result-template | Fixed operator assertions, actual selected artifact hashes and explicit pass/fail/incomplete states; no arbitrary execution or external execution authentication; see BEHAVIORAL_EVIDENCE.md |
 | Controlled improvement loop | loop/, cycle-demo | Data-only profiles and fixed tests; not arbitrary self-modifying application execution |
 | JSON contract trial and cross-runtime comparison | contract-*, interop-* | Named reviewed component; not universal runtime equivalence |
 | Multi-source research missions | runner/forge_research.py | Bounded graph, packet, replay and cooperative cancellation |
