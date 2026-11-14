@@ -13,6 +13,8 @@ This is a review matrix, not a claim that every program behavior has been consid
 | Reproducibility | Frozen original target contracts, cache reuse, semantic versus receipt identity | Independent held-out outcome study; deployment reproducibility on every host |
 | Evidence | Source identities, doc locations, syntax versus observed APIs, separate runtime/rights status | A source comment or profile label being true; hashes authenticating execution |
 | Operations | CLI/HTTP agreement, authentication denial, source-preserving scans, finished processes | Native browser policy exception, Mac/Windows qualification, unattended deployment |
+| Large Python modules | Full module identity/context, bounded whole-definition inspection, source-block roundtrip | Modules above 2 MB or 60,000 AST nodes; Hound API observations above 250 kB; complete runtime dependency resolution |
+| Declaration context | Decorator/default/annotation/base/metaclass syntax, bounded scope binding leads | Evaluated expressions, string annotations, complete comprehensions/lambdas or dynamic namespace semantics |
 
 Source families in this release are now regression material. Do not present repeated tests as independent samples or turn unsupported-language records into passed coverage. Keep the existing byte, time, depth, entry and authorization limits.
 

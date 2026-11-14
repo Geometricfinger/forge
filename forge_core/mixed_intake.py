@@ -9,10 +9,10 @@ import ast,collections,hashlib,io,json,re,stat,tokenize,zipfile
 from pathlib import PurePosixPath
 from .common import Blocked,canonical,sha,loads
 
-VERSION='mixed-intake-2-context'
+VERSION='mixed-intake-3-module-windows'
 DEFAULTS={'max_container_bytes':8_000_000,'max_member_bytes':2_000_000,'max_source_bytes':250_000,
-          'max_total_bytes':25_000_000,'max_entries':2500,'max_depth':2,'max_segments':400,'max_ratio':200,'max_nodes':60_000}
-GAP_STATES={'CONTAINER_SIZE_LIMIT','MEMBER_SIZE_LIMIT','SOURCE_SIZE_LIMIT','EXPANSION_LIMIT','ENTRY_LIMIT','DEPTH_LIMIT','RATIO_LIMIT','SEGMENT_LIMIT','UNSAFE_MEMBER','AMBIGUOUS_MEMBER','INVALID_ARCHIVE','ENCRYPTED_MEMBER','UNSUPPORTED_COMPRESSION','UNSUPPORTED_ENCODING','UNCLOSED_FENCE','PYTHON_SYNTAX_ERROR','AST_LIMIT','NOTEBOOK_LANGUAGE_UNSUPPORTED','NOTEBOOK_INVALID','READ_ERROR','LANGUAGE_NOT_ANALYZED','UNSUPPORTED_FORMAT'}
+          'max_module_bytes':2_000_000,'max_total_bytes':25_000_000,'max_entries':2500,'max_depth':2,'max_segments':400,'max_ratio':200,'max_nodes':60_000}
+GAP_STATES={'CONTAINER_SIZE_LIMIT','MEMBER_SIZE_LIMIT','SOURCE_SIZE_LIMIT','MODULE_SIZE_LIMIT','DEFINITION_SIZE_LIMIT','EXPANSION_LIMIT','ENTRY_LIMIT','DEPTH_LIMIT','RATIO_LIMIT','SEGMENT_LIMIT','UNSAFE_MEMBER','AMBIGUOUS_MEMBER','INVALID_ARCHIVE','ENCRYPTED_MEMBER','UNSUPPORTED_COMPRESSION','UNSUPPORTED_ENCODING','UNCLOSED_FENCE','PYTHON_SYNTAX_ERROR','AST_LIMIT','NOTEBOOK_LANGUAGE_UNSUPPORTED','NOTEBOOK_INVALID','READ_ERROR','LANGUAGE_NOT_ANALYZED','UNSUPPORTED_FORMAT'}
 TEXT_EXT={'.txt','.md','.markdown','.rst'}
 CODE_EXT={'.py','.pyi','.pyw'}
 OTHER_CODE={'.js','.jsx','.ts','.tsx','.sh','.bash','.go','.rs','.c','.cpp','.h','.java','.cs','.sql','.yaml','.yml','.toml'}
@@ -62,6 +62,24 @@ def _definitions(tree):
     Walk().visit(tree)
     return rows
 
+def _source_windows(data,definitions,limit):
+    """Complete original lines, in UTF-8 bytes; no dedenting or executable slices.
+
+    Python line numbers recognize CR/LF, not all Unicode str.splitlines breaks.
+    Windows can overlap (nested definitions); their byte lengths are not coverage.
+    """
+    offsets=[0,*[m.end() for m in re.finditer(b'\r\n|\r|\n',data)]]
+    if offsets[-1]!=len(data):offsets.append(len(data))
+    module_hash=sha(data)
+    for definition in definitions:
+        start=offsets[definition['start_line']-1]
+        end=offsets[definition['end_line']]
+        definition['source_window']={
+            'status':'AVAILABLE' if end-start<=limit else 'DEFINITION_SIZE_LIMIT',
+            'byte_start':start,'byte_end':end,'bytes':end-start,
+            'sha256':sha(data[start:end]),'module_sha256':module_hash,
+            'byte_basis':'UTF8_SEGMENT_SOURCE','complete':True}
+
 class Reader:
     def __init__(self,name,limits):
         self.name=name;self.limits=DEFAULTS|dict(limits or {});self.segments=[];self.inventory=[];self.expanded=0;self.entries=0
@@ -72,7 +90,12 @@ class Reader:
         self.inventory.append({'path':path,'status':status,'member_chain':chain,**extra})
     def add(self,code,path,chain,fmt,start_line=1,end_line=None,hint=None,cell=None,encoding='utf-8'):
         b=code.encode('utf-8')
-        if len(b)>self.limits['max_source_bytes']:self.note(path,'SOURCE_SIZE_LIMIT',chain);return
+        # Preserve one module identity and AST context. Large modules are not
+        # rewritten as standalone function programs and never sent to Hound.
+        if len(b)>self.limits['max_module_bytes']:
+            self.note(path,'MODULE_SIZE_LIMIT',chain,stage='structural_parsing',source_bytes=len(b),start_line=start_line);return
+        large=len(b)>self.limits['max_source_bytes']
+        if large:self.note(path,'SOURCE_SIZE_LIMIT',chain,stage='api_analysis',source_bytes=len(b),start_line=start_line,structural_analysis='ATTEMPTED')
         if len(self.segments)>=self.limits['max_segments']:self.note(path,'SEGMENT_LIMIT',chain);return
         try:
             tree=ast.parse(code)
@@ -84,6 +107,12 @@ class Reader:
         from .structure import describe, declared_apis
         module_structure, definition_structure = describe(tree)
         definitions = _definitions(tree)
+        _source_windows(b,definitions,self.limits['max_source_bytes'])
+        for definition in definitions:
+            if definition['source_window']['status']!='AVAILABLE':
+                self.note(path,'DEFINITION_SIZE_LIMIT',chain,stage='definition_inspection',name=definition['name'],
+                          start_line=start_line+definition['start_line']-1,end_line=start_line+definition['end_line']-1,
+                          source_bytes=definition['source_window']['bytes'])
         for definition in definitions:
             detail = definition_structure[(definition['name'], definition['definition_line'])]
             detail['declared_api_leads'] = declared_apis(detail, module_structure)
@@ -92,9 +121,11 @@ class Reader:
         for n in ast.walk(tree):
             if isinstance(n,ast.Import):imports.extend(a.name for a in n.names)
             elif isinstance(n,ast.ImportFrom):imports.extend('.'*n.level+(n.module+'.' if n.module else '')+a.name for a in n.names)
-        lines=code.splitlines();end_line=end_line if end_line is not None else start_line+max(0,len(lines)-1)
+        line_count=len(re.findall(r'\r\n|\r|\n',code))+int(bool(code) and not code.endswith(('\n','\r')))
+        end_line=end_line if end_line is not None else start_line+max(0,line_count-1)
         locator={'member_chain':chain,'format':fmt,'start_line':start_line,'end_line':end_line,'cell_index':cell,'source_sha256':sha(b)}
         seg={'segment_local_id':'segment_'+sha(canonical(locator)),**locator,'path':path,'logical_path_hint':hint,'encoding':encoding,'source_hex':b.hex(),
+             'large_module':large,'source_bytes':len(b),
              'definitions':definitions,'imports':sorted(set(imports)), 'module_structure':module_structure,
              'script_present':any(not isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef,ast.ClassDef,ast.Import,ast.ImportFrom)) and not (isinstance(n,ast.Expr) and isinstance(n.value,ast.Constant) and isinstance(n.value.value,str)) for n in tree.body),
              'dependency_scope':'isolated_segment; adjacent blocks are NOT concatenated',
@@ -107,7 +138,7 @@ class Reader:
         if ext in CODE_EXT:
             self.add(t,path,chain,'python_file',encoding=enc);return
         # Fences are explicit source boundaries, not instructions to execute.
-        lines=t.splitlines(keepends=True);active=None;seen_fence=False
+        lines=[line for line in re.findall(r'[^\r\n]*(?:\r\n|\r|\n|$)',t) if line];active=None;seen_fence=False
         for i,line in enumerate(lines):
             match=re.match(r'^ {0,3}(`{3,}|~{3,})([^\r\n]*)[\r\n]*$',line)
             if not match:continue

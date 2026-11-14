@@ -97,6 +97,17 @@ def inspect_one(data,source,home,profile,analyzer,segment_dir=None,job_binding=N
     if parsed.get('container_sha256')!=source['sha256'] or parsed.get('upstream_code_executed') is not False:raise Blocked('CORPUS_PARSE_BINDING')
     result={'source':source,'segments':[],'inventory':parsed['inventory'],'gaps':list(parsed['gaps']),
             'upstream_code_executed':False,'analysis_status':'PARSED','hound_errors':[]}
+    from .source_blocks import deconstruct,reconstruct
+    boundaries=[]
+    if len(parsed['segments'])==1:
+        module=parsed['segments'][0]
+        if module['format']=='python_file' and not module['member_chain'] and module['source_sha256']==source['sha256']:
+            boundaries=[n for d in module['definitions'] for n in (d['source_window']['byte_start'],d['source_window']['byte_end']) if 0<n<len(data)]
+    partition=deconstruct(data,preferred_boundaries=boundaries)
+    if reconstruct(partition['manifest'],partition['blocks'])!=data:raise Blocked('SOURCE_ROUNDTRIP_MISMATCH')
+    result['source_reconstruction']={'manifest':partition['manifest'],'verified_exact_bytes':True,
+        'boundary_basis':'DEFINITION_BOUNDARIES_WHEN_POSSIBLE' if boundaries else 'RAW_CONTAINER_BYTES',
+        'blocks_persisted':False,'blocks_are_standalone_programs':False}
     if validation is not None:result['acquisition_validation']=validation
     def analyze(segment):
         segment=__import__('copy').deepcopy(segment)
@@ -108,6 +119,11 @@ def inspect_one(data,source,home,profile,analyzer,segment_dir=None,job_binding=N
             d['definition_id']='definition_'+sha(canonical([sid,d['name'],d['start_line'],d['end_line']]))
             d['member_start_line']=segment['start_line']+d['start_line']-1
             d['member_end_line']=segment['start_line']+d['end_line']-1
+        if len(payload)>DEFAULTS['max_source_bytes']:
+            # A full structural module is retained, but it is not a smaller
+            # executable program. Do not spend or misreport an analyzer attempt.
+            segment['hound']={};segment['hound_status']='BLOCKED';segment['hound_reason']='SOURCE_LIMIT'
+            return segment
         key={'job':job_binding,'source':source['sha256'],'source_id':sid,'profile':sha(canonical(profile))}
         cache=(segment_dir/(sid+'.json')) if segment_dir is not None else None
         journal=analysis_recovery.Journal(segment_dir.parent/'analysis_attempts'/sid,key) if segment_dir is not None else None
@@ -235,6 +251,18 @@ def run(workbench,source_root,manifest_file,out,profile=None,max_containers=20,a
                 'cache':{'reused_containers':cached,'new_containers':used},'sources':results,'gaps':gaps,
                 'equivalent_text_groups':{k:v for k,v in occurrences.items() if len(v)>1},'elapsed_seconds':time.monotonic()-start,
                 'source_bodies_retained':False,'upstream_code_executed':False,'model_calls':0,'release_approved':False,'independent_evaluation':False}
+        report['coverage']['definitions']={
+            'discovered':len(definitions),
+            'inspection_available':sum(d.get('source_window',{}).get('status')=='AVAILABLE' for d in definitions),
+            'inspection_omitted':sum(d.get('source_window',{}).get('status')=='DEFINITION_SIZE_LIMIT' for d in definitions),
+            'api_analyzed':sum(len(s['definitions']) for s in segments if s['hound_status']=='INSPECTED'),
+            'large_modules':sum(s.get('large_module',False) for s in segments),
+            'discovery_complete':not unread and not blocked and not any(
+                g.get('status') not in ('SOURCE_SIZE_LIMIT','DEFINITION_SIZE_LIMIT') and 'source_id' not in g for g in gaps),
+            'omitted_definition_count_known':not unread and not blocked and not any(
+                g.get('status') not in ('SOURCE_SIZE_LIMIT','DEFINITION_SIZE_LIMIT') and 'source_id' not in g for g in gaps),
+            'count_basis':'Definition occurrences; nested spans overlap and are not summed as source-byte coverage'}
+        report['summary']['source_roundtrips_verified']=sum(r.get('source_reconstruction',{}).get('verified_exact_bytes') is True for r in results)
         report['recovery']=analysis_recovery.summary(out/'analysis_attempts')
         report['summary']['source_scope_records']=sum(1 for _ in source_rows(report))
         workbench.guard()  # Reject publication if the qualified tools changed mid-run.
@@ -274,6 +302,9 @@ def rows(report):
                        'attribute_reads':d.get('structure',{}).get('attribute_reads',[]),
                        'comparison_operators':sorted({op for cmp in d.get('structure',{}).get('comparisons',[]) for op in cmp['operators']}),
                        'structure_truncated':d.get('structure',{}).get('truncated',False),
+                       'source_window':d.get('source_window'),
+                       'api_analysis_status':s.get('hound_status','NOT_CAPTURED'),
+                       'api_analysis_reason':s.get('hound_reason'),
                        'declared_calls':[c['name'] for c in d.get('structure',{}).get('calls',[])],
                        'declared_api_leads':[c['name'] for c in d.get('structure',{}).get('declared_api_leads',[])],
                        'context_status':'CAPTURED' if 'structure' in d else 'REINDEX_REQUIRED',
@@ -343,6 +374,11 @@ def dependency_context(report, definition_id):
         raise Blocked('CONTEXT_DEFINITION_ID')
     from .structure import context
     return context(report, definition_id)
+
+def inspect_definition(report,definition_id,source_root,max_bytes=250_000):
+    """Explicit, hash-bound source inspection; bodies are never saved to corpus."""
+    from .source_inspection import inspect_definition as inspect
+    return inspect(report,definition_id,source_root,max_bytes)
 
 
 def render(report):

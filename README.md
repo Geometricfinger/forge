@@ -95,6 +95,9 @@ Point Forge at a plain folder; no manifest needed:
 python3 forge.py --home ~/forge-home corpus-run --source-root examples/hello_local --run-id first
 python3 forge.py --home ~/forge-home --human corpus-search --run-id first --query "subprocess.run" --distinct
 python3 forge.py --home ~/forge-home corpus-context --run-id first --definition <definition_id from the search>
+
+# Explicitly inspect a complete definition from the unchanged original sources.
+python3 forge.py --home ~/forge-home corpus-inspect --run-id first --definition <definition_id from the search> --source-root /path/to/sources
 ```
 
 Replace `examples/hello_local` with your own folder. Forge reads `.py .pyi .pyw .ipynb .zip .txt .md .markdown .rst` files (hidden files and symlinks are skipped), records their structure and **never runs them**. A `--run-id` is pinned to the exact folder contents, so use a new id after you edit files.
@@ -167,7 +170,7 @@ CHECKS="$(cd "$CHECKS" && pwd -P)"
 mkdir -p "$CHECKS/tmp"
 export TMPDIR="$CHECKS/tmp" PYTHONDONTWRITEBYTECODE=1
 
-python3 run_tests.py --out "$CHECKS/workbench"         # Workbench suite (893 tests)
+python3 run_tests.py --out "$CHECKS/workbench"         # Workbench suite (964 tests)
 python3 hound/run_tests.py --out "$CHECKS/hound"       # Hound suite (483 tests)
 python3 runner/run_tests.py                          # Research runner and continuation (102 tests)
 python3 runner/run_demo.py --out "$CHECKS/research"    # Research runner demo mission
