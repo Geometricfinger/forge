@@ -167,7 +167,7 @@ CHECKS="$(cd "$CHECKS" && pwd -P)"
 mkdir -p "$CHECKS/tmp"
 export TMPDIR="$CHECKS/tmp" PYTHONDONTWRITEBYTECODE=1
 
-python3 run_tests.py --out "$CHECKS/workbench"         # Workbench suite (872 tests)
+python3 run_tests.py --out "$CHECKS/workbench"         # Workbench suite (893 tests)
 python3 hound/run_tests.py --out "$CHECKS/hound"       # Hound suite (483 tests)
 python3 runner/run_tests.py                          # Research runner and continuation (102 tests)
 python3 runner/run_demo.py --out "$CHECKS/research"    # Research runner demo mission
@@ -183,6 +183,22 @@ explicit workspace and output paths must still meet the product's path checks.
 ### Continuous verification
 
 Every push to `main` and every pull request runs the same checks in GitHub Actions ([`.github/workflows/qualification.yml`](.github/workflows/qualification.yml)) on Python 3.11 and 3.13: the pre-publish check over the full git history, the full qualification (`verify.py`), the research-runner tests and both demos. Each run publishes its evidence (the `verify.py` output, test logs, demo output, `provenance.json` and `SHA256SUMS.txt`) as a workflow artifact named `forge-verification-<commit-sha>-py<version>`, bound to the exact commit it checked. Branch protection on `main` requires these checks to pass. CI evidence comes from the project's own pipeline, so it shows the checks ran on that commit; it is not an independent evaluation.
+
+### Verify a downloaded CI artifact
+
+After downloading a workflow artifact ZIP, verify its exact file set, both checksum
+records and the intended commit without extracting or executing anything:
+
+```sh
+python3 tools/verify_ci_evidence.py /path/to/evidence.zip --commit <40-character-commit-sha>
+```
+
+Supply `--artifact-sha256 <64-character-digest>` to also compare GitHub's artifact
+digest. The command rejects missing hidden files, unlisted payloads, stale hashes,
+unsafe archive members and inconsistent qualification status. Evidence from a
+failed job can be internally intact: `reported_qualification_passed` stays false.
+Matching receipts are not independent proof of execution or release approval.
+The upload contains only the workflow's public synthetic fixtures, not user corpora.
 
 ## Limits
 
