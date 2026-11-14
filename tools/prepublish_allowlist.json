@@ -53,8 +53,10 @@
     },
     {
       "path": "git:commit-metadata",
-      "contains": "coulsonlane@gmail.com",
-      "reason": "Maintainer explicitly approved this public contact and commit identity; retain existing history."
+      "match_sha256": "6f8d028cc18fdf95d2e0e0fd2c264987fd2a89b9800288e14f616f2888204e8f",
+      "rule": "email",
+      "history_only": true,
+      "reason": "Exact existing public-history contact identity. This selector applies only to historical email matches, never current files or artifacts. The hash is a policy selector, not a confidentiality guarantee."
     },
     {
       "path": "git:commit-metadata",
@@ -63,8 +65,10 @@
     },
     {
       "path": "README.md",
-      "contains": "coulsonlane@gmail.com",
-      "reason": "Maintainer explicitly approved publishing this exact project contact address."
+      "match_sha256": "6f8d028cc18fdf95d2e0e0fd2c264987fd2a89b9800288e14f616f2888204e8f",
+      "rule": "email",
+      "history_only": true,
+      "reason": "Exact existing public-history contact identity. This selector applies only to historical email matches, never current files or artifacts. The hash is a policy selector, not a confidentiality guarantee."
     },
     {
       "path": "tools/gen_error_codes.py",
@@ -80,6 +84,16 @@
       "path": "git:commit-metadata",
       "contains": "Signed-off-by: dependabot[bot] <support@github.com>",
       "reason": "Exact public Dependabot sign-off observed in GitHub-generated dependency commit metadata; not a blanket email or source-file exception."
+    },
+    {
+      "path": "tools/prepublish_check.py",
+      "contains": "(?<![A-Za-z0-9_])(/Users/[A-Za-z][^/\\s\"\\']*|/home/[a-z][a-z0-9_-]*|/Volumes/[^/\\s\"\\']+|[A-Za-z]:\\\\Users\\\\[^\\\\\\s\"\\']+)",
+      "reason": "Exact historical home-path detection regex, not a personal filesystem location. Adjacent content is still scanned."
+    },
+    {
+      "path": "tests/test_round3_review.py",
+      "contains": "example/fixture?token=secret",
+      "reason": "Exact synthetic repository query-injection fixture; validation must reject this repository identifier."
     }
   ]
 }

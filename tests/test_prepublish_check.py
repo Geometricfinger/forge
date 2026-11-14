@@ -18,7 +18,7 @@ class PrepublishCheckTests(unittest.TestCase):
         self.other = 'unapproved' + '@' + 'mail.dev'
         self.patterns = {name: re.compile(rx) for name, rx in check.BUILTIN.items()}
         self.allow = [
-            {'path': path, 'contains': self.public}
+            {'path': path, 'contains': self.public, 'reason': 'Synthetic public identity fixture.'}
             for path in ('README.md', 'git:commit-metadata')
         ]
 

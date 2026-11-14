@@ -69,10 +69,30 @@ class EvidenceChecks(unittest.TestCase):
         self.assertFalse(result['release_approved'])
 
     def test_upload_recipe_preserves_manifest_members(self):
+        from tools.prepare_public_evidence import prepare
         workflow = (ROOT / '.github/workflows/qualification.yml').read_text()
         uploader = workflow.split('name: Upload verification evidence', 1)[1]
         self.assertIn('include-hidden-files: true', uploader)
-        self.assertIn('!${{ env.EVIDENCE }}/qualification/home', uploader)
+        self.assertIn('path: ${{ env.PUBLIC_EVIDENCE }}', uploader)
+        self.assertIn("steps.public_evidence.outcome == 'success'", uploader)
+        self.assertNotIn('env.EVIDENCE', uploader)
+        # The exclusion now belongs to checked staging. Verify the original
+        # manifest and hidden files survive that path without a raw-folder fallback.
+        source = self.root / 'source'; source.mkdir()
+        files = fixture()
+        for name, data in files.items():
+            path = source / name; path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(data)
+        excluded = source / 'qualification' / 'home'; excluded.mkdir()
+        (excluded / '.env').write_text('PASSWORD=' + 'synthetic-exclusion-probe')
+        staged = self.root / 'public'
+        result = prepare(source, staged, COMMIT)
+        self.assertEqual(result['status'], 'PUBLIC_EVIDENCE_PREPARED')
+        actual = {p.relative_to(staged).as_posix(): p.read_bytes()
+                  for p in staged.rglob('*') if p.is_file()}
+        self.assertEqual(actual, files)
+        self.write(actual)
+        self.assertEqual(verify(self.path, COMMIT)['files_verified'], len(files))
 
     def test_missing_hidden_file_reproduces_download_failure(self):
         files = fixture(); del files['runner-demo/mission/.runner.lock']

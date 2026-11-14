@@ -2,7 +2,7 @@
 
 Created by **Lane Coulson / [Geometricfinger](https://github.com/Geometricfinger)**.
 
-Public contact: [coulsonlane@gmail.com](mailto:coulsonlane@gmail.com).
+For usage questions, open a GitHub issue. For security concerns, follow [SECURITY.md](SECURITY.md).
 
 Forge is a local, deterministic, model-free static-analysis workbench for **Python source code**. It reads Python files you explicitly give it (plain files, ZIPs, notebooks and Python code blocks in text files), records structure (definitions, classes, imports, calls) and the call sites of APIs you name in a data-only profile, lets you search that metadata, and packages source-identified leads for human review. Files in other languages are listed but not analysed.
 
