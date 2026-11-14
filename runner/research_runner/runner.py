@@ -7,7 +7,7 @@ from __future__ import annotations
 import argparse, html, sys, time
 from pathlib import Path
 from .core import *
-from .bridge import verify_base,inspect_source,investigate
+from .bridge import verify_base,inspect_source,investigate,validate_questions
 ROOT=Path(__file__).resolve().parents[1]
 
 def tool_binding():
@@ -25,6 +25,7 @@ def run(manifest,source_root,work,forge_root,max_steps=1000,stop_after_checkpoin
     check_int(max_steps,0,1000);m=check_manifest(manifest);work=no_links(work);source_root=no_links(source_root);forge_root=no_links(forge_root)
     for p in (source_root,forge_root,ROOT):
         if work==p or work.is_relative_to(p) or p.is_relative_to(work):raise Blocked('SEPARATE_WORKSPACE_REQUIRED')
+    validate_questions(m['questions'],forge_root)
     work.mkdir(parents=True,exist_ok=True,mode=0o700)
     binding={'tool':tool_binding(),'forge':verify_base(forge_root),'manifest':digest(m),'source_root':str(source_root)}
     key=digest(binding);atomic_new(work/'binding.json',canonical(binding))

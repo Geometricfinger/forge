@@ -5,11 +5,11 @@ Callers must remove them before checkpointing. Lines refer to the nearest text
 member; notebook code uses cell-local lines. Cross-block dependencies are unknown.
 """
 from __future__ import annotations
-import ast,collections,hashlib,io,json,re,stat,tokenize,zipfile
+import ast,bisect,collections,hashlib,io,json,re,stat,tokenize,zipfile
 from pathlib import PurePosixPath
 from .common import Blocked,canonical,sha,loads
 
-VERSION='mixed-intake-3-module-windows'
+VERSION='mixed-intake-4-decorator-statements'
 DEFAULTS={'max_container_bytes':8_000_000,'max_member_bytes':2_000_000,'max_source_bytes':250_000,
           'max_module_bytes':2_000_000,'max_total_bytes':25_000_000,'max_entries':2500,'max_depth':2,'max_segments':400,'max_ratio':200,'max_nodes':60_000}
 GAP_STATES={'CONTAINER_SIZE_LIMIT','MEMBER_SIZE_LIMIT','SOURCE_SIZE_LIMIT','MODULE_SIZE_LIMIT','DEFINITION_SIZE_LIMIT','EXPANSION_LIMIT','ENTRY_LIMIT','DEPTH_LIMIT','RATIO_LIMIT','SEGMENT_LIMIT','UNSAFE_MEMBER','AMBIGUOUS_MEMBER','INVALID_ARCHIVE','ENCRYPTED_MEMBER','UNSUPPORTED_COMPRESSION','UNSUPPORTED_ENCODING','UNCLOSED_FENCE','PYTHON_SYNTAX_ERROR','AST_LIMIT','NOTEBOOK_LANGUAGE_UNSUPPORTED','NOTEBOOK_INVALID','READ_ERROR','LANGUAGE_NOT_ANALYZED','UNSUPPORTED_FORMAT'}
@@ -42,8 +42,32 @@ def _excluded(name):
     if set(x.lower() for x in p.parts)&VENDOR:return 'DEPENDENCY_OR_GENERATED_EXCLUDED'
     return None
 
-def _definitions(tree):
-    rows=[]
+def _decorator_statements(code):
+    """Find whole decorator statements, whose AST expression may start later.
+
+    Normalize physical newlines only in this transient token view. Source
+    windows still slice the original UTF-8 bytes without rewriting them.
+    Only an @ at the beginning of a logical statement is a decorator; matrix
+    operators and text inside strings cannot supply a declaration boundary.
+    """
+    starts=[];ends=[];first=True;start=None
+    text=re.sub(r'\r\n|\r','\n',code)
+    try:
+        for token in tokenize.generate_tokens(io.StringIO(text).readline):
+            if token.type==tokenize.NEWLINE:
+                if start is not None:starts.append(start);ends.append(token.end[0])
+                first=True;start=None
+            elif token.type in (tokenize.NL,tokenize.COMMENT,tokenize.INDENT,tokenize.DEDENT,tokenize.ENDMARKER):
+                continue
+            elif first:
+                if token.type==tokenize.OP and token.string=='@':start=token.start[0]
+                first=False
+    except (tokenize.TokenError,IndentationError,SyntaxError) as exc:
+        raise Blocked('DECORATOR_SOURCE_BOUNDARY') from exc
+    return starts,ends
+
+def _definitions(tree,code):
+    rows=[];decorated=[]
     class Walk(ast.NodeVisitor):
         def __init__(self):self.parents=[]
         def visit_ClassDef(self,n):
@@ -57,9 +81,16 @@ def _definitions(tree):
             # A declaration, not an AI interpretation or execution result.
             rows.append({'name':'.'.join([*self.parents,n.name]),'start_line':min([n.lineno,*[d.lineno for d in n.decorator_list]]),'definition_line':n.lineno,'end_line':n.end_lineno,'parameters':params,
                          'declared_terms':tokens(n.name+' '+doc)[:100],'evidence':'STRUCTURE_AND_DOCUMENTED_WORDS','runtime_status':'NOT_RUN'})
+            if n.decorator_list:decorated.append((rows[-1],min(d.lineno for d in n.decorator_list)))
             self.parents.append(n.name);self.generic_visit(n);self.parents.pop()
         visit_AsyncFunctionDef=visit_FunctionDef
     Walk().visit(tree)
+    if decorated:
+        starts,ends=_decorator_statements(code)
+        for row,expression_line in decorated:
+            index=bisect.bisect_right(starts,expression_line)-1
+            if index<0 or expression_line>ends[index]:raise Blocked('DECORATOR_SOURCE_BOUNDARY')
+            row['start_line']=starts[index]
     return rows
 
 def _source_windows(data,definitions,limit):
@@ -106,7 +137,7 @@ class Reader:
         if fmt=='python_text' and not meaningful:self.note(path,'CONTEXT_ONLY',chain);return
         from .structure import describe, declared_apis
         module_structure, definition_structure = describe(tree)
-        definitions = _definitions(tree)
+        definitions = _definitions(tree,code)
         _source_windows(b,definitions,self.limits['max_source_bytes'])
         for definition in definitions:
             if definition['source_window']['status']!='AVAILABLE':

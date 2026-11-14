@@ -15,9 +15,10 @@ class Workflow(unittest.TestCase):
         self.p1=patch.object(runner,'verify_base',return_value={'mocked_for_controller_test':True})
         self.p2=patch.object(runner,'inspect_source',side_effect=self.source)
         self.p3=patch.object(runner,'investigate',side_effect=self.query)
-        self.p1.start();self.p2.start();self.p3.start()
+        self.p4=patch.object(runner,'validate_questions',return_value=None)
+        self.p1.start();self.p2.start();self.p3.start();self.p4.start()
     def tearDown(self):
-        self.p3.stop();self.p2.stop();self.p1.stop();self.tmp.cleanup()
+        self.p4.stop();self.p3.stop();self.p2.stop();self.p1.stop();self.tmp.cleanup()
     def source(self,s,*args):
         self.calls.append('source');return {'status':'CODE_INDEXED','source':s,'records':[],'references':[],'gaps':[]}
     def query(self,q,s,*args):

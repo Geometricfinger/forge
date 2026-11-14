@@ -111,6 +111,7 @@ class Supervisor:
             # separately counts all reserved questions, including failed work.
             v = dict(manifest, questions=[*manifest['questions'], q])
             c.check_manifest(v)
+            self.bridge.validate_questions([q], self.forge)
             return None
         c.check_int(request['max_chars'], 16, 4096)
         if not isinstance(request['source_id'], str) or not isinstance(request['evidence_id'], str):

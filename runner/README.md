@@ -34,6 +34,14 @@ on macOS. The product still rejects symlinked input and workspace paths.
 
 Use `contracts/MISSION.json` as the source/query schema. Each input has a local relative path, source kind, capture method, origin, family, byte size and SHA-256. GitHub sources additionally need repository, full commit, repository path and Git blob hash. External text cannot add commands or permissions.
 
+Code and mixed questions must also satisfy the selected Workbench's actual search
+policy: at most 200 characters, no control characters, and 1–32 distinct searchable
+terms after its tokenizer. Initial missions validate this before creating their
+workspace. Reference-only questions retain the separate 400-character manifest
+contract. An optional `required_api` uses observed API evidence and is applied
+before either code-search channel's result limit; mentioning an API in prose is
+not an observation.
+
 ```sh
 python3 forge_research.py run --manifest my_mission.json --source-root /approved/copies --work /new/mission-work --forge-root ..
 python3 forge_research.py status --work /new/mission-work
@@ -76,7 +84,9 @@ request replays its saved result, even after cancellation. It does not rerun wor
 An interrupted reservation requires review and is not automatically retried.
 
 The original mission questions count toward `max_questions`; failed/reserved
-follow-ups consume slots too. Inspections have a separate cap equal to that
+follow-ups consume slots too. An invalid code-search query or API filter is
+rejected before a follow-up is reserved, without changing its question budget,
+completed reports or supervision ledger. Inspections have a separate cap equal to that
 original question budget. Request JSON is limited to 16 KiB. Full results stay in
 `work/supervision/`; responses are bounded by the original packet budget. Missing
 inputs or altered source, report, checkpoints, runner code or workbench code block

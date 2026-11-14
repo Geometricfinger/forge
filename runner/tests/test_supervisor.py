@@ -17,13 +17,14 @@ class SupervisorContract(unittest.TestCase):
         self.source_result={'status':'CODE_INDEXED','source':self.source,'records':[self.record],'references':[],'gaps':[],'source_code_executed':False}
         self.calls=0
         self.v=patch.object(runner,'verify_base',return_value={'mocked_for_controller_test':True});self.v.start()
-        with patch.object(runner,'inspect_source',return_value=self.source_result),patch.object(runner,'investigate',side_effect=self.search):
+        self.validation=patch.object(bridge,'validate_questions',return_value=None);self.validation.start()
+        with patch.object(runner,'inspect_source',return_value=self.source_result),patch.object(runner,'investigate',side_effect=self.search),patch.object(runner,'validate_questions',return_value=None):
             runner.run(self.m,self.src,self.work,self.forge)
         self.calls=0
         self.lookup=patch.object(bridge,'investigate',side_effect=self.search);self.lookup.start()
         self.session=fs.Supervisor(self.mp,self.src,self.work,self.forge)
     def tearDown(self):
-        self.lookup.stop();self.v.stop();self.t.cleanup()
+        self.lookup.stop();self.validation.stop();self.v.stop();self.t.cleanup()
     def search(self,q,s,*a):
         self.calls+=1
         r=dict(self.record,snippet=self.record['text'],channels=['lexical'],matched_terms=['useful'],term_count=1)

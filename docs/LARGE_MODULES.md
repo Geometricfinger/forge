@@ -45,10 +45,19 @@ bind the original bytes and encoding. Decorators, indentation and physical newli
 sequences remain in the returned window. A nested function's window is still part
 of its original enclosing scope, not a new executable component.
 
+Decorator windows start at the complete logical `@` statement, including
+parenthesized or backslash-continued expressions whose first AST node appears on
+a later physical line. Token boundaries are used only to locate that statement;
+the returned window still contains the original source bytes.
+
 Dependency context includes bounded syntax leads for decorators, defaults,
 annotations, class bases/metaclasses and referenced bindings. Imports, globals,
 closure candidates and ambiguous/rebound names remain distinct. These are static
 leads: runtime dispatch and complete dependency closure are not established.
+Assignment expressions in defaults, decorators and class headers contribute
+binding leads to their defining scope without treating nested bodies as part of
+that scope. Postponed annotations do not contribute binding effects; generic
+declaration and comprehension effects retain explicit uncertainty.
 
 ## Reconstruct the original bytes
 
