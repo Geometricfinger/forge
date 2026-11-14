@@ -11,6 +11,8 @@ private application source, data, corpus metadata and credentials do not.
 | Python structure and exact API observations | hound, addon, corpus-run | Static parsing, not runtime meaning; Python only |
 | Files, ZIPs, notebooks, Python fences | corpus-run, make-manifest | Bounded intake; explicit unread/blocked/unsupported states |
 | Source pinning, recovery, lexical search and dependency context | corpus-* | File/version identity, checkpoints; not universal semantic search |
+| Large Python module structure and complete definition inspection | corpus-run, corpus-context, corpus-inspect | Bounded 2 MB module parse; unchanged 250 kB API analyzer limit remains an explicit gap; see LARGE_MODULES.md |
+| Lossless source block reconstruction | source_blocks, corpus-run | Exact original-byte roundtrip and block hashes; bodies transient, hashes cannot recreate missing bytes |
 | Optional bounded public GitHub discovery | new, packet, accept, run | Operator-started GET-only discovery; never implicit in local scans |
 | Source-linked reuse review | review-* | Requirements and notes; no automatic license clearance |
 | Rule-based opportunity analysis and feedback | opportunity-* | Reviewed annotations; not autonomous invention or customer validation |
@@ -39,7 +41,7 @@ public test corpus are not by themselves a removed product capability.
 | Drive / chat-library retrieval | The supervising host supplied authorized copies. This repository does not contain a user's connected account credentials or a full native Drive/chat connector. |
 | Automatic semantic contracts and independent invention | Not demonstrated. Transfer Review validates supplied labels, not their truth. |
 | Continuously hosted model controller | No model service is started by these commands. Agent integration needs explicit authority, budgets and evaluation. |
-| Full language / large-module / archive coverage | Not complete. Preserve explicit limits and omissions instead of marking every repository fully analyzed. |
+| Full language / large-module / archive coverage | Not complete. Large Python structure is bounded at 2 MB and 60,000 AST nodes; API observations beyond 250 kB remain unavailable. Preserve explicit limits and omissions instead of marking every repository fully analyzed. |
 
 These are tracked integration/research requirements, not reasons to publish private
 archives or label missing functions as verified. Test against new source families

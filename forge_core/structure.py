@@ -5,12 +5,15 @@ proof that a callee executes. Adjacent transcript blocks/cells are never merged.
 """
 from __future__ import annotations
 import ast
+import copy
 from pathlib import PurePosixPath
 from .common import Blocked
 from .lexical import counts
 
-VERSION = 'lexical-context-2-class-state'
+VERSION = 'lexical-context-3-declaration-bindings'
 MAX_CALLS = 128
+MAX_DECLARATIONS = 64
+MAX_BINDING_CANDIDATES = 8
 
 def dotted(node):
     if isinstance(node, ast.Name):
@@ -28,6 +31,192 @@ def own_nodes(nodes):
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Lambda)):
             continue
         stack.extend(reversed(list(ast.iter_child_nodes(node))))
+
+def _scope_syntax(nodes, name, kind, line=1, parameters=(), type_parameters=()):
+    """Bounded binding/read syntax for one scope, never a runtime symbol table."""
+    result = {'name': name, 'kind': kind, 'line': line, 'bindings': [], 'reads': [],
+              'globals': [], 'nonlocals': [], 'truncated': False, 'bindings_truncated': False, 'omissions': [],
+              'type_parameters': list(type_parameters)[:MAX_CALLS]}
+    if len(type_parameters) > MAX_CALLS:
+        result['truncated'] = result['bindings_truncated'] = True
+    def add(key, value):
+        if len(result[key]) < MAX_CALLS: result[key].append(value)
+        else:
+            result['truncated'] = True
+            if key != 'reads': result['bindings_truncated'] = True
+    def binding(local_name, where, binding_kind, **extra):
+        if len(local_name) <= 240:
+            add('bindings', {'name': local_name, 'line': where, 'kind': binding_kind, **extra})
+        else: result['truncated'] = result['bindings_truncated'] = True
+    for symbol in parameters: binding(symbol, line, 'parameter')
+    stack = [(node, False) for node in reversed(nodes)]
+    while stack:
+        node, comprehension = stack.pop()
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            binding(node.name, node.lineno, 'class' if isinstance(node, ast.ClassDef) else 'function')
+            continue
+        if isinstance(node, ast.Lambda):
+            if 'LAMBDA_BODY_NOT_CAPTURED' not in result['omissions']:
+                result['omissions'].append('LAMBDA_BODY_NOT_CAPTURED')
+            # Lambda defaults execute in the containing scope, unlike its body.
+            stack.extend((child, comprehension) for child in reversed(
+                [*node.args.defaults, *[x for x in node.args.kw_defaults if x is not None]]))
+            continue
+        if isinstance(node, (ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp)):
+            comprehension = True
+            if 'COMPREHENSION_BINDINGS_UNRESOLVED' not in result['omissions']:
+                result['omissions'].append('COMPREHENSION_BINDINGS_UNRESOLVED')
+        if isinstance(node, ast.Name):
+            if len(node.id) > 240:
+                result['truncated'] = True
+                if not isinstance(node.ctx, ast.Load): result['bindings_truncated'] = True
+            elif isinstance(node.ctx, ast.Load):
+                add('reads', {'name': node.id, 'line': node.lineno,
+                              'scope_uncertain': comprehension})
+            elif not comprehension:
+                binding(node.id, node.lineno, 'delete' if isinstance(node.ctx, ast.Del) else 'assignment')
+        elif isinstance(node, ast.Import):
+            for alias in node.names:
+                binding(alias.asname or alias.name.split('.')[0], node.lineno, 'import',
+                        module=alias.name[:240], symbol=None, level=0)
+                if len(alias.name) > 240: result['truncated'] = result['bindings_truncated'] = True
+        elif isinstance(node, ast.ImportFrom):
+            for alias in node.names:
+                binding(alias.asname or alias.name, node.lineno, 'from_import',
+                        module=(node.module or '')[:240], symbol=alias.name[:240], level=node.level)
+                if len(node.module or '') > 240 or len(alias.name) > 240:
+                    result['truncated'] = result['bindings_truncated'] = True
+        elif isinstance(node, (ast.Global, ast.Nonlocal)):
+            for symbol in node.names:
+                if len(symbol) <= 240: add('globals' if isinstance(node, ast.Global) else 'nonlocals', symbol)
+                else: result['truncated'] = result['bindings_truncated'] = True
+        elif isinstance(node, ast.NamedExpr) and comprehension and isinstance(node.target, ast.Name):
+            binding(node.target.id, node.target.lineno, 'comprehension_assignment_expression')
+        elif isinstance(node, ast.ExceptHandler) and node.name:
+            binding(node.name, node.lineno, 'exception_target')
+        elif isinstance(node, (ast.MatchAs, ast.MatchStar)) and node.name:
+            binding(node.name, node.lineno, 'pattern_capture')
+        elif isinstance(node, ast.MatchMapping) and node.rest:
+            binding(node.rest, node.lineno, 'pattern_capture')
+        stack.extend((child, comprehension) for child in reversed(list(ast.iter_child_nodes(node))))
+    return result
+
+def _scope_chain(scopes):
+    # A method body does not close over class-local names. A declaration directly
+    # in a class body can nevertheless read that class namespace.
+    return [scope for i, scope in enumerate(reversed(scopes))
+            if i == 0 or scope['kind'] != 'class']
+
+def _read_context(reads, scopes, *, declaration=False, uncertain_names=()):
+    references = []; truncated = False
+    for read in reads[:MAX_CALLS]:
+        name = read['name']; candidates = []; status = 'UNRESOLVED_OR_BUILTIN_OR_EXTERNAL'
+        chain = list(scopes)
+        explicit_nonlocal = bool(chain and name in chain[0]['nonlocals'])
+        if read.get('scope_uncertain'):
+            status = 'COMPREHENSION_SCOPE_UNRESOLVED'; chain = []
+        elif name in uncertain_names or any(name in scope['type_parameters'] for scope in chain):
+            status = 'TYPE_PARAMETER_SCOPE_UNRESOLVED'; chain = []
+        elif chain and name in chain[0]['globals']:
+            chain = [scope for scope in chain if scope['kind'] == 'module']
+            status = 'GLOBAL_BINDING_NOT_CAPTURED'
+        elif chain and name in chain[0]['nonlocals']:
+            chain = [scope for scope in chain[1:] if scope['kind'] == 'function']
+            status = 'NONLOCAL_BINDING_NOT_CAPTURED'
+        for scope in chain:
+            # A truncated scope could contain a closer binding or a global/
+            # nonlocal declaration; do not infer through that missing evidence.
+            if scope['bindings_truncated']:
+                status = 'BINDING_CAPTURE_TRUNCATED'; truncated = True; break
+            if any(x['kind'] == 'from_import' and x.get('symbol') == '*' for x in scope['bindings']):
+                status = 'WILDCARD_IMPORT_BINDING_UNRESOLVED'; break
+            if name in scope['globals'] and scope['kind'] != 'module':
+                if explicit_nonlocal:
+                    status = 'NONLOCAL_BINDING_NOT_CAPTURED'; break
+                # An enclosing global declaration prevents capture from a
+                # still-outer function, even if the module binding is absent.
+                module = next((x for x in scopes if x['kind'] == 'module'), None)
+                if module is None:
+                    status = 'GLOBAL_BINDING_NOT_CAPTURED'; break
+                if module['bindings_truncated']:
+                    status = 'BINDING_CAPTURE_TRUNCATED'; truncated = True; break
+                scope = module
+                matches = [x for x in scope['bindings'] if x['name'] == name]
+                if not matches:
+                    status = 'GLOBAL_BINDING_NOT_CAPTURED'; break
+            elif name in scope['nonlocals']:
+                continue
+            else:
+                matches = [x for x in scope['bindings'] if x['name'] == name]
+            if not matches: continue
+            candidates = [{**site, 'scope': scope['name'], 'scope_kind': scope['kind'],
+                           'scope_line': scope['line'], 'binding_effect_proven': False}
+                          for site in matches[:MAX_BINDING_CANDIDATES]]
+            truncated |= len(matches) > MAX_BINDING_CANDIDATES
+            status = 'LEXICAL_BINDING_CANDIDATE' if len(matches) == 1 else 'AMBIGUOUS_OR_REBOUND_BINDING'
+            if any(x['kind'] == 'comprehension_assignment_expression' for x in matches):
+                status = 'COMPREHENSION_BINDING_EFFECT_UNRESOLVED'
+            if declaration and any(x['line'] >= read['line'] for x in matches):
+                status = 'DECLARATION_BINDING_ORDER_UNRESOLVED'
+            break
+        references.append({'name': name, 'line': read['line'], 'status': status,
+                           'candidates': candidates, 'runtime_resolution': 'NOT_ESTABLISHED'})
+    return references, truncated or len(reads) > MAX_CALLS
+
+def _binding_context(scope, scopes):
+    uncertain_names = [name for enclosing in scopes for name in enclosing['type_parameters']]
+    references, truncated = _read_context(scope['reads'], _scope_chain(scopes), uncertain_names=uncertain_names)
+    return {'references': references, 'global_names': scope['globals'],
+            'nonlocal_names': scope['nonlocals'], 'scope_omissions': scope['omissions'],
+            'truncated': truncated or scope['truncated'],
+            'runtime_resolution': 'NOT_ESTABLISHED', 'dependency_closure_complete': False,
+            'evidence': 'NAME_LOAD_AND_BINDING_SYNTAX_NOT_RUNTIME_RESOLUTION'}
+
+def _declaration_context(node, scopes):
+    expressions = []; truncated = False; budget = MAX_CALLS; omissions = set()
+    type_parameters = [p.name for p in getattr(node, 'type_params', ())]
+    type_parameters += [name for scope in scopes for name in scope['type_parameters']]
+    if type_parameters: omissions.add('TYPE_PARAMETER_SCOPE_NOT_RESOLVED')
+    def add(kind, expression, parameter=None):
+        nonlocal truncated, budget
+        if expression is None: return
+        if len(expressions) >= MAX_DECLARATIONS:
+            truncated = True; return
+        syntax = _scope_syntax([expression], '<declaration>', 'expression')
+        reads = syntax['reads'][:budget]; budget -= len(reads)
+        references, cut = _read_context(reads, _scope_chain(scopes), declaration=True,
+                                        uncertain_names=type_parameters)
+        truncated |= syntax['truncated'] or cut or len(reads) < len(syntax['reads'])
+        omissions.update(syntax['omissions'])
+        if 'annotation' in kind and any(isinstance(x, ast.Constant) and isinstance(x.value, str)
+                                        for x in ast.walk(expression)):
+            omissions.add('STRING_ANNOTATION_CONTENT_NOT_RESOLVED')
+        symbol = dotted(expression.func) if isinstance(expression, ast.Call) else dotted(expression)
+        expressions.append({'kind': kind, 'parameter': parameter,
+                            'line': expression.lineno, 'end_line': expression.end_lineno,
+                            'symbol': symbol if symbol and len(symbol) <= 240 else None,
+                            'references': references})
+    for expression in node.decorator_list: add('decorator', expression)
+    for parameter in getattr(node, 'type_params', ()):
+        add('type_parameter_bound', getattr(parameter, 'bound', None), parameter.name)
+        add('type_parameter_default', getattr(parameter, 'default_value', None), parameter.name)
+    if isinstance(node, ast.ClassDef):
+        for expression in node.bases: add('class_base', expression)
+        for keyword in node.keywords:
+            add('metaclass' if keyword.arg == 'metaclass' else 'class_keyword', keyword.value, keyword.arg)
+    else:
+        positional = [*node.args.posonlyargs, *node.args.args]
+        for parameter, expression in zip(positional[len(positional) - len(node.args.defaults):], node.args.defaults):
+            add('positional_default', expression, parameter.arg)
+        for parameter, expression in zip(node.args.kwonlyargs, node.args.kw_defaults):
+            add('keyword_default', expression, parameter.arg)
+        for parameter in [*positional, *node.args.kwonlyargs, *([node.args.vararg] if node.args.vararg else []),
+                          *([node.args.kwarg] if node.args.kwarg else [])]:
+            add('parameter_annotation', parameter.annotation, parameter.arg)
+        add('return_annotation', node.returns)
+    return {'expressions': expressions, 'scope_omissions': sorted(omissions), 'truncated': truncated,
+            'runtime_resolution': 'NOT_ESTABLISHED', 'dependency_closure_complete': False,
+            'evidence': 'DECLARATION_EXPRESSION_SYNTAX_NOT_EVALUATED'}
 
 def metadata(nodes, parameters=()):
     calls, imports, stores = [], [], set(parameters)
@@ -78,6 +267,8 @@ def metadata(nodes, parameters=()):
 def describe(tree):
     module = metadata(tree.body)
     module['class_definitions'] = []
+    module_scope = _scope_syntax(tree.body, '<module>', 'module')
+    module['binding_context'] = _binding_context(module_scope, [module_scope])
     bindings={}
     for n in own_nodes(tree.body):
         name=(n.id if isinstance(n,ast.Name) and isinstance(n.ctx,(ast.Store,ast.Del)) else
@@ -88,6 +279,7 @@ def describe(tree):
     class Walker(ast.NodeVisitor):
         def __init__(self):
             self.parents = []; self.functions = []; self.classes = []; self.kinds = []
+            self.scopes = [module_scope]
         def visit_ClassDef(self, node):
             name = '.'.join([*self.parents, node.name])
             doc = node.body[0] if (node.body and isinstance(node.body[0], ast.Expr)
@@ -101,11 +293,17 @@ def describe(tree):
                       'bases_truncated': len(node.bases) > 8,
                       'decorated': bool(node.decorator_list), 'keywords_present': bool(node.keywords),
                       'top_level_unconditional':node in tree.body,
+                      'declaration_context': _declaration_context(node, self.scopes),
                       'evidence': 'CLASS_DOCUMENTATION_NOT_BEHAVIOR_PROOF',
                       'runtime_resolution': 'NOT_ESTABLISHED'}
+            scope = _scope_syntax(node.body, name, 'class', node.lineno,
+                                  type_parameters=[p.name for p in getattr(node, 'type_params', ())])
+            record['binding_context'] = _binding_context(scope, [*self.scopes, scope])
             module['class_definitions'].append(record)
             self.parents.append(node.name); self.classes.append(record); self.kinds.append('class')
+            self.scopes.append(scope)
             for child in node.body: self.visit(child)
+            self.scopes.pop()
             self.kinds.pop(); self.classes.pop(); self.parents.pop()
         def visit_FunctionDef(self, node):
             name = '.'.join([*self.parents, node.name])
@@ -118,10 +316,17 @@ def describe(tree):
             body=[x for x in node.body if not (isinstance(x,ast.Expr) and isinstance(x.value,ast.Constant) and isinstance(x.value.value,str))]
             stub=not body or all(isinstance(x,ast.Pass) or (isinstance(x,ast.Expr) and isinstance(x.value,ast.Constant) and x.value.value is Ellipsis) or (isinstance(x,ast.Raise) and ((isinstance(x.exc,ast.Name) and x.exc.id=='NotImplementedError') or (isinstance(x.exc,ast.Call) and dotted(x.exc.func)=='NotImplementedError'))) for x in body)
             m = metadata(node.body, params)
+            scope = _scope_syntax(node.body, name, 'function', node.lineno, params,
+                                  [p.name for p in getattr(node, 'type_params', ())])
             m['implementation_kind']='DECLARATION_OR_STUB' if stub else 'BODY_PRESENT_NOT_VERIFIED'
             m.update({'enclosing_functions': list(self.functions),
+                      'declaration_context': _declaration_context(node, self.scopes),
+                      'binding_context': _binding_context(scope, [*self.scopes, scope]),
                       'enclosing_class': self.classes[-1]['name'] if self.classes else None,
-                      'class_context': owner, 'method_role': role,
+                      # The class body context remains on its module record;
+                      # copying it into every method would multiply that data.
+                      'class_context': {k: v for k, v in owner.items() if k != 'binding_context'} if owner else None,
+                      'method_role': role,
                       'method_role_evidence': 'DIRECT_DEFINITION_NAME_AND_ENCLOSING_SCOPE_NOT_RUNTIME_SEMANTICS',
                       'parameter_roots': params,
                       'term_frequencies': {
@@ -130,7 +335,9 @@ def describe(tree):
                           'parameters': counts(' '.join(params))}})
             definitions[(name, node.lineno)] = m
             self.parents.append(node.name); self.functions.append(name); self.kinds.append('function')
+            self.scopes.append(scope)
             for child in node.body: self.visit(child)
+            self.scopes.pop()
             self.kinds.pop(); self.functions.pop(); self.parents.pop()
         visit_AsyncFunctionDef = visit_FunctionDef
     Walker().visit(tree)
@@ -214,6 +421,18 @@ def context(report, definition_id, max_references=64):
     if 'structure' not in definition:
         return base | {'status': 'STRUCTURAL_CONTEXT_NOT_CAPTURED_REINDEX_REQUIRED'}
     meta = definition['structure']; mod = segment.get('module_structure', {})
+    # Keep offsets explicit: these additive records refer to the same original
+    # segment as existing lexical evidence, including fenced text/notebook cells.
+    base['declaration_context'] = copy.deepcopy(meta.get('declaration_context', {
+        'status': 'NOT_CAPTURED_REINDEX_REQUIRED', 'dependency_closure_complete': False}))
+    base['binding_context'] = copy.deepcopy(meta.get('binding_context', {
+        'status': 'NOT_CAPTURED_REINDEX_REQUIRED', 'dependency_closure_complete': False}))
+    owner = meta.get('class_context')
+    if owner:
+        base['class_declaration_context'] = copy.deepcopy(owner.get('declaration_context', {
+            'status': 'NOT_CAPTURED_REINDEX_REQUIRED', 'dependency_closure_complete': False}))
+    base['additional_context_line_basis'] = 'SEGMENT_LOCAL'
+    base['additional_context_member_start_line'] = segment['start_line']
     path = _module_path(segment)
     universe = []
     for source_row in report['sources']:

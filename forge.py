@@ -118,6 +118,7 @@ def main():
     a=s.add_parser('corpus-search');a.add_argument('--run-id',required=True);a.add_argument('--query',required=True);a.add_argument('--include-tests',action='store_true');a.add_argument('--out',type=Path)
     a.add_argument('--distinct',action='store_true');a.add_argument('--filters',type=Path)
     a=s.add_parser('corpus-context');a.add_argument('--run-id',required=True);a.add_argument('--definition',required=True);a.add_argument('--out',type=Path)
+    a=s.add_parser('corpus-inspect',help='read one complete, hash-bound definition; never execute it');a.add_argument('--run-id',required=True);a.add_argument('--definition',required=True);a.add_argument('--source-root',type=Path,required=True);a.add_argument('--max-bytes',type=int,default=250_000)
     s.add_parser('corpus-list')
     a=s.add_parser('make-manifest',help='write a provider "local" manifest for a plain folder');a.add_argument('folder',type=Path);a.add_argument('--out',type=Path,required=True)
     s.add_parser('reuse-demo')
@@ -134,11 +135,12 @@ def main():
     home=a.home.absolute()
     # Validate before initialize() or automatic manifest creation. Otherwise a
     # refused scan can already have populated the target with workspace files.
-    if a.command=='corpus-run':
+    if a.command in ('corpus-run','corpus-inspect'):
         source=safe_path(a.source_root);checked_home=safe_path(home)
         if not source.is_dir():raise Blocked('SOURCE_ROOT')
         if source==checked_home or source.is_relative_to(checked_home) or checked_home.is_relative_to(source):
             raise Blocked('CORPUS_SEPARATE_OUTPUT')
+        if a.command=='corpus-inspect' and not checked_home.is_dir():raise Blocked('CORPUS_INSPECTION_REQUIRES_EXISTING_RUN')
 
     if a.command=='make-manifest':
         out=safe_path(a.out)
@@ -243,6 +245,10 @@ def main():
         from forge_core import corpus
         value=corpus.dependency_context(corpus.get(w,a.run_id),a.definition)
         if a.out:write(a.out,canonical(value),new=True)
+    elif a.command=='corpus-inspect':
+        from forge_core import corpus
+        value=corpus.inspect_definition(corpus.get(w,a.run_id),a.definition,a.source_root,a.max_bytes)
+        w.guard()
     elif a.command=='review-new':
         from forge_core.engine import ROOT
         value=w.casebook().create(a.mission,loads(read(a.contract or ROOT/'templates/reuse_contract.json',16000)))
