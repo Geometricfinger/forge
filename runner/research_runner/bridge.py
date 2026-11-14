@@ -9,6 +9,8 @@ from itertools import zip_longest
 from pathlib import Path
 from .core import *
 
+MAX_LEXICAL_CHARS=25_000_000
+
 def verify_base(root):
     """Verify the FORGE engine this runner drives (by default, the enclosing repository).
 
@@ -47,7 +49,8 @@ def load_base(root):
 
 
 def query_filters(question):
-    filters={'record_kind':'function'}
+    # A module/script is implementation evidence, but never a fake callable.
+    filters={}
     if 'required_api' in question:filters['required_apis']=[question['required_api']]
     return filters
 
@@ -128,12 +131,39 @@ def inspect_source(s,root,work,forge_root):
         raise Blocked('BRIDGE_CORPUS_BINDING')
     def location(path,name,start,end,cell,chain):
         return (path,name,start,end,cell,tuple((member['path'],member['sha256']) for member in chain))
+    from forge_core.retrieval import occurrence_id
     indexed=list(corpus.rows(report)); lookup={location(r['path'],r['name'],r['start_line'],r['end_line'],r.get('cell_index'),r['member_chain']):r for r in indexed}
     if len(lookup)!=len(indexed):raise Blocked('BRIDGE_DEFINITION_NOT_UNIQUE')
-    records=[];retained_chars=0
+    scope_rows=list(corpus.source_rows(report))
+    scopes={location(r['path'],r['name'],r['start_line'],r['end_line'],r.get('cell_index'),r['member_chain']):r for r in scope_rows}
+    if len(scopes)!=len(scope_rows):raise Blocked('BRIDGE_SOURCE_SCOPE_NOT_UNIQUE')
+    records=[];retained_chars=0;scope_records=[];scope_gaps=[];seen_scopes=set()
     for seg in parsed['segments']:
         raw=bytes.fromhex(seg['source_hex']);segment_hash=sha(raw)
         if segment_hash!=seg['source_sha256']:raise Blocked('BRIDGE_SOURCE_BINDING')
+        scope=scopes.get(location(seg['path'],'<module>',seg['start_line'],seg['end_line'],seg.get('cell_index'),seg['member_chain']))
+        if scope is not None:
+            sid=occurrence_id(scope);seen_scopes.add(sid)
+            if scope['source_sha256']!=segment_hash or scope['record_kind']!='source_scope':
+                raise Blocked('BRIDGE_SOURCE_SCOPE_BINDING')
+            # Keep the complete containing segment, including surrounding code.
+            # It is non-callable evidence. Oversized modules remain an explicit
+            # omission rather than a prefix labeled as a complete source window.
+            if len(raw)>corpus.DEFAULTS['max_source_bytes']:
+                scope_gaps.append({'status':'SOURCE_SCOPE_SIZE_LIMIT','stage':'research_source_scope',
+                  'source_scope_id':sid,'path':seg['path'],'start_line':seg['start_line'],'end_line':seg['end_line'],
+                  'cell_index':seg.get('cell_index'),'member_chain':seg['member_chain'],'source_bytes':len(raw),
+                  'max_source_bytes':corpus.DEFAULTS['max_source_bytes']})
+            else:
+                body=raw.decode('utf-8')
+                window={'status':'AVAILABLE','byte_start':0,'byte_end':len(raw),'bytes':len(raw),
+                  'sha256':segment_hash,'module_sha256':segment_hash,'byte_basis':'UTF8_SEGMENT_SOURCE','complete':True}
+                scope_records.append({'id':sid,'record_kind':'source_scope','source_id':s['id'],'source_sha256':segment_hash,
+                  'container_sha256':s['sha256'],'origin':s['origin'],'capture':s['capture'],'family':s['family'],
+                  'name':'<module>','path':seg['path'],'start_line':seg['start_line'],'end_line':seg['end_line'],
+                  'kind':'implementation','text':body,'text_complete':True,'text_sha256':segment_hash,'source_window':window,
+                  'class_documentation':'','test_path':seg['test_path'],'cell_index':seg.get('cell_index'),
+                  'runtime_validation':'NOT_RUN','observed_apis':scope.get('observed_apis',[])})
         for d in seg['definitions']:
             start=seg['start_line']+d['start_line']-1;end=seg['start_line']+d['end_line']-1
             key=location(seg['path'],d['name'],start,end,seg.get('cell_index'),seg['member_chain']);mr=lookup.get(key)
@@ -158,18 +188,29 @@ def inspect_source(s,root,work,forge_root):
             if window.get('status')!='AVAILABLE' or len(selected)>corpus.DEFAULTS['max_source_bytes']:
                 raise Blocked('BRIDGE_DEFINITION_WINDOW_BINDING')
             body=selected.decode('utf-8');retained_chars+=len(body)
-            if retained_chars>25000000:raise Blocked('LEXICAL_EXPANSION_LIMIT')
+            if retained_chars>MAX_LEXICAL_CHARS:raise Blocked('LEXICAL_EXPANSION_LIMIT')
             owner=d.get('structure',{}).get('class_context') or {};classdoc=owner.get('documentation','')
-            records.append({'id':mr['definition_id'],'source_id':s['id'],'source_sha256':mr['source_sha256'],
+            records.append({'id':mr['definition_id'],'record_kind':'function','source_id':s['id'],'source_sha256':mr['source_sha256'],
              'container_sha256':s['sha256'],'origin':s['origin'],'capture':s['capture'],'family':s['family'],
              'name':d['name'],'path':seg['path'],'start_line':start,'end_line':end,'kind':'implementation',
              'text':body,'text_complete':True,'text_sha256':sha(selected),'source_window':window,
              'class_documentation':classdoc,'test_path':seg['test_path'],'cell_index':seg.get('cell_index'),
              'runtime_validation':'NOT_RUN','observed_apis':mr.get('observed_apis',[])})
+    if seen_scopes!={occurrence_id(row) for row in scope_rows}:raise Blocked('BRIDGE_SOURCE_SCOPE_BINDING')
+    # Added module context must not evict the previously supported functions.
+    # Admit it against the same cumulative character budget after definitions.
+    for record in scope_records:
+        if retained_chars+len(record['text'])>MAX_LEXICAL_CHARS:
+            scope_gaps.append({'status':'SOURCE_SCOPE_RETENTION_LIMIT','stage':'research_source_scope',
+              'source_scope_id':record['id'],'path':record['path'],'start_line':record['start_line'],
+              'end_line':record['end_line'],'cell_index':record['cell_index'],
+              'source_bytes':record['source_window']['bytes'],'max_retained_chars':MAX_LEXICAL_CHARS})
+        else:
+            records.append(record);retained_chars+=len(record['text'])
     if data!=read_source(root,s):raise Blocked('SOURCE_CHANGED_DURING_INSPECTION')
     w.guard()
-    return {'status':'CODE_INDEXED' if report['status']=='COMPLETED_FOR_SELECTED_CONTAINERS' else 'CODE_INDEXED_WITH_GAPS',
-      'source':s,'records':records,'references':[],'gaps':report['gaps']+report['coverage']['blocked'],
+    return {'status':'CODE_INDEXED' if report['status']=='COMPLETED_FOR_SELECTED_CONTAINERS' and not scope_gaps else 'CODE_INDEXED_WITH_GAPS',
+      'source':s,'records':records,'references':[],'gaps':report['gaps']+report['coverage']['blocked']+scope_gaps,
       'forge_report_path':str(report_dir/'corpus.json'),'forge_summary':report['summary'], 'source_code_executed':False}
 
 
@@ -197,7 +238,7 @@ class Lexical:
 
 def project(r,query,matched=None):
     qt=set(terms(query));matched=matched if matched is not None else sorted(qt & set(terms(r['name']+' '+r.get('class_documentation','')+' '+r['text'])))
-    return {k:r[k] for k in ('id','source_id','source_sha256','origin','capture','family','name','path','start_line','end_line','kind','observed_apis','runtime_validation')}|{'matched_terms':matched,'term_count':len(qt),'snippet':r['text'][:1600]}
+    return {k:r[k] for k in ('id','source_id','source_sha256','origin','capture','family','name','path','start_line','end_line','kind','observed_apis','runtime_validation')}|{'record_kind':r.get('record_kind','function'),'matched_terms':matched,'term_count':len(qt),'snippet':r['text'][:1600]}
 
 
 def investigate(q,source_results,forge_root):
@@ -205,34 +246,46 @@ def investigate(q,source_results,forge_root):
     records=[r for source in selected for r in source.get('records',[]) if not r.get('test_path')]
     refs=[r for source in selected for r in source.get('references',[])]
     gaps=[{'source':r['source']['id'],'state':r['status'],'gaps':r.get('gaps',[])} for r in selected if r['status'] in ('BLOCKED','UNSUPPORTED_BINARY','CODE_INDEXED_WITH_GAPS','TEXT_ONLY_UNSUPPORTED_LANGUAGE')]
-    lexical=[];forgerows=[];reference=[]
+    lexical=[];forgerows=[];reference=[];observations={}
     if q['intent'] in ('code','mixed'):
         corpus=validate_questions([q],forge_root)
-        # Use observed API evidence before either channel's top-k cutoff.
-        # Filtering after truncation can hide a valid lower-ranked candidate.
+        from forge_core.retrieval import occurrence_id
         required_api=q.get('required_api')
-        eligible=[r for r in records if not required_api or required_api in r.get('observed_apis',[])]
-        index=Lexical(eligible)
-        try:lexical=index.search(q['query'],10)
-        finally:index.close()
-        by_id={r['id']:r for r in eligible}
+        by_id={r['id']:r for r in records}
         lists=[]
         for source in sorted(selected,key=lambda item:item['source']['id']):
             source_rows=[]
             path=source.get('forge_report_path')
             if path:
                 report=corpus.read_report(Path(path).parent)
+                # API evidence comes from checksum-verified corpus rows, not
+                # declarations supplied by the lexical record. Keep it even
+                # when this query only matches full source text.
+                for metadata in corpus.all_rows(report):
+                    rid=occurrence_id(metadata);original=by_id.get(rid)
+                    if original is not None:
+                        if (original['source_sha256']!=metadata['source_sha256'] or
+                                original.get('record_kind','function')!=metadata['record_kind']):
+                            raise Blocked('BRIDGE_EVIDENCE_BINDING')
+                        observations[rid]=metadata.get('observed_apis',[])
                 found=corpus.search(report,q['query'],limit=10,distinct=False,filters=query_filters(q))
                 for r in found['results']:
-                    original=by_id.get(r['definition_id'])
-                    if original is not None:source_rows.append(project(original,q['query']))
+                    original=by_id.get(occurrence_id(r))
+                    if original is not None:
+                        source_rows.append(project(dict(original,observed_apis=observations[original['id']]),q['query']))
             if source_rows:lists.append(source_rows)
+        # Both channels apply observed-API eligibility before their top-k cut.
+        eligible=[dict(r,observed_apis=observations.get(r['id'],[])) for r in records
+                  if not required_api or required_api in observations.get(r['id'],[])]
+        index=Lexical(eligible)
+        try:lexical=index.search(q['query'],10)
+        finally:index.close()
         forgerows=[row for layer in zip_longest(*lists) for row in layer if row is not None][:10]
         # Per-source list order is retained with deterministic round-robin policy;
         # no raw score equivalence across different source indexes is assumed.
     if q['intent'] in ('reference','mixed') or not records:
         reference=reference_hits(refs,q['query'],5)
-    fused=rank_fusion(lexical,forgerows,5,required_api=q.get('required_api'))
+    fused=rank_fusion(lexical,forgerows,5,required_api=q.get('required_api'),forge_observations=observations)
     if q['intent']=='reference':fused=[]
     full=any(len(r['matched_terms'])==r['term_count'] for r in fused)
     status=('STATIC_LEADS_REVIEW_REQUIRED' if full else 'PARTIAL_QUERY_ONLY' if fused else

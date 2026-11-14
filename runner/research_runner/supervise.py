@@ -131,7 +131,7 @@ class Supervisor:
         result['results'] = []
         result['references'] = []
         for r in full.get('results', [])[:5]:
-            keep = {k: r[k] for k in ('id', 'source_id', 'source_sha256', 'origin', 'capture', 'name', 'path', 'start_line', 'end_line', 'channels') if k in r}
+            keep = {k: r[k] for k in ('id', 'source_id', 'source_sha256', 'origin', 'capture', 'name', 'path', 'start_line', 'end_line', 'record_kind', 'channels') if k in r}
             keep['excerpt'] = r.get('snippet', '')[:192]
             keep['excerpt_truncated'] = len(r.get('snippet', '')) > 192
             result['results'].append(keep)
@@ -186,7 +186,7 @@ class Supervisor:
                         result = self._project(full)
                     else:
                         text = evidence.get('text', '')
-                        result = {k: evidence[k] for k in ('id', 'source_id', 'source_sha256', 'origin', 'kind', 'capture', 'name', 'path', 'start_line', 'end_line') if k in evidence}
+                        result = {k: evidence[k] for k in ('id', 'source_id', 'source_sha256', 'origin', 'kind', 'capture', 'name', 'path', 'start_line', 'end_line', 'record_kind', 'text_sha256', 'source_window') if k in evidence}
                         result.update(text=text[:request['max_chars']], total_chars=len(text),
                                       truncated=len(text) > request['max_chars'], runtime_validation='NOT_RUN')
                         full = result

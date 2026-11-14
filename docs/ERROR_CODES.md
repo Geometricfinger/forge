@@ -390,7 +390,10 @@ If `reason` is a Python exception name instead of a code:
 | <a id="bridge_corpus_binding"></a>`BRIDGE_CORPUS_BINDING` | A stored record is bound to different inputs/code than the current ones (integrity check). | runner/research_runner/bridge.py |
 | <a id="bridge_definition_not_unique"></a>`BRIDGE_DEFINITION_NOT_UNIQUE` | Input or stored state failed a validation check (see the raising module). | runner/research_runner/bridge.py |
 | <a id="bridge_definition_window_binding"></a>`BRIDGE_DEFINITION_WINDOW_BINDING` | A stored record is bound to different inputs/code than the current ones (integrity check). | runner/research_runner/bridge.py |
+| <a id="bridge_evidence_binding"></a>`BRIDGE_EVIDENCE_BINDING` | A stored record is bound to different inputs/code than the current ones (integrity check). | runner/research_runner/bridge.py |
 | <a id="bridge_source_binding"></a>`BRIDGE_SOURCE_BINDING` | A stored record is bound to different inputs/code than the current ones (integrity check). | runner/research_runner/bridge.py |
+| <a id="bridge_source_scope_binding"></a>`BRIDGE_SOURCE_SCOPE_BINDING` | A stored record is bound to different inputs/code than the current ones (integrity check). | runner/research_runner/bridge.py |
+| <a id="bridge_source_scope_not_unique"></a>`BRIDGE_SOURCE_SCOPE_NOT_UNIQUE` | A source record or file failed validation. | runner/research_runner/bridge.py |
 | <a id="budget_fields"></a>`BUDGET_FIELDS` | A JSON object has missing or unexpected fields. | runner/research_runner/core.py |
 | <a id="candidate_budget_exhausted"></a>`CANDIDATE_BUDGET_EXHAUSTED` | Input or stored state failed a validation check (see the raising module). | loop/forge_cycle.py |
 | <a id="candidate_state"></a>`CANDIDATE_STATE` | Input or stored state failed a validation check (see the raising module). | loop/forge_cycle.py |

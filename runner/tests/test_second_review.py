@@ -39,8 +39,13 @@ class SecondReview(unittest.TestCase):
             groups.append({'source':{'id':source},'status':'CODE_INDEXED','records':[candidate(source,n) for n in range(6)],
               'references':[],'gaps':[],'forge_report_path':'/'+source+'/corpus.json'})
         if reverse:groups.reverse()
-        backend=SimpleNamespace(read_report=lambda p: str(p),
-           search=lambda report,*a,**kw:{'results':[{'definition_id':report.strip('/')+'-'+str(i)} for i in range(6)]})
+        # The bridge reads actual corpus observations independently of query
+        # hits. Keep this ordering test's fake metadata in the same shape.
+        def metadata(report):
+            return [{'definition_id':report.strip('/')+'-'+str(i),'record_kind':'function',
+                     'source_sha256':'a'*64,'observed_apis':[]} for i in range(6)]
+        backend=SimpleNamespace(read_report=lambda p: str(p),all_rows=metadata,
+           search=lambda report,*a,**kw:{'results':metadata(report)})
         q={'id':'q','query':'match','sources':['a','b'],'intent':'code'}
         with patch.object(bridge,'load_base',return_value=(backend,None,None)):
             return bridge.investigate(q,groups,Path('/unused'))

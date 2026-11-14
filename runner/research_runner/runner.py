@@ -60,7 +60,10 @@ def run(manifest,source_root,work,forge_root,max_steps=1000,stop_after_checkpoin
             else:
                 output={'schema':1,'objective':m['objective'],'status':'READY_FOR_SUPERVISOR_REVIEW',
                   'sources':[{'id':s['id'],'status':completed['source:'+s['id']]['status'],'sha256':s['sha256'],'origin':s['origin'],
-                     'capture':s['capture'],'definition_count':len(completed['source:'+s['id']]['records']),'gaps':completed['source:'+s['id']]['gaps']} for s in m['sources']],
+                     'capture':s['capture'],
+                     'definition_count':sum(r.get('record_kind','function')=='function' for r in completed['source:'+s['id']]['records']),
+                     'source_scope_count':sum(r.get('record_kind')=='source_scope' for r in completed['source:'+s['id']]['records']),
+                     'gaps':completed['source:'+s['id']]['gaps']} for s in m['sources']],
                   'queries':[completed['query:'+q['id']] for q in m['questions']],
                   'authority':{'execute_source':False,'modify_baseline':False,'deploy':False,'market_validated':False,'novelty_established':False},
                   'model_calls':0,'independent_evaluation':False,'tool_binding':key}
