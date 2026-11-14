@@ -1,0 +1,41 @@
+name: Review source snapshot
+on:
+  push:
+    branches: [forge/capability-drift-review-20261113]
+    paths: [.github/workflows/review-source-snapshot.yml]
+permissions:
+  contents: read
+jobs:
+  snapshot:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ea4abb028cf9e120291f9127ffa70a6d55e0455f
+          persist-credentials: false
+          submodules: false
+          lfs: false
+      - name: Export tracked baseline only; execute no project code
+        env:
+          OUT: ${{ runner.temp }}/review-source
+        run: |
+          mkdir -p "$OUT"
+          git archive --format=zip --output="$OUT/source.zip" HEAD
+          git ls-tree -rl HEAD > "$OUT/git-tree.txt"
+          python3 -I -S - <<'PY'
+          import hashlib, json, os, pathlib, subprocess
+          root = pathlib.Path(os.environ['OUT'])
+          commit = subprocess.check_output(['git','rev-parse','HEAD'], text=True).strip()
+          assert commit == 'ea4abb028cf9e120291f9127ffa70a6d55e0455f'
+          result = {'repository':'Geometricfinger/forge', 'source_commit':commit,
+                    'source_sha256':hashlib.sha256((root/'source.zip').read_bytes()).hexdigest(),
+                    'project_code_executed':False, 'other_repositories_accessed':False}
+          (root/'receipt.json').write_text(json.dumps(result,indent=2)+'\n')
+          PY
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: forge-review-source-ea4abb0
+          path: ${{ runner.temp }}/review-source/
+          retention-days: 14
+          if-no-files-found: error
