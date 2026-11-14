@@ -23,6 +23,8 @@ It never executes the code it inspects and makes no model calls. The analysis co
 - **Mixed-source corpus intake.** Plain files, ZIP archives, notebooks and saved transcripts, each pinned by size and SHA-256 in a manifest.
 - **Local search.** BM25 with reciprocal-rank fusion over definitions, imports and call sites, backed by SQLite FTS5.
 - **Local web UI.** `forge.py serve` binds to `127.0.0.1` only.
+- **Declared transfer review.** `opportunity-review` checks source-bound input/output, unit, frame, timing and effect declarations before recommending experiment components. It does not verify the truth of those declarations.
+- **Bounded research follow-ups.** `runner/forge_supervise.py` asks new questions and inspects indexed evidence from a completed mission, without another source-intake pass. Replay, cancellation and the original question budget are retained.
 - **Review packets.** Results are packaged as source-identified leads with hashes so a person can check every claim.
 - **Offline and reproducible.** Analysis makes no network requests or model calls, and Forge has no third-party Python dependencies. Analyzer files are hash-pinned and verified on every workspace.
 - **Opt-in public discovery.** `forge.py run` (or **Run** in the UI) can search GitHub for public, permissively licensed example code with bounded, GET-only requests. It never runs unless you start it. See [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md).
@@ -38,6 +40,8 @@ It never executes the code it inspects and makes no model calls. The analysis co
 | `runner/` | The research runner: bounded multi-source research missions with checkpoints, producing a compact review packet. |
 | `examples/demo/` | Public demo pack. Synthetic data only. |
 | `tests/`, `tools/`, `contracts/`, `templates/`, `assets/` | Test suite, maintenance tools, frozen test contracts, profile templates and web UI assets. |
+
+For the complete capability inventory, including separate prototypes and unimplemented requirements, see [docs/CAPABILITIES.md](docs/CAPABILITIES.md).
 
 The layers reflect how Forge grew. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) explains which component owns what.
 
@@ -143,6 +147,17 @@ Each row needs `file_id` (unique, any id), `path` (relative to `--source-root`),
 | `gdrive` (default) | the Google Drive file view URL for `file_id` | files downloaded from Google Drive |
 | `synthetic` | `fixture://<file_id>` | built-in test fixtures |
 
+## Research and reuse review
+
+A completed research mission can be continued through the data-only interface
+in [`runner/forge_supervise.py`](runner/forge_supervise.py). See
+[runner/README.md](runner/README.md#supervisor-continuation) for request formats.
+It starts no model or shell and does not execute the inspected applications.
+
+To compare explicitly supplied capability contracts, run the
+[synthetic transfer-review example](examples/transfer_review/README.md). Findings
+remain leads until their meaning and behavior are independently checked.
+
 ## Running the tests
 
 ```sh
@@ -152,9 +167,9 @@ CHECKS="$(cd "$CHECKS" && pwd -P)"
 mkdir -p "$CHECKS/tmp"
 export TMPDIR="$CHECKS/tmp" PYTHONDONTWRITEBYTECODE=1
 
-python3 run_tests.py --out "$CHECKS/workbench"         # Workbench suite (809 tests)
+python3 run_tests.py --out "$CHECKS/workbench"         # Workbench suite (893 tests)
 python3 hound/run_tests.py --out "$CHECKS/hound"       # Hound suite (483 tests)
-python3 runner/run_tests.py                          # Research runner (64 tests)
+python3 runner/run_tests.py                          # Research runner and continuation (102 tests)
 python3 runner/run_demo.py --out "$CHECKS/research"    # Research runner demo mission
 python3 verify.py --out "$CHECKS/qualification"       # Workbench, Hound, add-on, loop, contract and recovery qualification
 ```
@@ -168,6 +183,22 @@ explicit workspace and output paths must still meet the product's path checks.
 ### Continuous verification
 
 Every push to `main` and every pull request runs the same checks in GitHub Actions ([`.github/workflows/qualification.yml`](.github/workflows/qualification.yml)) on Python 3.11 and 3.13: the pre-publish check over the full git history, the full qualification (`verify.py`), the research-runner tests and both demos. Each run publishes its evidence (the `verify.py` output, test logs, demo output, `provenance.json` and `SHA256SUMS.txt`) as a workflow artifact named `forge-verification-<commit-sha>-py<version>`, bound to the exact commit it checked. Branch protection on `main` requires these checks to pass. CI evidence comes from the project's own pipeline, so it shows the checks ran on that commit; it is not an independent evaluation.
+
+### Verify a downloaded CI artifact
+
+After downloading a workflow artifact ZIP, verify its exact file set, both checksum
+records and the intended commit without extracting or executing anything:
+
+```sh
+python3 tools/verify_ci_evidence.py /path/to/evidence.zip --commit <40-character-commit-sha>
+```
+
+Supply `--artifact-sha256 <64-character-digest>` to also compare GitHub's artifact
+digest. The command rejects missing hidden files, unlisted payloads, stale hashes,
+unsafe archive members and inconsistent qualification status. Evidence from a
+failed job can be internally intact: `reported_qualification_passed` stays false.
+Matching receipts are not independent proof of execution or release approval.
+The upload contains only the workflow's public synthetic fixtures, not user corpora.
 
 ## Limits
 

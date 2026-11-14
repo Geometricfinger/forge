@@ -71,7 +71,7 @@ def run(manifest,source_root,work,forge_root,max_steps=1000,stop_after_checkpoin
         for s in m['sources']:
             if s['id'] not in source_errors:read_source(source_root,s)
         if binding['tool']!=tool_binding():raise Blocked('RUNNER_CHANGED_DURING_RUN')
-        verify_base(forge_root)
+        if binding['forge']!=verify_base(forge_root):raise Blocked('FORGE_CHANGED_DURING_RUN')
         result=completed['assemble'];packet=compact_packet(result,m['budgets']['packet_bytes'])
         atomic_new(work/'report.json',canonical(result));atomic_new(work/'supervisor_packet.json',canonical(packet));atomic_new(work/'Review.html',render(result).encode())
         receipt={'report_sha256':digest(result),'packet_sha256':digest(packet),'packet_bytes':len(canonical(packet)),

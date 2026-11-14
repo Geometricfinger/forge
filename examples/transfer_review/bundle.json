@@ -1,0 +1,179 @@
+{
+  "schema": 1,
+  "title": "Trace the missing identity",
+  "as_of": "2026-09-21",
+  "max_age_days": 365,
+  "public_brief": "Investigate artifact identity at a workflow handoff.",
+  "sources": [
+    {
+      "id": "operator",
+      "text": "I must manually recover the artifact identity before reviewing the received file.",
+      "kind": "synthetic",
+      "public": false,
+      "origin_group": "operator",
+      "capture_method": "synthetic_fixture",
+      "uri": "fixture://operator",
+      "observed_on": "2026-09-21",
+      "derived_from": []
+    }
+  ],
+  "workflows": [
+    {
+      "id": "handoff",
+      "title": "Artifact handoff",
+      "actor": "Receiving operator",
+      "domain": "engineering",
+      "purpose": "Review a received artifact without guessing its identity.",
+      "initial_fields": [
+        "artifact",
+        "attributes"
+      ],
+      "steps": [
+        {
+          "id": "export",
+          "action": "Export a file",
+          "requires": [
+            "artifact"
+          ],
+          "produces": [
+            "file"
+          ],
+          "evidence": [
+            {
+              "source": "operator",
+              "start": 0,
+              "end": 81,
+              "quote": "I must manually recover the artifact identity before reviewing the received file."
+            }
+          ]
+        },
+        {
+          "id": "review",
+          "action": "Review the file",
+          "requires": [
+            "file",
+            "identity"
+          ],
+          "produces": [
+            "decision"
+          ],
+          "evidence": [
+            {
+              "source": "operator",
+              "start": 0,
+              "end": 81,
+              "quote": "I must manually recover the artifact identity before reviewing the received file."
+            }
+          ]
+        }
+      ],
+      "needs": [
+        {
+          "id": "identity",
+          "step": "review",
+          "field": "identity",
+          "pattern": "identity_loss",
+          "why": "The next step needs an identity that the described handoff does not supply.",
+          "basis": "reported",
+          "evidence": [
+            {
+              "source": "operator",
+              "start": 0,
+              "end": 81,
+              "quote": "I must manually recover the artifact identity before reviewing the received file."
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "observations": [
+    {
+      "id": "manual",
+      "workflow": "handoff",
+      "need": "identity",
+      "kind": "manual",
+      "scope": "target",
+      "statement": "The fixture operator reconstructs identity manually.",
+      "evidence": [
+        {
+          "source": "operator",
+          "start": 0,
+          "end": 81,
+          "quote": "I must manually recover the artifact identity before reviewing the received file."
+        }
+      ]
+    }
+  ],
+  "mechanisms": [
+    {
+      "id": "matching",
+      "title": "Attribute matching with abstention",
+      "domain": "catalog records",
+      "purpose": "Narrow identity candidates",
+      "mechanism": "Compare recorded attributes and escalate indistinguishable results.",
+      "addresses": [
+        "identity_loss"
+      ],
+      "requires": [
+        "attributes",
+        "distinguishing_information"
+      ],
+      "provides": [
+        "identity_candidates"
+      ],
+      "limits": [
+        "Identical recorded attributes cannot determine one unique identity."
+      ],
+      "evidence": [
+        {
+          "source": "operator",
+          "start": 0,
+          "end": 81,
+          "quote": "I must manually recover the artifact identity before reviewing the received file."
+        }
+      ],
+      "code_queries": [
+        "match_catalog_entry",
+        "normalize_part_label"
+      ]
+    },
+    {
+      "id": "record",
+      "title": "Carry an identity record",
+      "domain": "software provenance",
+      "purpose": "Preserve identity across a handoff",
+      "mechanism": "Bind an acquisition record to an artifact digest.",
+      "addresses": [
+        "identity_loss"
+      ],
+      "requires": [
+        "artifact"
+      ],
+      "provides": [
+        "identity_evidence"
+      ],
+      "limits": [
+        "A digest binds bytes, not the correctness of the supplied identity."
+      ],
+      "evidence": [
+        {
+          "source": "operator",
+          "start": 0,
+          "end": 81,
+          "quote": "I must manually recover the artifact identity before reviewing the received file."
+        }
+      ],
+      "code_queries": [
+        "file_hash",
+        "digest"
+      ]
+    }
+  ],
+  "preferences": {
+    "identity_loss": 3,
+    "manual_bridge": 3,
+    "verification_gap": 3,
+    "information_gap": 1
+  }
+}
