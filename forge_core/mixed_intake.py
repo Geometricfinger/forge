@@ -9,10 +9,10 @@ import ast,bisect,collections,hashlib,io,json,re,stat,tokenize,zipfile
 from pathlib import PurePosixPath
 from .common import Blocked,canonical,sha,loads
 
-VERSION='mixed-intake-4-decorator-statements'
+VERSION='mixed-intake-5-structural-units'
 DEFAULTS={'max_container_bytes':8_000_000,'max_member_bytes':2_000_000,'max_source_bytes':250_000,
           'max_module_bytes':2_000_000,'max_total_bytes':25_000_000,'max_entries':2500,'max_depth':2,'max_segments':400,'max_ratio':200,'max_nodes':60_000}
-GAP_STATES={'CONTAINER_SIZE_LIMIT','MEMBER_SIZE_LIMIT','SOURCE_SIZE_LIMIT','MODULE_SIZE_LIMIT','DEFINITION_SIZE_LIMIT','EXPANSION_LIMIT','ENTRY_LIMIT','DEPTH_LIMIT','RATIO_LIMIT','SEGMENT_LIMIT','UNSAFE_MEMBER','AMBIGUOUS_MEMBER','INVALID_ARCHIVE','ENCRYPTED_MEMBER','UNSUPPORTED_COMPRESSION','UNSUPPORTED_ENCODING','UNCLOSED_FENCE','PYTHON_SYNTAX_ERROR','AST_LIMIT','NOTEBOOK_LANGUAGE_UNSUPPORTED','NOTEBOOK_INVALID','READ_ERROR','LANGUAGE_NOT_ANALYZED','UNSUPPORTED_FORMAT'}
+GAP_STATES={'CONTAINER_SIZE_LIMIT','MEMBER_SIZE_LIMIT','SOURCE_SIZE_LIMIT','MODULE_SIZE_LIMIT','DEFINITION_SIZE_LIMIT','EXPANSION_LIMIT','ENTRY_LIMIT','DEPTH_LIMIT','RATIO_LIMIT','SEGMENT_LIMIT','UNSAFE_MEMBER','AMBIGUOUS_MEMBER','INVALID_ARCHIVE','ENCRYPTED_MEMBER','UNSUPPORTED_COMPRESSION','UNSUPPORTED_ENCODING','UNCLOSED_FENCE','PYTHON_SYNTAX_ERROR','AST_LIMIT','AST_UNIT_LIMIT','MODULE_CONTEXT_LIMIT','STRUCTURAL_UNIT_COUNT_LIMIT','NOTEBOOK_LANGUAGE_UNSUPPORTED','NOTEBOOK_INVALID','READ_ERROR','LANGUAGE_NOT_ANALYZED','UNSUPPORTED_FORMAT'}
 TEXT_EXT={'.txt','.md','.markdown','.rst'}
 CODE_EXT={'.py','.pyi','.pyw'}
 OTHER_CODE={'.js','.jsx','.ts','.tsx','.sh','.bash','.go','.rs','.c','.cpp','.h','.java','.cs','.sql','.yaml','.yml','.toml'}
@@ -66,7 +66,7 @@ def _decorator_statements(code):
         raise Blocked('DECORATOR_SOURCE_BOUNDARY') from exc
     return starts,ends
 
-def _definitions(tree,code):
+def _definitions(tree,code,decorator_statements=None):
     rows=[];decorated=[]
     class Walk(ast.NodeVisitor):
         def __init__(self):self.parents=[]
@@ -86,7 +86,7 @@ def _definitions(tree,code):
         visit_AsyncFunctionDef=visit_FunctionDef
     Walk().visit(tree)
     if decorated:
-        starts,ends=_decorator_statements(code)
+        starts,ends=decorator_statements if decorator_statements is not None else _decorator_statements(code)
         for row,expression_line in decorated:
             index=bisect.bisect_right(starts,expression_line)-1
             if index<0 or expression_line>ends[index]:raise Blocked('DECORATOR_SOURCE_BOUNDARY')
@@ -128,16 +128,54 @@ class Reader:
         large=len(b)>self.limits['max_source_bytes']
         if large:self.note(path,'SOURCE_SIZE_LIMIT',chain,stage='api_analysis',source_bytes=len(b),start_line=start_line,structural_analysis='ATTEMPTED')
         if len(self.segments)>=self.limits['max_segments']:self.note(path,'SEGMENT_LIMIT',chain);return
+        from .structure import describe, declared_apis, prepare_module
+        from .structural_units import FAST_MODULE_BYTES, admitted_trees, node_count, plan
+        planned=None
         try:
-            tree=ast.parse(code)
-            if sum(1 for _ in ast.walk(tree))>self.limits['max_nodes']:raise Blocked('AST_LIMIT')
+            tree=None
+            # Large modules never allocate one whole-module AST. Keep the old
+            # single-parse path for ordinary bounded-size modules when admitted.
+            if len(b)<=FAST_MODULE_BYTES:
+                tree=ast.parse(code)
+                if node_count(tree,self.limits['max_nodes'])>self.limits['max_nodes']:tree=None
+            if tree is None:
+                planned=plan(code,self.limits['max_nodes'])
+                module_context=prepare_module(planned['envelope'],planned['metadata']['module_context_complete'])
+                module_structure=module_context[0]
+                definition_structure={};definitions=[];imports=[]
+                decorators=_decorator_statements(code)
+                for tree in admitted_trees(code,planned):
+                    _,details=describe(tree,module_context)
+                    definition_structure.update(details)
+                    definitions.extend(_definitions(tree,code,decorators))
+                    for n in ast.walk(tree):
+                        if isinstance(n,ast.Import):imports.extend(a.name for a in n.names)
+                        elif isinstance(n,ast.ImportFrom):imports.extend('.'*n.level+(n.module+'.' if n.module else '')+a.name for a in n.names)
+                    del tree
+                meaningful=planned['meaningful'];script_present=planned['script_present']
+            else:
+                meaningful=any(isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef,ast.ClassDef,ast.Import,ast.ImportFrom,ast.Assign,ast.AnnAssign,ast.AugAssign,ast.Call)) for n in ast.walk(tree))
+                module_structure,definition_structure=describe(tree)
+                definitions=_definitions(tree,code)
+                imports=[]
+                for n in ast.walk(tree):
+                    if isinstance(n,ast.Import):imports.extend(a.name for a in n.names)
+                    elif isinstance(n,ast.ImportFrom):imports.extend('.'*n.level+(n.module+'.' if n.module else '')+a.name for a in n.names)
+                script_present=any(not isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef,ast.ClassDef,ast.Import,ast.ImportFrom)) and not (isinstance(n,ast.Expr) and isinstance(n.value,ast.Constant) and isinstance(n.value.value,str)) for n in tree.body)
         except (SyntaxError,ValueError,RecursionError,MemoryError,Blocked) as e:
-            self.note(path,'AST_LIMIT' if isinstance(e,(MemoryError,RecursionError,Blocked)) else 'PYTHON_SYNTAX_ERROR',chain,start_line=start_line,syntax_line=getattr(e,'lineno',None));return
-        meaningful=any(isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef,ast.ClassDef,ast.Import,ast.ImportFrom,ast.Assign,ast.AnnAssign,ast.AugAssign,ast.Call)) for n in ast.walk(tree))
+            status='AST_LIMIT' if isinstance(e,(MemoryError,RecursionError,Blocked)) else 'CONTEXT_ONLY' if fmt=='python_text' else 'PYTHON_SYNTAX_ERROR'
+            self.note(path,status,chain,start_line=start_line,syntax_line=getattr(e,'lineno',None));return
         if fmt=='python_text' and not meaningful:self.note(path,'CONTEXT_ONLY',chain);return
-        from .structure import describe, declared_apis
-        module_structure, definition_structure = describe(tree)
-        definitions = _definitions(tree,code)
+        if planned is not None:
+            for unit in planned['metadata']['units']:
+                if unit['status']=='ANALYZED':continue
+                extra={k:v for k,v in unit.items() if k not in ('status','start_line','end_line','index')}
+                self.note(path,unit['status'],chain,stage='structural_parsing',unit_index=unit['index'],
+                          start_line=start_line+unit['start_line']-1,end_line=start_line+unit['end_line']-1,
+                          definition_count_known=False,**extra)
+            if planned['metadata']['envelope_limited']:
+                self.note(path,'MODULE_CONTEXT_LIMIT',chain,stage='module_context',start_line=start_line,
+                          max_nodes=self.limits['max_nodes'],shared_bindings_complete=False)
         _source_windows(b,definitions,self.limits['max_source_bytes'])
         for definition in definitions:
             if definition['source_window']['status']!='AVAILABLE':
@@ -148,19 +186,16 @@ class Reader:
             detail = definition_structure[(definition['name'], definition['definition_line'])]
             detail['declared_api_leads'] = declared_apis(detail, module_structure)
             definition['structure'] = detail
-        imports=[]
-        for n in ast.walk(tree):
-            if isinstance(n,ast.Import):imports.extend(a.name for a in n.names)
-            elif isinstance(n,ast.ImportFrom):imports.extend('.'*n.level+(n.module+'.' if n.module else '')+a.name for a in n.names)
         line_count=len(re.findall(r'\r\n|\r|\n',code))+int(bool(code) and not code.endswith(('\n','\r')))
         end_line=end_line if end_line is not None else start_line+max(0,line_count-1)
         locator={'member_chain':chain,'format':fmt,'start_line':start_line,'end_line':end_line,'cell_index':cell,'source_sha256':sha(b)}
         seg={'segment_local_id':'segment_'+sha(canonical(locator)),**locator,'path':path,'logical_path_hint':hint,'encoding':encoding,'source_hex':b.hex(),
              'large_module':large,'source_bytes':len(b),
              'definitions':definitions,'imports':sorted(set(imports)), 'module_structure':module_structure,
-             'script_present':any(not isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef,ast.ClassDef,ast.Import,ast.ImportFrom)) and not (isinstance(n,ast.Expr) and isinstance(n.value,ast.Constant) and isinstance(n.value.value,str)) for n in tree.body),
+             'script_present':script_present,
              'dependency_scope':'isolated_segment; adjacent blocks are NOT concatenated',
              'test_path':any(p.lower() in ('test','tests') for p in PurePosixPath(hint or path).parts) or PurePosixPath(hint or path).name.lower().startswith('test_')}
+        if planned is not None:seg['structural_partition']=planned['metadata']
         self.segments.append(seg);self.note(path,'PYTHON_SEGMENT',chain,segment_local_id=seg['segment_local_id'],start_line=start_line,end_line=end_line,cell_index=cell)
     def text(self,data,path,chain,ext):
         try:t,enc=_decode(data)
@@ -191,11 +226,9 @@ class Reader:
             active={'line':i,'char':mark[0],'length':len(mark),'language':language,'hint':hint,'python':language in ('python','py','python3') or (not language and hint is not None)}
         if active:self.note(path,'UNCLOSED_FENCE',chain,start_line=active['line']+2)
         if not seen_fence:
-            try:tree=ast.parse(t)
-            except (SyntaxError,ValueError,RecursionError,MemoryError):self.note(path,'CONTEXT_ONLY',chain);return
-            if any(isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef,ast.ClassDef,ast.Import,ast.ImportFrom,ast.Assign,ast.AnnAssign,ast.Call)) for n in ast.walk(tree)):
-                self.add(t,path,chain,'python_text',encoding=enc)
-            else:self.note(path,'CONTEXT_ONLY',chain)
+            # Classification uses the same bounded path; do not pre-parse a
+            # potentially large plain-text Python module as one giant AST.
+            self.add(t,path,chain,'python_text',encoding=enc)
         else:self.note(path,'TEXT_CONTAINER_INSPECTED',chain)
     def notebook(self,data,path,chain):
         try:
