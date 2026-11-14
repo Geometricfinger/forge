@@ -6,14 +6,32 @@ Forge has two modes with different threat models.
 
 ## 1. Offline analysis (default)
 
-Every analysis command reads only local files that you name and writes only to the workspace (`--home`) or a new output folder. These commands make **no network requests and no model calls**, and they never import or run the code they inspect:
+Analysis commands read local files and write only to the workspace (`--home`) or a new output folder. They make **no network requests and no model calls**, and they never import or run caller-supplied code they inspect:
 
-- `init`, `corpus-run`, `corpus-search`, `corpus-context`, `corpus-list`, `corpus-demo`
-- `opportunity-*`, `review*`, `reuse-demo`, `verify-packet`
-- `contract-show`, `contract-trial`, `contract-verify`, `interop-fingerprint`, `interop-verify`
-- `demo` and `cycle-demo` (the discovery demo uses a synthetic in-process transport, not the network)
+- `init`, `corpus-run`, `corpus-search`, `corpus-context`, `corpus-inspect`, `corpus-list`, `corpus-demo`
+- `opportunity-*`, `review-*`, `review`, `behavior-result-template`, `verify-packet`
+- `contract-show`, `reviewed-trial-prepare`, `reviewed-trial-verify`
+- `demo` (the discovery demo uses a synthetic in-process transport, not the network)
 - `new`, `status`, `packet`, `accept`, `export`, `cancel` (they create or move discovery work locally; `accept` ingests a response someone else collected)
-- everything under `hound/`, `addon/`, `loop/` and `runner/`, plus `run_tests.py`, `verify.py` and `examples/demo/run_demo.py`
+- the static analysis and research commands under `hound/`, `addon/`, `loop/` and `runner/`
+
+### Named offline experiments and built-in serialization
+
+Some offline commands deliberately execute reviewed, bundled implementations:
+`reuse-demo`, `contract-trial`, `cycle-demo`, the qualification/test drivers and
+`reviewed-trial-run`. They use fixed fixtures or data-only profiles and do not
+accept a discovered module, user-selected callable or shell command to execute.
+`interop-fingerprint` and `interop-verify` use the pinned JSON serializer; the
+older `contract-verify` also invokes it when checking its recorded interop receipt.
+These commands remain offline, but they must not be described as mere byte checks.
+
+The new `reviewed-trial-run` is limited to the two bundled serializers and the 28
+published RFC 8785 examples per subject. It checks a prepared plan before starting
+a fresh bounded Python worker, records actual environment and module identities,
+and preserves raw outputs and failed executions. Its `prepare` and `verify`
+operations do not evaluate the trial inputs or invoke the selected vendor. FORGE
+still uses its ordinary serializer for internal metadata. See
+[REVIEWED_EVALUATOR.md](REVIEWED_EVALUATOR.md) for this fixed execution boundary.
 
 `forge.py serve` listens on `127.0.0.1` only, requires a per-session bearer token (shown once in the local URL fragment), checks `Host` and `Origin`, and serves its pages with a `'self'`-only Content Security Policy. Opening the UI does not contact any outside service.
 

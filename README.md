@@ -177,6 +177,19 @@ source. The [behavioral evidence guide](docs/BEHAVIORAL_EVIDENCE.md) explains
 source identity, positive/negative controls, artifact verification and the
 remaining limits of operator-supplied observations.
 
+For a real, fixed component experiment, run the
+[reviewed evaluator example](examples/reviewed_evaluator/README.md):
+
+```sh
+python3 -B examples/reviewed_evaluator/run_demo.py --out "$WORK/reviewed-trial"
+```
+
+It prepares source-bound contracts, executes the two bundled JSON serializers on
+28 published RFC 8785 examples each, retains raw outputs and checks their
+translation into behavioral evidence. Preparation and later verification do not
+rerun the trial. The [reviewed evaluator guide](docs/REVIEWED_EVALUATOR.md) explains
+its fixed execution boundary and why intact evidence can still describe a failure.
+
 ## Running the tests
 
 ```sh

@@ -13,6 +13,7 @@ def code_binding():
     paths += [ROOT/'tools/interop_reference.cjs',ROOT/'tools/contract_fault_cases.py',ROOT/'tools/run_contract_fault_checks.py']
     paths += [ROOT/'tools/run_self_recovery_trial.py',ROOT/'tools/test_environment.py',*sorted((ROOT/'examples/demo').rglob('*.py'))]
     paths += sorted((ROOT/'examples/behavior_review').rglob('*.py'))
+    paths += sorted((ROOT/'examples/reviewed_evaluator').rglob('*.py'))
     paths += [ROOT/name/'SHA256SUMS.txt' for name in ('loop','addon','hound')]
     return {p.relative_to(ROOT).as_posix():sha(read(p)) for p in paths}
 

@@ -32,6 +32,11 @@ The [synthetic example](../examples/behavior_review/README.md) provides a comple
 replayable instance of this sequence. Its observations are deliberately constructed
 data, so no component execution is implied.
 
+The [reviewed evaluator](REVIEWED_EVALUATOR.md) supplies a separate, named path for
+the two bundled RFC 8785 subjects. It freezes their contracts before execution
+and validates translation from the fixed raw report. This does not add execution
+to `opportunity-review` or grant that command authority over an external harness.
+
 ## CLI
 
 The commands use an existing `--home` containing the selected corpus. IDs below
