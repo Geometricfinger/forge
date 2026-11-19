@@ -6,7 +6,107 @@ const say=t=>$('opp-notice').textContent=t;
 async function api(path,body){const r=await fetch(path,{method:body===undefined?'GET':'POST',headers:{Authorization:'Bearer '+token,...(body===undefined?{}:{'Content-Type':'application/json'})},body:body===undefined?undefined:JSON.stringify(body)});const d=await r.json();if(!r.ok)throw Error(d.error||'Request failed');return d;}
 function button(label,fn){const b=el('button',label,'secondary');b.onclick=()=>fn().catch(e=>say(e.message));return b;}
 function label(s){return s.toLowerCase().replaceAll('_',' ').replace(/^./,c=>c.toUpperCase());}
-async function refresh(){const d=await api('/api/opportunities'),area=$('opp-runs');area.replaceChildren();if(!d.runs.length)area.append(el('p','No investigations yet. Run the case study or import a reviewed brief.'));for(const r of d.runs){const a=el('article',undefined,'mission');a.append(el('h3',r.title),el('p',r.summary.hypotheses+' hypotheses · '+r.summary.sources+' sources'),button('Inspect evidence',()=>show(r.id)),button('Export private packet',async()=>{const p=await api('/api/opportunity/export',{run:r.id});say('Saved locally: '+p.path);}));area.append(a);}return d;}
+const beforeRun=$('opp-before'), afterRun=$('opp-after');
+let comparisonRequest=0;
+
+function resetComparison(){
+  comparisonRequest++;
+  $('opp-compare').disabled=!beforeRun.value || !afterRun.value;
+  $('opp-compare-summary').textContent='';
+  $('opp-compare-results').replaceChildren();
+}
+
+function updateRunChoices(runs){
+  // A completed demo can refresh the board while a selection is open.
+  if(beforeRun.options.length===runs.length+1 &&
+     runs.every((run,i)=>beforeRun.options[i+1].value===run.id))return;
+  let length=16; // Includes the opp_ prefix and twelve hex digits.
+  while(new Set(runs.map(run=>run.id.slice(0,length))).size<runs.length)length+=4;
+  for(const select of [beforeRun,afterRun]){
+    const selected=select.value;
+    const prompt=el('option','Choose a run');
+    prompt.value='';
+    select.replaceChildren(prompt);
+    for(const run of runs){
+      const option=el('option',run.title+' · '+run.id.slice(0,length));
+      option.value=run.id;
+      select.append(option);
+    }
+    select.value=runs.some(run=>run.id===selected)?selected:'';
+  }
+  if(!beforeRun.value || !afterRun.value)resetComparison();
+}
+
+function citationDetails(citations){
+  const details=el('details');
+  details.append(el('summary','Citations ('+citations.length+')'));
+  details.ontoggle=()=>{
+    if(!details.open)return;
+    details.ontoggle=null;
+    details.append(el('p','Character ranges start at zero and exclude the end position.','hint'));
+    const list=el('ul');
+    const range=endpoint=>endpoint?'['+endpoint.start+', '+endpoint.end+')':'—';
+    for(const cite of citations){
+      const item=el('li');
+      item.append(el('strong',label(cite.status)+' · '+cite.source),
+        el('p',label(cite.role)+' '+cite.owner+' · Before '+range(cite.before)+' · After '+range(cite.after)));
+      if(cite.source_text_changed)item.append(el('p','Source text changed.','hint'));
+      if(cite.source_metadata_changed)item.append(el('p','Source metadata changed.','hint'));
+      list.append(item);
+    }
+    details.append(list);
+  };
+  return details;
+}
+
+function renderComparison(comparison){
+  const counts=comparison.summary;
+  $('opp-compare-summary').textContent=[
+    counts.total+(counts.total===1?' hypothesis':' hypotheses'),
+    counts.review_required+' for review', counts.retained+' with citations retained',
+    counts.added+' added', counts.removed+' removed'
+  ].join(' · ');
+  const results=$('opp-compare-results');
+  results.replaceChildren();
+  if(comparison.scope)results.append(el('p',comparison.scope,'hint'));
+  for(const hypothesis of comparison.hypotheses){
+    const row=el('article',undefined,'finding');
+    row.append(el('h3',hypothesis.title),el('p',label(hypothesis.status),'state'),el('small',hypothesis.id));
+    if(hypothesis.reasons.length){
+      const reasons=el('ul');
+      for(const reason of hypothesis.reasons){
+        reasons.append(el('li',/^[A-Z][A-Z0-9_]+$/.test(reason)?label(reason):reason));
+      }
+      row.append(reasons);
+    }
+    if(hypothesis.citations.some(c=>c.source_text_changed && (c.status==='RETAINED' || c.status==='MOVED'))){
+      row.append(el('p','A source changed while its cited wording stayed the same. Review the passage in context.','hint'));
+    }
+    if(hypothesis.citations.length)row.append(citationDetails(hypothesis.citations));
+    results.append(row);
+  }
+}
+
+beforeRun.onchange=afterRun.onchange=resetComparison;
+$('opp-compare-form').onsubmit=async event=>{
+  event.preventDefault();
+  if(!beforeRun.value || !afterRun.value)return;
+  const current=++comparisonRequest;
+  const query=new URLSearchParams({before:beforeRun.value,after:afterRun.value});
+  $('opp-compare').disabled=true;
+  $('opp-compare-summary').textContent='Comparing retained citations…';
+  $('opp-compare-results').replaceChildren();
+  try{
+    const comparison=await api('/api/opportunity/compare?'+query);
+    if(current===comparisonRequest)renderComparison(comparison);
+  }catch(e){
+    if(current===comparisonRequest)$('opp-compare-summary').textContent=e.message;
+  }finally{
+    if(current===comparisonRequest)$('opp-compare').disabled=false;
+  }
+};
+
+async function refresh(){const d=await api('/api/opportunities'),area=$('opp-runs');updateRunChoices(d.runs);area.replaceChildren();if(!d.runs.length)area.append(el('p','No investigations yet. Run the case study or import a reviewed brief.'));for(const r of d.runs){const a=el('article',undefined,'mission');a.append(el('h3',r.title),el('p',r.summary.hypotheses+' hypotheses · '+r.summary.sources+' sources'),button('Inspect evidence',()=>show(r.id)),button('Export private packet',async()=>{const p=await api('/api/opportunity/export',{run:r.id});say('Saved locally: '+p.path);}));area.append(a);}return d;}
 async function show(id){const r=await api('/api/opportunity?run='+encodeURIComponent(id)),area=$('opp-detail');area.hidden=false;area.replaceChildren(el('h2',r.title),el('p',r.scope,'hint'));
 for(const h of r.hypotheses){const a=el('article',undefined,'finding');a.append(el('p',label(h.state),'state'),el('h3',h.concept.title),el('p',h.concept.problem_hypothesis),el('p','Next action: '+label(h.concept.recommended_action)),el('p','User: '+h.concept.user),el('p',h.concept.proposed_intervention));
 const table=el('table'),head=el('tr');for(const x of ['Mechanism','Missing prerequisites','Output fit'])head.append(el('th',x));table.append(head);for(const m of h.mechanisms){const tr=el('tr');tr.append(el('td',m.title),el('td',m.missing_prerequisites.join(', ')||'None in the declared map; not verified'),el('td',label(m.output_fit)));table.append(tr);}a.append(table);

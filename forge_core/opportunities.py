@@ -451,8 +451,8 @@ class OpportunityStore:
     def path(self,rid):
         if not isinstance(rid,str) or not re.fullmatch('opp_[0-9a-f]{64}',rid):raise Blocked('OPPORTUNITY_RUN_ID')
         return self.root/rid
-    def get(self,rid):
-        self.w.guard();p=self.path(rid);r=__import__('json')
+    def _record(self,rid):
+        self.w.guard();p=self.path(rid)
         from .common import loads
         if not (p/'record.json').is_file():raise Blocked('OPPORTUNITY_RUN_MISSING')
         v=loads(read(p/'record.json',10_000_000));obj(v,{'payload','sha256'})
@@ -462,7 +462,12 @@ class OpportunityStore:
         expected='opp_'+sha(canonical({'version':data['report']['version'],'bundle':data['bundle'],'corpora':data['report']['corpus_bindings']}))
         if expected!=rid or data['report'].get('authority')!=AUTHORITY:raise Blocked('OPPORTUNITY_AUTHORITY')
         validate_investigation_report(data['report'])
-        return data['report']
+        return data
+    def get(self,rid):
+        return self._record(rid)['report']
+    def compare(self,before,after):
+        from .opportunity_compare import compare
+        return compare(self._record(before),self._record(after))
     def list(self):
         self.w.guard()
         if not self.root.exists():return []
