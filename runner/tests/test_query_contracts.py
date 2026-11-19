@@ -175,6 +175,65 @@ class QueryContracts(unittest.TestCase):
                 self.assertEqual(result['result']['results'], [])
         self.assertEqual(json.loads((work / 'report.json').read_bytes())['queries'][0]['intent'], 'reference')
 
+    def test_single_word_overlap_survives_report_packet_and_supervisor_projection(self):
+        data = b'def data_archive():\n    """history known saved"""\n    return 1\n'
+        query = 'archive weather charts'
+        work, _, session = self.start(self.mission(data, query=query))
+        full = json.loads((work / 'report.json').read_bytes())
+        item = full['queries'][0]
+        evidence = item['query_evidence']
+        self.assertEqual(item['results'][0]['name'], 'data_archive')
+        self.assertEqual(item['status'], 'PARTIAL_QUERY_ONLY')
+        self.assertEqual(evidence['term_coverage'], 'SINGLE_TERM_OVERLAP')
+        self.assertEqual(evidence['matched_terms'], ['archive'])
+        self.assertEqual(evidence['unmatched_terms'], ['charts', 'weather'])
+        self.assertEqual(item['next_action'], 'INSPECT_SOURCE_OR_REFINE_QUERY')
+        packet = core.compact_packet(full, 4096)
+        self.assertEqual(packet['queries'][0]['term_coverage'], 'SINGLE_TERM_OVERLAP')
+        request = self.request(query)
+        followup = session.execute(request)
+        self.assertEqual(followup['result']['query_evidence'], evidence)
+        self.assertEqual(session.execute(request)['result'], followup['result'])
+        for i, (query, n, total, action) in enumerate((
+            ('data archive weather charts river stone field', 2, 7, 'INSPECT_SOURCE_OR_REFINE_QUERY'),
+            ('data archive history known saved river stone', 5, 7, 'INSPECT_SOURCE'),
+            ('data archive weather charts', 2, 4, 'INSPECT_SOURCE'),
+            ('archive', 1, 1, 'INSPECT_SOURCE'),
+        )):
+            with self.subTest(query=query):
+                result = session.execute(self.request(query, rid='coverage' + str(i)))['result']
+                self.assertEqual(result['results'][0]['name'], 'data_archive')
+                evidence = result['query_evidence']
+                self.assertEqual((evidence['matched_term_count'], evidence['query_term_count'],
+                                  evidence['next_action']), (n, total, action))
+                self.assertEqual(result['next_action'], action if n < total - n else
+                                 'REVIEW_EVIDENCE_AND_DECLARE_BEHAVIOR_TEST')
+
+    def budgeted_result(self, limit):
+        doc = 'Use example records and archive data. ' * 8
+        data = ''.join(f'def archive_{letter}_{"x" * 80}(data):\n    """{doc}"""\n    return data\n\n'
+                       for letter in 'abcde')
+        mission = self.mission(data.encode(), query='archive')
+        mission['budgets']['packet_bytes'] = limit
+        mission['sources'][0]['origin'] = 'fixture://' + 'e' * 90
+        work, _, session = self.start(mission)
+        request = self.request('archive')
+        response = session.execute(request)
+        self.assertEqual(session.execute(request)['result'], response['result'])
+        return work, response
+
+    def test_tight_followup_preserves_fitting_source_results_and_full_evidence(self):
+        work, response = self.budgeted_result(4700)
+        self.assertEqual(response['state'], 'COMPLETED')
+        self.assertLessEqual(len(core.canonical(response)), 4700)
+        self.assertEqual(len(response['result']['results']), 5)
+        saved = json.loads((work / 'supervision' / 'followup.json').read_bytes())
+        self.assertEqual(saved['result']['query_evidence']['matched_terms'], ['archive'])
+
+    def test_oversized_followup_still_enforces_existing_limit(self):
+        _, response = self.budgeted_result(4096)
+        self.assertEqual((response['state'], response['reason']), ('FAILED', 'SUPERVISOR_RESPONSE_LIMIT'))
+
     def test_cli_invalid_query_returns_reason_without_creating_ledger(self):
         work, manifest, _ = self.start(self.simple_mission())
         request = self.directory / 'request.json'

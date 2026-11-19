@@ -81,6 +81,8 @@ python3 forge.py --home "$WORK/home" init
 python3 forge.py --home "$WORK/home" corpus-run --source-root examples/demo/src \
     --manifest examples/demo/manifest.json --run-id demo --profile examples/demo/profile.json
 python3 forge.py --home "$WORK/home" corpus-search --run-id demo --query "pickle load"
+# For a known function or method name, request its definition or captured call sites.
+python3 forge.py --home "$WORK/home" corpus-symbol --run-id demo --name load_blob
 python3 forge.py --home "$WORK/home" serve          # web UI on 127.0.0.1
 ```
 

@@ -207,6 +207,14 @@ def compact_packet(report,max_bytes):
             else:added+=1
     p['omitted_evidence']=all_evidence-added
     p['omitted_items']=p['omitted_evidence']+p['omitted_queries']
+    # Include optional lexical context only after fitting the source-backed evidence.
+    for question, entry in included:
+        info = question.get('query_evidence')
+        if info:
+            for field in ('term_coverage', 'next_action', 'matched_term_count', 'query_term_count'):
+                entry[field] = info[field]
+                if len(canonical(p)) > max_bytes:
+                    del entry[field]
     if len(canonical(p))>max_bytes:raise Blocked('PACKET_LIMIT')
     return p
 

@@ -188,6 +188,10 @@ def main():
     a=s.add_parser('corpus-run');a.add_argument('--source-root',type=Path,required=True,help='folder holding the sources');a.add_argument('--manifest',type=Path,help='manifest JSON; omit it to analyse every .py/.pyi/.pyw/.ipynb/.zip/.txt/.md/.rst file in --source-root as provider "local"');a.add_argument('--run-id',required=True);a.add_argument('--max-containers',type=int,default=20);a.add_argument('--profile',type=Path,help='data-only exact-API profile JSON (schema 1); default templates/corpus_profile.json')
     a=s.add_parser('corpus-search');a.add_argument('--run-id',required=True);a.add_argument('--query',required=True);a.add_argument('--include-tests',action='store_true');a.add_argument('--out',type=Path)
     a.add_argument('--distinct',action='store_true');a.add_argument('--filters',type=Path)
+    a=s.add_parser('corpus-symbol',help='look up a literal indexed function or method name and its captured call spellings')
+    a.add_argument('--run-id',required=True);a.add_argument('--name',required=True)
+    a.add_argument('--include-tests',action='store_true');a.add_argument('--limit',type=int,default=20)
+    a.add_argument('--out',type=Path)
     a=s.add_parser('corpus-context');a.add_argument('--run-id',required=True);a.add_argument('--definition',required=True);a.add_argument('--out',type=Path)
     a=s.add_parser('corpus-inspect',help='read one complete, hash-bound definition; never execute it');a.add_argument('--run-id',required=True);a.add_argument('--definition',required=True);a.add_argument('--source-root',type=Path,required=True);a.add_argument('--max-bytes',type=int,default=250_000)
     s.add_parser('corpus-list')
@@ -362,6 +366,10 @@ def main():
         r=corpus.get(w,a.run_id)
         options={'distinct':a.distinct,'include_tests':a.include_tests,'filters':loads(read(a.filters,8000)) if a.filters else None}
         value=corpus.export_search(r,a.query,a.out,**options) if a.out else corpus.search(r,a.query,**options)
+    elif a.command=='corpus-symbol':
+        from forge_core import corpus, symbol_lookup
+        value=symbol_lookup.lookup(corpus.get(w,a.run_id),a.name,include_tests=a.include_tests,limit=a.limit)
+        if a.out:write(a.out,canonical(value),new=True)
     elif a.command=='corpus-context':
         from forge_core import corpus
         value=corpus.dependency_context(corpus.get(w,a.run_id),a.definition)

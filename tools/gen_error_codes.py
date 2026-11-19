@@ -14,6 +14,7 @@ SKIP={'third_party','dependencies','history','evidence','review','__pycache__'}
 
 # Hand-written meanings for the codes a newcomer is most likely to hit.
 KNOWN={
+ 'INVALID_SYMBOL_NAME':'Use a literal Python function or method name, for example process_item or Worker.process_item.',
  'REVIEWED_TRIAL_SEPARATE_OUTPUT':'Keep the checkout, workspace, prepared packet and result packet separate in both containment directions. Keep outputs away from original indexed source roots. Reject an unsafe layout before initialization or execution.',
  'REVIEWED_TRIAL_OUTPUT_EXISTS':'Use a new prepared/result directory. Existing evidence is never overwritten and a completed run is never silently retried.',
  'REVIEWED_TRIAL_EXISTING_HOME_REQUIRED':'Run with the existing `--home` used during preparation; execution does not initialize a replacement workspace.',

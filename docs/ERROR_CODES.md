@@ -212,6 +212,7 @@ If `reason` is a Python exception name instead of a code:
 | <a id="invalid_json"></a>`INVALID_JSON` | The file is not valid UTF-8 JSON. Commands that take JSON (`--bundle`, `--contract`, `--filters`, `review-note --file`, ...) need a JSON object. `opportunity-draft --file` also accepts plain-text notes; a file whose first character is `{` is parsed as JSON. | forge_core/common.py, runner/research_runner/core.py |
 | <a id="invalid_json_or_unicode"></a>`INVALID_JSON_OR_UNICODE` | Malformed or oversized JSON. | forge_core/interop.py |
 | <a id="invalid_number"></a>`INVALID_NUMBER` | Input or stored state failed a validation check (see the raising module). | forge_core/interop.py |
+| <a id="invalid_symbol_name"></a>`INVALID_SYMBOL_NAME` | Use a literal Python function or method name, for example process_item or Worker.process_item. | forge_core/symbol_lookup.py |
 | <a id="invalid_unicode"></a>`INVALID_UNICODE` | Input or stored state failed a validation check (see the raising module). | forge_core/interop.py, forge_core/server.py |
 | <a id="investigation_plan_changed"></a>`INVESTIGATION_PLAN_CHANGED` | A pinned input changed after it was recorded (hash/identity no longer matches). Start a new run/home, or restore the original file. | forge_core/opportunities.py |
 | <a id="investigation_plan_missing"></a>`INVESTIGATION_PLAN_MISSING` | Input or stored state failed a validation check (see the raising module). | forge_core/opportunities.py |
@@ -406,7 +407,7 @@ If `reason` is a Python exception name instead of a code:
 | <a id="rrf_duplicate_in_channel"></a>`RRF_DUPLICATE_IN_CHANNEL` | The input repeats an item that must be unique. | forge_core/retrieval.py |
 | <a id="rrf_k"></a>`RRF_K` | Input or stored state failed a validation check (see the raising module). | forge_core/retrieval.py |
 | <a id="search_api_filter"></a>`SEARCH_API_FILTER` | Invalid search query, filter or index. | forge_core/retrieval.py |
-| <a id="search_bool"></a>`SEARCH_BOOL` | Invalid search query, filter or index. | forge_core/retrieval.py |
+| <a id="search_bool"></a>`SEARCH_BOOL` | Invalid search query, filter or index. | forge_core/retrieval.py, forge_core/symbol_lookup.py |
 | <a id="search_class_counts"></a>`SEARCH_CLASS_COUNTS` | Wrong number of items for this field. | forge_core/retrieval.py |
 | <a id="search_container_filter"></a>`SEARCH_CONTAINER_FILTER` | Invalid search query, filter or index. | forge_core/retrieval.py |
 | <a id="search_evidence_authority"></a>`SEARCH_EVIDENCE_AUTHORITY` | The record claims an authority Forge never grants (e.g. release approval, execution). | forge_core/retrieval.py |
