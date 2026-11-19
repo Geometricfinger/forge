@@ -258,6 +258,7 @@ If `reason` is a Python exception name instead of a code:
 | <a id="operator_cannot_assert_execution_or_syntax"></a>`OPERATOR_CANNOT_ASSERT_EXECUTION_OR_SYNTAX` | Input or stored state failed a validation check (see the raising module). | forge_core/reuse.py, tools/reproduce_fault_controls.py |
 | <a id="opportunity_authority"></a>`OPPORTUNITY_AUTHORITY` | The record claims an authority Forge never grants (e.g. release approval, execution). | forge_core/opportunities.py, verify.py |
 | <a id="opportunity_binding"></a>`OPPORTUNITY_BINDING` | A stored record is bound to different inputs/code than the current ones (integrity check). | forge_core/opportunities.py |
+| <a id="opportunity_compare_ambiguous_id"></a>`OPPORTUNITY_COMPARE_AMBIGUOUS_ID` | Two records share an identifier in one run. Give the needs distinct IDs and rerun the reviewed brief before comparing it. | forge_core/opportunity_compare.py |
 | <a id="opportunity_corpus_changed"></a>`OPPORTUNITY_CORPUS_CHANGED` | A pinned input changed after it was recorded (hash/identity no longer matches). Start a new run/home, or restore the original file. | forge_core/opportunities.py |
 | <a id="opportunity_date"></a>`OPPORTUNITY_DATE` | An opportunity bundle, run or packet failed validation. | forge_core/opportunities.py |
 | <a id="opportunity_fields"></a>`OPPORTUNITY_FIELDS` | A JSON object has missing or unexpected fields. | forge_core/opportunities.py |

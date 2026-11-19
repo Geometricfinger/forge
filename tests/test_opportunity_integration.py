@@ -25,6 +25,23 @@ class OpportunityIntegration(unittest.TestCase):
         s,b=self.request('/api/opportunities');self.assertEqual(s,200);self.assertTrue(loads(b)['runs'])
     def test_http_read(self):
         s,b=self.request('/api/opportunity?run='+self.report['id']);self.assertEqual(s,200);self.assertEqual(loads(b),self.report)
+    def test_http_compare_uses_selected_order(self):
+        revised=example_bundle()
+        revised['observations']=[]
+        before=self.report['id']
+        after=self.book.run(revised)['id']
+        for first,second in [(before,after),(after,before)]:
+            path=f'/api/opportunity/compare?before={first}&after={second}'
+            status,body=self.request(path)
+            self.assertEqual(status,200)
+            self.assertEqual(loads(body),self.book.compare(first,second))
+        self.assertEqual(self.request(path,auth=False)[0],403)
+    def test_http_compare_requires_exactly_two_named_inputs(self):
+        rid=self.report['id']
+        for query in [f'before={rid}',f'before={rid}&after=',f'before={rid}&after={rid}&after=',
+                      f'before={rid}&after={rid}&extra=']:
+            with self.subTest(query=query):
+                self.assertEqual(self.request('/api/opportunity/compare?'+query)[0],403)
     def test_http_unauthenticated(self):self.assertEqual(self.request('/api/opportunities',auth=False)[0],403)
     def test_host_origin_guard(self):self.assertEqual(self.request('/api/opportunities',origin='https://attacker.invalid')[0],403)
     def test_http_analyze_matches_engine(self):

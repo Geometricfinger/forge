@@ -181,6 +181,8 @@ def main():
     a=s.add_parser('opportunity-verify');a.add_argument('folder',type=Path)
     a=s.add_parser('opportunity-run');a.add_argument('--bundle',type=Path,required=True);a.add_argument('--corpus-run',action='append',default=[])
     a=s.add_parser('opportunity-show');a.add_argument('run_id')
+    a=s.add_parser('opportunity-compare',help='compare citations and workflow declarations in two saved runs')
+    a.add_argument('before');a.add_argument('after')
     a=s.add_parser('opportunity-export');a.add_argument('run_id');a.add_argument('--out',type=Path,required=True)
     a=s.add_parser('opportunity-feedback');a.add_argument('run_id');a.add_argument('--file',type=Path,required=True)
     a=s.add_parser('opportunity-draft',help='turn plain-text notes (or a JSON source record) into draft cues');a.add_argument('--file',type=Path,required=True,help='plain-text notes, or a JSON source record')
@@ -301,6 +303,7 @@ def main():
             value=run(w)
         elif a.command=='opportunity-list':value={'runs':book.list()}
         elif a.command=='opportunity-show':value=book.get(a.run_id)
+        elif a.command=='opportunity-compare':value=book.compare(a.before,a.after)
         elif a.command=='opportunity-run':
             reports=[(name,corpus.get(w,name)) for name in a.corpus_run]
             value=book.run(loads(read(a.bundle,MAX_INPUT)),reports)

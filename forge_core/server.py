@@ -99,6 +99,12 @@ class Handler(BaseHTTPRequestHandler):
                 query=parse_qs(urlsplit(self.path).query)
                 if set(query)!={'run'} or len(query['run'])!=1:raise Blocked('OPPORTUNITY_QUERY')
                 value=OpportunityStore(self.server.app).get(query['run'][0])
+            elif path=='/api/opportunity/compare':
+                from .opportunities import OpportunityStore
+                query=parse_qs(urlsplit(self.path).query,keep_blank_values=True)
+                if set(query)!={'before','after'} or any(len(values)!=1 for values in query.values()):
+                    raise Blocked('OPPORTUNITY_QUERY')
+                value=OpportunityStore(self.server.app).compare(query['before'][0],query['after'][0])
             elif path=='/api/corpora':
                 from .corpus import list_runs
                 value={'corpora':list_runs(self.server.app)}
