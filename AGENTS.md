@@ -184,6 +184,14 @@ python3 "$FORGE/forge.py" --home "$WORK/forge-home" corpus-list
 
 Search options: `--include-tests` adds test code, `--distinct` groups byte-identical duplicates, and `--filters` accepts `required_apis`, `exclude_apis`, `record_kind` (`function` or `source_scope`) and `container_ids` (manifest `file_id`s). Each result has `path`, `name`, `start_line`, `end_line`, `observed_apis` and `definition_id`. Ranking is lexical relevance, not confidence. `search_status: NO_METADATA_MATCH` does not mean the capability is absent.
 
+For a known Python function or method name, use the literal lookup. It distinguishes a definition with an inspectable ID from code that only calls it.
+
+```sh
+python3 "$FORGE/forge.py" --home "$WORK/forge-home" corpus-symbol --run-id "$RUN" --name process_item
+```
+
+A bare name matches the last component of a definition or call spelling. A dotted name matches its exact source-local spelling, such as `Worker.process_item`. For a module-qualified call such as `helpers.process_item`, try its leaf `process_item` and inspect the returned files. A matching call alone does not establish its runtime target. The lookup counts every matching definition even when `--limit` caps the displayed lists. It excludes test paths unless you pass `--include-tests`. Coverage is limited to indexed Python function and method definitions in the selected inputs. Call counts cover recorded named calls. `missing_or_truncated_call_scopes` counts scopes with missing or truncated structural metadata. For a natural-language search, `query_evidence` lists matched and missing terms for the first lead. A partial lead matching only one term or fewer than half of the distinct query terms prompts source inspection or query refinement. The same routing applies to the first fused code lead in the research runner.
+
 ### 7. Rescan after the code changes
 
 The manifest pins file hashes, and a run id is bound to its manifest and profile. After the code or profile changes, rebuild the manifest (step 2) and use a **new** `RUN` id.

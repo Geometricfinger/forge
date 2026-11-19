@@ -258,6 +258,7 @@ def investigate(q,source_results,forge_root):
     refs=[r for source in selected for r in source.get('references',[])]
     gaps=[{'source':r['source']['id'],'state':r['status'],'gaps':r.get('gaps',[])} for r in selected if r['status'] in ('BLOCKED','UNSUPPORTED_BINARY','CODE_INDEXED_WITH_GAPS','TEXT_ONLY_UNSUPPORTED_LANGUAGE')]
     lexical=[];forgerows=[];reference=[];observations={}
+    evidence = {}
     if q['intent'] in ('code','mixed'):
         corpus=validate_questions([q],forge_root)
         from forge_core.retrieval import occurrence_id
@@ -299,12 +300,22 @@ def investigate(q,source_results,forge_root):
         reference=reference_hits(refs,q['query'],5)
     fused=rank_fusion(lexical,forgerows,5,required_api=q.get('required_api'),forge_observations=observations)
     if q['intent']=='reference':fused=[]
+    else:
+        # Older external workbenches keep their existing result format.
+        from forge_core import retrieval
+        if hasattr(retrieval, 'query_evidence'):
+            evidence['query_evidence'] = retrieval.query_evidence(
+                terms(q['query']), fused[0]['matched_terms'] if fused else [], 'TOP_FUSED_IMPLEMENTATION_RESULT')
+
     full=any(len(r['matched_terms'])==r['term_count'] for r in fused)
     status=('STATIC_LEADS_REVIEW_REQUIRED' if full else 'PARTIAL_QUERY_ONLY' if fused else
             'REFERENCE_OR_TEXT_ONLY' if reference else 'EVALUATION_BLOCKED' if gaps else 'NO_EVIDENCE_IN_SELECTED_SOURCES')
     warnings=['Token coverage is not proof of a requirement. Literature is not tested implementation or market demand.']
     if set(terms(q['query'])) & {'no','not','without','guarantee','secure','prove','never'}:warnings.append('NATURAL_LANGUAGE_CONSTRAINT_NOT_ENFORCED')
-    return {'id':q['id'],'query':q['query'],'intent':q['intent'],'status':status,'results':fused,'references':reference,
+    next_action = 'REVIEW_EVIDENCE_AND_DECLARE_BEHAVIOR_TEST' if fused else 'ACQUIRE_ADDITIONAL_PERMITTED_EVIDENCE'
+    if evidence.get('query_evidence', {}).get('next_action') == 'INSPECT_SOURCE_OR_REFINE_QUERY':
+        next_action = evidence['query_evidence']['next_action']
+    return {**evidence,'id':q['id'],'query':q['query'],'intent':q['intent'],'status':status,'results':fused,'references':reference,
       'lexical_results':lexical[:5],'forge_results':forgerows[:5],'source_gaps':gaps,'warnings':warnings,
-      'next_action':('REVIEW_EVIDENCE_AND_DECLARE_BEHAVIOR_TEST' if fused else 'ACQUIRE_ADDITIONAL_PERMITTED_EVIDENCE'),
+      'next_action':next_action,
       'runtime_validation':'NOT_RUN','code_generated':False,'market_validated':False,'novelty_established':False}

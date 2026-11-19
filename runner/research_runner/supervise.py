@@ -125,7 +125,7 @@ class Supervisor:
 
     def _project(self, full):
         fields = ('id', 'query', 'intent', 'status', 'source_gaps', 'warnings',
-                  'next_action', 'runtime_validation', 'code_generated', 'market_validated', 'novelty_established')
+                  'next_action', 'query_evidence', 'runtime_validation', 'code_generated', 'market_validated', 'novelty_established')
         result = {k: full[k] for k in fields if k in full}
         result['runtime_validation'] = 'NOT_RUN'
         result['results'] = []
@@ -193,7 +193,15 @@ class Supervisor:
                     if self._context()[2] != context:
                         raise c.Blocked('SOURCE_OR_CONTEXT_CHANGED_DURING_REQUEST')
                     response = self._envelope(rid, 'COMPLETED', result, False, context)
-                    if len(c.canonical(response)) > m['budgets']['packet_bytes']:
+                    limit = m['budgets']['packet_bytes']
+                    if 'query_evidence' in result and len(c.canonical(response)) > limit:
+                        # The full evidence stays in the saved follow-up. Preserve responses
+                        # which fit the budget before this optional annotation was added.
+                        info = result['query_evidence']
+                        result['query_evidence'] = {'term_coverage': info['term_coverage']}
+                        if len(c.canonical(response)) > limit:
+                            del result['query_evidence']
+                    if len(c.canonical(response)) > limit:
                         raise c.Blocked('SUPERVISOR_RESPONSE_LIMIT')
                     c.atomic_new(self.work / 'supervision' / (rid + '.json'), c.canonical({'request': request, 'result': full, 'context': context}))
                 except Exception as ex:

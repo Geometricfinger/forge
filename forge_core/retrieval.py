@@ -113,6 +113,25 @@ def reciprocal_rank_fusion(rankings, k=RRF_K):
     return dict(scores)
 
 
+def query_evidence(terms, matched, basis):
+    """Describe overlap for the first returned implementation lead, without reranking."""
+    matched = sorted(set(matched))
+    unmatched = sorted(set(terms) - set(matched))
+    if not matched:
+        coverage, action = 'NO_TERM_OVERLAP', 'REFINE_QUERY_OR_REVIEW_SOURCE_SCOPE'
+    elif not unmatched:
+        coverage, action = 'ALL_QUERY_TERMS', 'INSPECT_SOURCE'
+    elif len(matched) == 1:
+        coverage, action = 'SINGLE_TERM_OVERLAP', 'INSPECT_SOURCE_OR_REFINE_QUERY'
+    else:
+        coverage, action = 'MULTIPLE_TERM_OVERLAP', 'INSPECT_SOURCE'
+        if len(matched) < len(unmatched):
+            action = 'INSPECT_SOURCE_OR_REFINE_QUERY'
+    return {'basis': basis, 'term_coverage': coverage, 'matched_terms': matched,
+            'matched_term_count': len(matched), 'query_term_count': len(matched) + len(unmatched),
+            'unmatched_terms': unmatched, 'next_action': action}
+
+
 class SearchIndex:
     """Immutable in-memory postings for one metadata snapshot; never holds source bodies."""
     def __init__(self, rows, binding):
@@ -244,6 +263,7 @@ class SearchIndex:
         if filters.get('exclude_apis'):
             warnings.append('ABSENT_API_OBSERVATION_DOES_NOT_PROVE_ABSENCE_OF_BEHAVIOR')
         return {'query': query, 'query_terms': qt, 'query_expansion': expansion,
+                'query_evidence': query_evidence(qt, scored[0]['matched_query_terms'] if scored else [], 'TOP_METADATA_RESULT'),
                 'filters': filters, 'distinct': distinct, 'total_matching_occurrences': len(scored),
                 'distinct_matching_groups': len(grouped), 'full_match_count': sum(r['all_query_terms_matched'] for r in scored),
                 'results': (displayed if distinct else scored)[:limit],
