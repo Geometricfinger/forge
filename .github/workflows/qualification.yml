@@ -83,6 +83,9 @@ jobs:
             python3 tools/prepublish_check.py --history
           fi
 
+      - name: Check research runner package inventory and hashes
+        run: python3 runner/tools/check_package.py
+
       - name: Full qualification (verify.py)
         run: python3 verify.py --out "$EVIDENCE/qualification" > "$EVIDENCE/verify-stdout.json" 2> "$EVIDENCE/verify-stderr.log"
 
