@@ -145,7 +145,7 @@ def terms(s):
     s=re.sub(r'([a-z0-9])([A-Z])',r'\1 \2',s)
     return [x for x in re.findall('[a-z][a-z0-9]*',s.lower()) if x not in STOP]
 
-def rank_fusion(lexical,forge,limit=5,required_api=None,forge_observations=None):
+def rank_fusion(lexical,forge,limit=5,required_api=None,forge_observations=None,directional_matches=None):
     check_int(limit,1,20);merged={}
     # A lexical assertion is not an observed API. Only FORGE contributes those.
     observed={r['id']:r.get('observed_apis',[]) for r in forge}
@@ -161,7 +161,12 @@ def rank_fusion(lexical,forge,limit=5,required_api=None,forge_observations=None)
             if r['id'] not in merged:
                 merged[r['id']]={**r,'channels':[],'rrf':0.0,'observed_apis':observed.get(r['id'],[]),'runtime_validation':'NOT_RUN'}
             x=merged[r['id']];x['channels'].append(channel);x['rrf']+=1/(60+rank)
-    return sorted(merged.values(),key=lambda r:(-int(len(r['matched_terms'])==r['term_count']),-len(r['matched_terms']),-int(r.get('exact_symbol',False)),-r['rrf'],r['id']))[:limit]
+    for rid, support in (directional_matches or {}).items():
+        if rid in merged:
+            merged[rid]['directional_match'] = support
+    return sorted(merged.values(),key=lambda r:(-int(len(r['matched_terms'])==r['term_count']),
+        -(len(r['matched_terms']) + int('directional_match' in r)), -int('directional_match' in r),
+        -int(r.get('exact_symbol',False)),-r['rrf'],r['id']))[:limit]
 
 def reference_hits(refs,query,limit):
     qt=set(terms(query));hits=[]

@@ -9,8 +9,9 @@ import copy
 from pathlib import PurePosixPath
 from .common import Blocked
 from .lexical import counts
+from . import direction
 
-VERSION = 'lexical-context-6-call-bindings'
+VERSION = 'lexical-context-7-conversion-endpoints'
 MAX_CALLS = 128
 MAX_DECLARATIONS = 64
 MAX_BINDING_CANDIDATES = 8
@@ -437,6 +438,9 @@ def describe(tree, module_context=None):
                           'symbol': counts(node.name),
                           'documentation': counts(ast.get_docstring(node) or ''),
                           'parameters': counts(' '.join(params))}})
+            endpoints = direction.declarations(node)
+            if endpoints:
+                m['conversion_endpoints'] = endpoints
             definitions[(name, node.lineno)] = m
             self.parents.append(node.name); self.functions.append(name); self.kinds.append('function')
             self.scopes.append(scope)

@@ -234,6 +234,17 @@ class QueryContracts(unittest.TestCase):
         _, response = self.budgeted_result(4096)
         self.assertEqual((response['state'], response['reason']), ('FAILED', 'SUPERVISOR_RESPONSE_LIMIT'))
 
+    def test_conversion_direction_reaches_fused_result_and_budgeted_supervisor(self):
+        source = (b'def amber(value):\n    """Convert copper to silver."""\n    return value\n'
+                  b'def blue(value):\n    """Convert silver to copper."""\n    return value\n')
+        work, _, session = self.start(self.mission(source, query='convert copper to silver'))
+        first = json.loads((work / 'report.json').read_bytes())['queries'][0]
+        self.assertEqual(first['results'][0]['name'], 'amber')
+        second = session.execute(self.request('convert silver to copper'))['result']
+        self.assertEqual(second['results'][0]['name'], 'blue')
+        self.assertEqual(second['query_evidence']['requested_direction']['top_result_declaration'],
+                         {'basis': 'DOCSTRING_SUMMARY', 'input': ['silver'], 'output': ['copper']})
+
     def test_cli_invalid_query_returns_reason_without_creating_ledger(self):
         work, manifest, _ = self.start(self.simple_mission())
         request = self.directory / 'request.json'
