@@ -14,7 +14,10 @@ def main():
     p.add_argument('--source-root',type=Path)
     p.add_argument('--manifest',type=Path)
     p.add_argument('--require-recovery',action='store_true')
-    args=p.parse_args();root=args.engine_root.resolve();sys.path.insert(0,str(root))
+    args=p.parse_args()
+    if (args.source_root is None) != (args.manifest is None):
+        p.error('--source-root and --manifest must be supplied together')
+    root=args.engine_root.resolve();sys.path.insert(0,str(root))
     from forge_core.common import canonical,loads,read,sha,Blocked,write,safe_path
     from forge_core.workspace import initialize
     from forge_core.engine import Analyzer
@@ -22,8 +25,14 @@ def main():
     out=safe_path(args.out)
     if out.exists() or out.is_relative_to(root):raise Blocked('NEW_EXTERNAL_OUTPUT_REQUIRED')
     out.mkdir(parents=True,mode=0o700)
-    if args.source_root and args.manifest:source,manifest=args.source_root,args.manifest
+    if args.manifest is not None:
+        source = args.source_root
+        source_origin = 'Caller-supplied source root and manifest'
+        # All four passes must use the same input manifest as the final receipt.
+        manifest = out / 'supplied-source-manifest.json'
+        write(manifest, read(args.manifest, 2_000_000), new=True)
     else:
+        source_origin = "This engine's own forge_core sources, packed into a local zip"
         # Default: a deterministic zip of this engine's own forge_core sources, built in the output folder.
         import io,zipfile
         source=out/'self-source';source.mkdir(mode=0o700);buf=io.BytesIO()
@@ -35,7 +44,8 @@ def main():
         manifest=out/'self-source-manifest.json'
         write(manifest,canonical({'schema':1,'files':[{'provider':'synthetic','file_id':'self_0','path':'forge_core_self.zip','size':len(blob),'sha256':sha(blob),'source_url':'fixture://self_0'}]}),new=True)
     w=initialize(out/'home')
-    selected=corpus.manifest(loads(read(manifest,2_000_000)))
+    manifest_bytes = read(manifest, 2_000_000)
+    selected = corpus.manifest(loads(manifest_bytes))
     source_before={r['path']:sha(read(source/r['path'],30_000_000)) for r in selected['files']}
     if any(source_before[r['path']]!=r['sha256'] for r in selected['files']):raise Blocked('SOURCE_VERSION_MISMATCH')
     target=b'def inspect_one(data,source,home,profile,analyzer,segment_dir=None,job_binding=None):'
@@ -68,9 +78,16 @@ def main():
         if isinstance(x,list):return [semantic(v) for v in x]
         return x
     semantically_equal=semantic(before_queries)==semantic(after_queries)
-    recovered=second['summary']['hound_segments']==steady['summary']['hound_segments']
-    summary={'status':'RECOVERY_DEMONSTRATED' if recovered else 'RECOVERY_NOT_DEMONSTRATED',
-      'source_origin':'This engine\'s own forge_core sources, packed into a local zip',
+    injected_ids = [e['source_id'] for e in fault.events[:n1]
+                    if e['action'] == 'INJECTED_TOOL_TIMEOUT']
+    gap_ids = [gap.get('source_id') for gap in first['gaps']
+               if gap.get('reason') == 'TOOL_TIMEOUT']
+    retried_ids = [e['source_id'] for e in fault.events[n1:n2]
+                   if e['action'] == 'REAL_HOUND_SCAN' and e.get('completed')]
+    recovered_ids = [row['source_id'] for row in second['recovery']['segments']
+                     if row['recovered']]
+    summary={
+      'source_origin':source_origin, 'source_manifest_sha256':sha(manifest_bytes),
       'source_files':steady['summary']['segments'],'steady':steady['summary'],
       'first_faulted':{'status':first['status'],'summary':first['summary'],'attempts':n1},
       'second':{'status':second['status'],'summary':second['summary'],'new_attempts':n2-n1},
@@ -84,9 +101,23 @@ def main():
       'cart_identical_to_steady':read(destination/'capabilities.ndjson.gz',3_000_000)==read(w.home/'corpora/steady/capabilities.ndjson.gz',3_000_000),
       'recovery_history':second.get('recovery'),'independent_model_calls':0,
       'source_code_executed':False,'release_approved':False,'independent_evaluation':False}
+    demonstrated = (
+        len(injected_ids) == 1
+        and gap_ids == retried_ids == recovered_ids == injected_ids
+        and first['status'] == 'COMPLETED_WITH_GAPS'
+        and first['summary']['hound_segments'] + 1 == steady['summary']['hound_segments']
+        and second['summary'] == third['summary'] == steady['summary']
+        and second['gaps'] == third['gaps'] == steady['gaps']
+        and n2 - n1 == 1 and n3 == n2
+        and summary['source_bytes_unchanged']
+        and summary['successful_segment_cache_bytes_unchanged']
+        and summary['recovered_rows_equal_steady']
+        and summary['query_semantics_equal_steady']
+        and summary['cart_identical_to_steady']
+    )
+    summary['status'] = 'RECOVERY_DEMONSTRATED' if demonstrated else 'RECOVERY_NOT_DEMONSTRATED'
     for name,obj in [('steady',steady),('faulted-first',first),('recovered-second',second),('cached-third',third),('queries-before',before_queries),('queries-after',after_queries),('tool-events',{'steady':analyzer.events,'faulted':fault.events}),('SUMMARY',summary)]:
         write(out/(name+'.json'),canonical(obj),new=True)
     print(json.dumps({k:v for k,v in summary.items() if k!='recovery_history'}))
-    checks=recovered and n2-n1==1 and n3-n2==0 and semantically_equal and summary['source_bytes_unchanged'] and summary['successful_segment_cache_bytes_unchanged'] and summary['cart_identical_to_steady']
-    return 0 if checks or not args.require_recovery else 2
+    return 0 if demonstrated or not args.require_recovery else 2
 if __name__=='__main__':raise SystemExit(main())
