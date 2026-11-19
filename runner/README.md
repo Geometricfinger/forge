@@ -27,6 +27,18 @@ python3 tools/run_fault_checks.py --out /tmp/forge-runner-fault-checks
 python3 tools/check_package.py
 ```
 
+The package check verifies SHA-256 hashes for the runner files. In a Forge Git
+checkout it also compares the manifest with all tracked files under `runner/`,
+excluding the manifest itself. Untracked notes and local outputs are outside this
+inventory. In an extracted archive
+the checker verifies the listed files and reports `MANIFEST_ENTRIES_ONLY`.
+
+After editing the runner, stage any new package files, run
+`python3 tools/check_package.py --refresh` from this directory, and review and
+stage `FILE_HASHES.json`. The refresh reads the working copies of tracked files.
+Refresh refuses to replace an existing digest for a changed or removed file under
+`contracts/`. Those files record historical commitments.
+
 The test and fault-check entrypoints normalize the temporary fixture directory
 on macOS. The product still rejects symlinked input and workspace paths.
 
