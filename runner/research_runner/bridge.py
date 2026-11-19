@@ -257,11 +257,14 @@ def investigate(q,source_results,forge_root):
     records=[r for source in selected for r in source.get('records',[]) if not r.get('test_path')]
     refs=[r for source in selected for r in source.get('references',[])]
     gaps=[{'source':r['source']['id'],'state':r['status'],'gaps':r.get('gaps',[])} for r in selected if r['status'] in ('BLOCKED','UNSUPPORTED_BINARY','CODE_INDEXED_WITH_GAPS','TEXT_ONLY_UNSUPPORTED_LANGUAGE')]
-    lexical=[];forgerows=[];reference=[];observations={}
+    lexical=[];forgerows=[];reference=[];observations={};directions={}
     evidence = {}
     if q['intent'] in ('code','mixed'):
         corpus=validate_questions([q],forge_root)
         from forge_core.retrieval import occurrence_id
+        from forge_core import retrieval
+        directional = getattr(retrieval, 'direction', None)
+        requested = directional.phrase(q['query']) if directional else None
         required_api=q.get('required_api')
         by_id={r['id']:r for r in records}
         lists=[]
@@ -281,6 +284,10 @@ def investigate(q,source_results,forge_root):
                                 canonical(original.get('analysis_view'))!=canonical(metadata.get('analysis_view'))):
                             raise Blocked('BRIDGE_EVIDENCE_BINDING')
                         observations[rid]=metadata.get('observed_apis',[])
+                        if requested and metadata.get('implementation_kind') != 'DECLARATION_OR_STUB':
+                            support = directional.match(requested, metadata.get('conversion_endpoints', ()))
+                            if support:
+                                directions[rid] = support
                 found=corpus.search(report,q['query'],limit=10,distinct=False,filters=query_filters(q))
                 for r in found['results']:
                     original=by_id.get(occurrence_id(r))
@@ -298,7 +305,7 @@ def investigate(q,source_results,forge_root):
         # no raw score equivalence across different source indexes is assumed.
     if q['intent'] in ('reference','mixed') or not records:
         reference=reference_hits(refs,q['query'],5)
-    fused=rank_fusion(lexical,forgerows,5,required_api=q.get('required_api'),forge_observations=observations)
+    fused=rank_fusion(lexical,forgerows,5,required_api=q.get('required_api'),forge_observations=observations,directional_matches=directions)
     if q['intent']=='reference':fused=[]
     else:
         # Older external workbenches keep their existing result format.
@@ -306,6 +313,10 @@ def investigate(q,source_results,forge_root):
         if hasattr(retrieval, 'query_evidence'):
             evidence['query_evidence'] = retrieval.query_evidence(
                 terms(q['query']), fused[0]['matched_terms'] if fused else [], 'TOP_FUSED_IMPLEMENTATION_RESULT')
+            if requested:
+                evidence['query_evidence']['requested_direction'] = {
+                    'input': requested[0], 'output': requested[1],
+                    'top_result_declaration': fused[0].get('directional_match') if fused else None}
 
     full=any(len(r['matched_terms'])==r['term_count'] for r in fused)
     status=('STATIC_LEADS_REVIEW_REQUIRED' if full else 'PARTIAL_QUERY_ONLY' if fused else

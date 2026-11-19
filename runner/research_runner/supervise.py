@@ -194,6 +194,10 @@ class Supervisor:
                         raise c.Blocked('SOURCE_OR_CONTEXT_CHANGED_DURING_REQUEST')
                     response = self._envelope(rid, 'COMPLETED', result, False, context)
                     limit = m['budgets']['packet_bytes']
+                    if ('requested_direction' in result.get('query_evidence', {})
+                            and len(c.canonical(response)) > limit):
+                        result['query_evidence'] = {k: v for k, v in result['query_evidence'].items()
+                                                    if k != 'requested_direction'}
                     if 'query_evidence' in result and len(c.canonical(response)) > limit:
                         # The full evidence stays in the saved follow-up. Preserve responses
                         # which fit the budget before this optional annotation was added.

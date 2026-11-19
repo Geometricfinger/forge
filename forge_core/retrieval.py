@@ -8,8 +8,9 @@ import collections, copy, math, re, threading
 from functools import lru_cache
 from .common import Blocked, canonical, integer, sha, text
 from .lexical import counts, words
+from . import direction
 
-VERSION = 'field-bm25-rrf-2-role-state'
+VERSION = 'field-bm25-rrf-3-direction'
 K1, B, RRF_K = 1.2, 0.75, 60
 WEIGHTS = {'symbol': 5.0, 'documentation': 1.0, 'parameters': 0.4,
            'path': 0.3, 'observed_api': 4.0, 'declared_call': 1.3,
@@ -140,6 +141,7 @@ class SearchIndex:
         # Do not silently rerank old observations as though fresh call context exists.
         self.legacy = any(r.get('context_status') == 'REINDEX_REQUIRED' for r in rows)
         self.features = []; self.postings = collections.defaultdict(set); self.groups = collections.defaultdict(list)
+        self.output_postings = collections.defaultdict(set)
         seen = set()
         for index, row in enumerate(self.rows):
             key = occurrence_id(row)
@@ -147,6 +149,10 @@ class SearchIndex:
             seen.add(key)
             if row.get('runtime_status') != 'NOT_RUN' or row.get('record_kind') not in ('function', 'source_scope'):
                 raise Blocked('SEARCH_EVIDENCE_AUTHORITY')
+            if row.get('implementation_kind') != 'DECLARATION_OR_STUB':
+                for declaration in row.get('conversion_endpoints', ()):
+                    for token in declaration['output']:
+                        self.output_postings[token].add(index)
             fields = _fields(row); self.features.append(fields)
             self.groups[group_key(row)].append(index)
             for token in set().union(*(set(x) for x in fields.values())):
@@ -178,6 +184,10 @@ class SearchIndex:
         for values in expansion.values():
             for token in values: indexes.update(self.postings.get(token, ()))
         if self.legacy: indexes = set(range(len(self.rows)))
+        requested = direction.phrase(query) if not self.legacy else None
+        if requested:
+            # A simple type annotation can supply a query term absent from the legacy postings.
+            indexes.update(set.intersection(*(self.output_postings.get(t, set()) for t in requested[1])))
         scored = []; excluded = collections.Counter()
         for i in sorted(indexes):
             row = copy.deepcopy(self.rows[i]); fields = self.features[i]
@@ -189,6 +199,12 @@ class SearchIndex:
             if set(filters.get('exclude_apis', ())) & apis: excluded['excluded_api_observed'] += 1; continue
             all_terms = set(row['search_terms']) if self.legacy else set().union(*(set(v) for v in fields.values()))
             matched = [t for t, variants in expansion.items() if set(variants) & all_terms]
+            declarations = row.pop('conversion_endpoints', ())
+            support = (direction.match(requested, declarations)
+                       if requested and row.get('implementation_kind') != 'DECLARATION_OR_STUB' else None)
+            if support:
+                endpoint_terms = sorted(set(qt) & set(support['input'] + support['output']))
+                matched = sorted(set(matched).union(endpoint_terms))
             if not matched: continue
             totals = {}; evidence = {}
             for field, weight in WEIGHTS.items():
@@ -209,6 +225,9 @@ class SearchIndex:
                         'text_group_id': group_key(row),
                         'rank_breakdown': {'field_bm25': totals, 'bm25_total': sum(totals.values())},
                         'matched_fields': evidence})
+            if support:
+                row['rank_breakdown']['directional_match'] = support
+                row['matched_fields']['conversion_declaration'] = {t: [t] for t in endpoint_terms}
             scored.append(row)
         # Channel rankings contain a content group once, not once per archive copy.
         rankings = []; channel_names = ('lexical', 'symbol', 'call')
@@ -242,7 +261,9 @@ class SearchIndex:
                 preference = (1 if role == 'CONSTRUCTOR' else -1 if role == 'CALL_OPERATION' else 0) if construction else (1 if role == 'CALL_OPERATION' else -1 if role == 'CONSTRUCTOR' else 0)
                 row['rank_breakdown']['role_preference'] = preference if class_match and row.get('implementation_kind') != 'DECLARATION_OR_STUB' else 0
                 row['rank_breakdown']['role_policy'] = 'EXPLICIT_CONSTRUCTION' if construction else 'CLASS_BEHAVIOR_TIEBREAK'
-            scored.sort(key=lambda row: (-row['match_count'], -int(row['exact_symbol_match']),
+            scored.sort(key=lambda row: (-int(row['all_query_terms_matched']),
+                                        -(row['match_count'] + int('directional_match' in row['rank_breakdown'])),
+                                        -int('directional_match' in row['rank_breakdown']), -int(row['exact_symbol_match']),
                                         -row['symbol_query_matches'], -row['rank_breakdown']['role_preference'], -row['rank_breakdown']['rrf'],
                                         -row['rank_breakdown']['bm25_total'], row['name'], occurrence_id(row)))
         grouped = collections.OrderedDict()
@@ -262,14 +283,18 @@ class SearchIndex:
             warnings.append('NATURAL_LANGUAGE_NEGATION_NOT_ENFORCED_USE_EXPLICIT_REQUIREMENTS')
         if filters.get('exclude_apis'):
             warnings.append('ABSENT_API_OBSERVATION_DOES_NOT_PROVE_ABSENCE_OF_BEHAVIOR')
-        return {'query': query, 'query_terms': qt, 'query_expansion': expansion,
+        orientation = {}
+        if requested:
+            orientation['requested_direction'] = {'input': requested[0], 'output': requested[1],
+                'matching_occurrences': sum('directional_match' in row['rank_breakdown'] for row in scored)}
+        return {'query': query, 'query_terms': qt, 'query_expansion': expansion, **orientation,
                 'query_evidence': query_evidence(qt, scored[0]['matched_query_terms'] if scored else [], 'TOP_METADATA_RESULT'),
                 'filters': filters, 'distinct': distinct, 'total_matching_occurrences': len(scored),
                 'distinct_matching_groups': len(grouped), 'full_match_count': sum(r['all_query_terms_matched'] for r in scored),
                 'results': (displayed if distinct else scored)[:limit],
                 'search_status': 'MATCHES_FOUND' if any(r['all_query_terms_matched'] for r in scored) else
                                  'PARTIAL_TERM_MATCHES_ONLY' if scored else 'NO_METADATA_MATCH',
-                'rank_meaning': ('legacy metadata coverage and exact symbols preserved; new call context requires reindexing; BM25 components diagnostic only' if self.legacy else 'metadata term coverage and exact symbols, then field-weighted BM25 / reciprocal rank fusion') + '; NOT confidence, code quality, or verified behavior',
+                'rank_meaning': ('legacy metadata coverage and exact symbols preserved; new call context requires reindexing; BM25 components diagnostic only' if self.legacy else 'complete term coverage first; an evidenced conversion direction can offset one missing term among partial matches; then exact symbols and field-weighted BM25 / reciprocal rank fusion') + '; NOT confidence, code quality, or verified behavior',
                 'ranker_version': 'legacy-coverage-compatible-1' if self.legacy else 'field-bm25-rrf-1',
                 'ranking_extension_version': None if self.legacy else VERSION, 'index_binding': self.binding,
                 'ranking_mode': 'LEGACY_COMPATIBILITY' if self.legacy else 'STRUCTURED_RETRIEVAL',

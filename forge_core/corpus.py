@@ -312,6 +312,8 @@ def rows(report):
                        'test_path':s['test_path'],'documented_terms':d['declared_terms'],'observed_apis':apis,
                        'local_start_line':d['start_line'],'local_end_line':d['end_line'],
                        'term_frequencies':d.get('structure',{}).get('term_frequencies',{}),
+                       **({'conversion_endpoints': d['structure']['conversion_endpoints']}
+                          if 'conversion_endpoints' in d.get('structure', {}) else {}),
                        'class_context':_class_context(d.get('structure',{}),s),
                        'implementation_kind':d.get('structure',{}).get('implementation_kind','NOT_CAPTURED'),
                        'method_role':d.get('structure',{}).get('method_role','UNCLASSIFIED'),
