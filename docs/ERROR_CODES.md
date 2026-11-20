@@ -126,6 +126,9 @@ If `reason` is a Python exception name instead of a code:
 | <a id="definition_source_binding"></a>`DEFINITION_SOURCE_BINDING` | A stored record is bound to different inputs/code than the current ones (integrity check). | forge_core/source_inspection.py |
 | <a id="demo_acceptance"></a>`DEMO_ACCEPTANCE` | Input or stored state failed a validation check (see the raising module). | forge_core/demo.py |
 | <a id="digest_required"></a>`DIGEST_REQUIRED` | A required input or precondition is missing. | forge_core/reuse.py |
+| <a id="doc_link_document_encoding"></a>`DOC_LINK_DOCUMENT_ENCODING` | Save the Markdown document as UTF-8. | forge_core/doc_links.py |
+| <a id="doc_link_document_size"></a>`DOC_LINK_DOCUMENT_SIZE` | Supply a document of at most 256,000 bytes. | forge_core/doc_links.py |
+| <a id="doc_link_reference_limit"></a>`DOC_LINK_REFERENCE_LIMIT` | Split the document into sections containing at most 256 dotted reference occurrences per input. | forge_core/doc_links.py |
 | <a id="duplicate_candidate"></a>`DUPLICATE_CANDIDATE` | The input repeats an item that must be unique. | forge_core/reuse.py |
 | <a id="duplicate_citation"></a>`DUPLICATE_CITATION` | The input repeats an item that must be unique. | forge_core/opportunities.py |
 | <a id="duplicate_corpus_source"></a>`DUPLICATE_CORPUS_SOURCE` | Two manifest rows share a `file_id` or `path`. | forge_core/corpus.py |

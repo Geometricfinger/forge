@@ -93,6 +93,38 @@ The physical `WORK` path above preserves Forge's symlink checks.
 
 See `examples/demo/README.md` for how to point Forge at your own code. A workspace (`--home`) must be outside the repository. The default is `~/.forge-workbench-0.8.4` (a fixed folder name, not the release version).
 
+### Follow Python references in a Markdown spec
+
+For a saved corpus run and a UTF-8 Markdown file, run:
+
+```sh
+python3 forge.py --home "$WORK/home" corpus-doc-links --run-id demo --document "$WORK/spec.md" --pretty
+```
+
+Write a dotted name such as `pkg.io.Writer.emit` inside backticks in the spec.
+Forge matches the complete source-local definition name and every stated module
+path component. Short forms such as `io.Writer.emit` and `Writer.emit()` can
+match several definitions. The JSON groups occurrences by their nearest ATX
+heading (`#` through `######`) and gives document lines, candidate paths,
+source lines, hashes and inspectable definition IDs. Each group's
+`linked_definition_ids` lists distinct uniquely linked definitions in mention
+order. Co-mention in a section records what's discussed together.
+
+The command checks the saved corpus receipt. Use `corpus-inspect` with a
+candidate ID and the original source root to verify the current bytes.
+Candidates cover functions and methods in indexed Python files, including ZIP
+members. Pass `--include-tests` to include test paths. An incomplete or older
+index returns `coverage_unknown` when it cannot establish a unique match or
+absence. Multiple matches return `ambiguous` or `lookup_truncated` when
+`--limit` caps the displayed candidates. A complete lookup without a match
+returns `unresolved`.
+
+The Markdown reader accepts single-line dotted code spans up to 200 characters,
+including an optional empty `()`. It skips fenced blocks, indented and quoted
+lines, and HTML comment lines. It accepts up to 256,000 input bytes and 256
+reference occurrences. Imports, aliases, prose and dynamic dispatch require
+separate review.
+
 ### Analyse your own folder
 
 Point Forge at a plain folder; no manifest needed:
