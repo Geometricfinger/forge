@@ -194,6 +194,10 @@ def main():
     a.add_argument('--run-id',required=True);a.add_argument('--name',required=True)
     a.add_argument('--include-tests',action='store_true');a.add_argument('--limit',type=int,default=20)
     a.add_argument('--out',type=Path)
+    a=s.add_parser('corpus-doc-links',help='link inline dotted Python names in a Markdown document to indexed definitions')
+    a.add_argument('--run-id',required=True);a.add_argument('--document',type=Path,required=True)
+    a.add_argument('--include-tests',action='store_true')
+    a.add_argument('--limit',type=int,default=10,help='display 1 to 20 candidates per reference (default 10)')
     a=s.add_parser('corpus-context');a.add_argument('--run-id',required=True);a.add_argument('--definition',required=True);a.add_argument('--out',type=Path)
     a=s.add_parser('corpus-inspect',help='read one complete, hash-bound definition; never execute it');a.add_argument('--run-id',required=True);a.add_argument('--definition',required=True);a.add_argument('--source-root',type=Path,required=True);a.add_argument('--max-bytes',type=int,default=250_000)
     s.add_parser('corpus-list')
@@ -373,6 +377,12 @@ def main():
         from forge_core import corpus, symbol_lookup
         value=symbol_lookup.lookup(corpus.get(w,a.run_id),a.name,include_tests=a.include_tests,limit=a.limit)
         if a.out:write(a.out,canonical(value),new=True)
+    elif a.command=='corpus-doc-links':
+        from forge_core import corpus, doc_links
+        raw=read(a.document,doc_links.MAX_DOCUMENT_BYTES)
+        report,digest=corpus.get_with_digest(w,a.run_id)
+        value=doc_links.resolve(report,raw,include_tests=a.include_tests,limit=a.limit)
+        value.update(run_id=a.run_id,corpus_report_sha256=digest)
     elif a.command=='corpus-context':
         from forge_core import corpus
         value=corpus.dependency_context(corpus.get(w,a.run_id),a.definition)

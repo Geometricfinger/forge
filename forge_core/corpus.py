@@ -429,17 +429,23 @@ function show(){let words=q.value.toLowerCase().trim().split(/\\s+/).filter(Bool
 # read ceiling; the generated report is trusted local output, not external input.
 REPORT_READ_LIMIT=256_000_000
 
-def read_report(folder):
+def _read_report_with_digest(folder):
     folder=safe_path(folder);data=read(folder/'corpus.json',REPORT_READ_LIMIT);receipt=loads(read(folder/'receipt.json',2000))
     if not isinstance(receipt,dict) or sha(data)!=receipt.get('report_sha256') or receipt.get('source_bodies_retained') is not False:raise Blocked('CORPUS_RECEIPT')
     report=loads(data)
     if not isinstance(report,dict) or report.get('upstream_code_executed') is not False or report.get('source_bodies_retained') is not False:raise Blocked('CORPUS_AUTHORITY')
-    return report
+    return report, receipt['report_sha256']
 
-def get(workbench,run_id):
+def read_report(folder):
+    return _read_report_with_digest(folder)[0]
+
+def get_with_digest(workbench,run_id):
     workbench.guard()
     if not isinstance(run_id,str) or not re.fullmatch('[A-Za-z0-9_-]{1,80}',run_id):raise Blocked('CORPUS_RUN_ID')
-    return read_report(workbench.home/'corpora'/run_id)
+    return _read_report_with_digest(workbench.home/'corpora'/run_id)
+
+def get(workbench,run_id):
+    return get_with_digest(workbench,run_id)[0]
 
 def list_runs(workbench):
     workbench.guard();folder=workbench.home/'corpora';items=[]
