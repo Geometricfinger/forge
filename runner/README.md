@@ -4,6 +4,55 @@ An add-on that automates a bounded research workflow around the Forge engine in 
 
 It executes no collected code, invokes no model, and makes no network requests.
 
+## Context for a conversation or agent
+
+`forge_converse.py` gives a trusted local client persistent facts, a record of
+played speech and optional excerpts from a completed research mission. The host
+chooses the user, database and project profile before sending any request. These
+identifiers assume an already trusted local account. The client supplies speech
+recognition, dialogue policy and audio playback.
+
+Save `{"project":"workshop"}` in `profile.json`. From this directory, send one
+JSON object per invocation. The database can be reopened in a later process.
+
+```sh
+echo '{"action":"remember","key":"location","value":"north entrance"}' |
+  python3 forge_converse.py --db ./private/memory.db --user operator --profile profile.json
+echo '{"action":"context","keys":["location"]}' |
+  python3 forge_converse.py --db ./private/memory.db --user operator --profile profile.json
+```
+
+Place the database outside shared or published directories. Operations use the
+active user and project. `correct` compares `old_value` before applying
+`new_value`. `forget` removes a key from fact recall. `clear_scope` clears
+that scope's facts and recorded playback together. Mission ledgers have their
+own retention and may contain search queries.
+
+For speech, send `start` with a unique `turn_id`, then `acknowledge` with the
+turn ID, consecutive 1-based `sequence` and exact `text` after each complete
+segment plays. Preserve spaces between segments. Send `finish` with
+`interrupted` set to true or false. `context` returns the latest turn and its
+confirmed spoken prefix. Starting another turn supersedes a still-playing
+turn. Retries of an acknowledged segment preserve its original text.
+
+For source lookup, add a `mission` to the trusted profile:
+
+```json
+{"project":"workshop","mission":{"manifest":"mission.json","source_root":"sources","work":"completed-run","sources":["handbook"]}}
+```
+
+Paths resolve relative to that profile. Use a completed research run and
+source IDs in its manifest. A `context` request accepts a `query` and optional
+`anchors`, for example `{"action":"context","query":"pickup point","anchors":["north entrance"]}`.
+Each fresh search uses the supervisor's existing follow-up allowance and
+inspects at most three ranked reference hits, up to 1,600 characters apiece.
+Repeated identical lookups in the same scope reuse their receipts. The
+result includes the source origin, digest, indexed line range and any
+truncation. Anchors filter the returned text by whole words or phrases.
+Treat a match as a passage to interpret. An unmatched or blocked lookup
+leaves the question open. Source text cannot select another project or write
+a remembered fact through this interface.
+
 ## Run the offline example
 
 ```sh
