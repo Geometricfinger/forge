@@ -12,6 +12,19 @@ chooses the user, database and project profile before sending any request. These
 identifiers assume an already trusted local account. The client supplies speech
 recognition, dialogue policy and audio playback.
 
+For microphone input, launch with `--channel speech`. This permits a context
+read or a proposed fact change. To suggest a change send
+`{"action":"propose","proposal_id":"change-1","key":"location","value":"north entrance"}`.
+Use JSON null for a proposed deletion. From a separate host control, launch
+with `--channel review` and send `{"action":"preview","proposal_id":"change-1"}` to
+show the pending key and value, including after a restart. After a deliberate
+decision, send `{"action":"decide","proposal_id":"change-1","accept":true}`
+or set `accept` to false. Replayed decisions preserve the outcome. An intervening
+write to the same fact makes pending suggestions stale, including a change away
+from and back to the original value. Allocate a fresh ID for a new suggestion.
+The host selects the channel and identity outside the transcript and request
+payload. Use the default host channel for trusted application commands.
+
 Save `{"project":"workshop"}` in `profile.json`. From this directory, send one
 JSON object per invocation. The database can be reopened in a later process.
 

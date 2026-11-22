@@ -218,6 +218,137 @@ class ConversationTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 reader.snapshot(["key"] * 17)
 
+    def test_pending_restart_rejection_and_replay_identity(self):
+        pending = {"proposal_id": "p", "key": "door", "value": "orange", "status": "pending"}
+        with self.store() as store:
+            store.remember("door", "green")
+            self.assertEqual(store.propose("p", "door", "orange"), pending)
+            self.assertEqual(store.propose("p", "door", "orange"), pending)
+            self.assertEqual(store.recall("door"), "green")
+        with self.store() as store:
+            self.assertEqual(store.proposal("p"), pending)
+            with self.assertRaises(ValueError):
+                store.propose("p", "other", "orange")
+            with self.assertRaises(ValueError):
+                store.decide("p", accept=1)
+            closed = store.decide("p", accept=False)
+            self.assertEqual(closed, {"proposal_id": "p", "key": "door", "status": "rejected"})
+            self.assertEqual(store.decide("p", accept=False), closed)
+            self.assertEqual(store.proposal("p"), closed)
+            self.assertEqual(store.propose("p", "door", "orange"), closed)
+            with self.assertRaises(ValueError):
+                store.decide("p", accept=True)
+            with self.assertRaises(ValueError):
+                store.propose("p", "door", None)
+            self.assertEqual(store.recall("door"), "green")
+
+    def test_aba_and_unrelated_writes(self):
+        with self.store() as store, self.store() as other:
+            store.remember("counter", "before")
+            store.propose("aba", "counter", "proposed")
+            self.assertTrue(other.correct("counter", "before", "between"))
+            other.remember("counter", "before")
+            self.assertEqual(store.decide("aba", accept=True)["status"], "stale")
+            self.assertEqual(store.recall("counter"), "before")
+            store.propose("independent", "counter", "next")
+            self.assertFalse(other.correct("counter", "wrong", "unused"))
+            other.remember("other", "unchanged")
+            self.assertEqual(store.decide("independent", True)["status"], "applied")
+            self.assertEqual(store.recall("counter"), "next")
+            self.assertEqual(store.recall("other"), "unchanged")
+            other.remember("counter", "latest")
+            self.assertEqual(store.decide("independent", True)["status"], "applied")
+            self.assertEqual(store.recall("counter"), "latest")
+
+    def test_proposed_forget_and_direct_forget_drop_pending_contents(self):
+        with self.store() as store:
+            store.remember("desk", "tall")
+            self.assertIsNone(store.propose("del", "desk", None)["value"])
+            self.assertEqual(store.recall("desk"), "tall")
+            store.propose("replacement", "desk", "short")
+            self.assertEqual(store.decide("del", True)["status"], "applied")
+            self.assertIsNone(store.recall("desk"))
+            self.assertEqual(store.decide("replacement", True)["status"], "stale")
+            store.propose("missing", "desk", "unconfirmed")
+            self.assertFalse(store.forget("desk"))
+            self.assertNotIn("value", store.proposal("missing"))
+            self.assertEqual(store.propose("missing", "desk", "unconfirmed")["status"], "stale")
+        db = sqlite3.connect(self.path)
+        try:
+            self.assertEqual(db.execute("SELECT value, base_hash FROM proposals").fetchall(),
+                             [(None, None)] * 3)
+        finally:
+            db.close()
+
+    def test_proposals_are_scoped_and_cleared(self):
+        with self.store() as first, self.store(user="b") as second, self.store(project="q") as third:
+            first.propose("p", "color", "blue")
+            with self.assertRaises(ValueError):
+                second.decide("p", True)
+            with self.assertRaises(ValueError):
+                third.decide("p", True)
+            second.propose("p", "color", "red")
+            third.propose("p", "color", "green")
+            first.clear_scope()
+            with self.assertRaises(ValueError):
+                first.proposal("p")
+            with self.assertRaises(ValueError):
+                first.decide("p", True)
+            second.decide("p", True)
+            third.decide("p", True)
+            self.assertEqual(second.recall("color"), "red")
+            self.assertEqual(third.recall("color"), "green")
+            self.assertIsNone(first.recall("color"))
+
+    def test_competing_proposals_cannot_both_apply(self):
+        updates = ["west", "east"]
+        with self.store() as store:
+            for value in updates:
+                store.propose(value, "place", value)
+        barrier = threading.Barrier(2)
+
+        def decide(value):
+            with self.store() as store:
+                barrier.wait(timeout=5)
+                return store.decide(value, True)["status"]
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            states = list(pool.map(decide, updates))
+        self.assertCountEqual(states, ["applied", "stale"])
+        with self.store() as store:
+            self.assertEqual(store.recall("place"), updates[states.index("applied")])
+
+    def test_upgrade_v1_preserves_scoped_history_and_facts(self):
+        # Remove only the v2 addition to reconstruct the original v1 schema on disk.
+        with self.store() as store:
+            store.remember("original", "kept")
+            store.start_turn("v1")
+            store.acknowledge("v1", 1, "Original playback.")
+        db = sqlite3.connect(self.path)
+        try:
+            for event in ("INSERT", "UPDATE", "DELETE"):
+                db.execute(f"DROP TRIGGER stale_proposals_after_{event}")
+            db.execute("DROP TABLE proposals")
+            db.execute("PRAGMA user_version=1")
+            db.commit()
+            # Keep the legacy connection alive across migration. Direct writes
+            # model its v1 statements, which know nothing about proposals.
+            with self.store() as store:
+                self.assertEqual(store.recall("original"), "kept")
+                self.assertEqual(store.turn("v1")["spoken_text"], "Original playback.")
+                store.propose("legacy-aba", "original", "replace")
+                for value in ("intervening", "kept"):
+                    with db:
+                        db.execute("UPDATE facts SET value=? WHERE key='original'", (value,))
+                self.assertEqual(store.decide("legacy-aba", True)["status"], "stale")
+                store.propose("fresh", "fresh", "new")
+                self.assertEqual(store.decide("fresh", True)["status"], "applied")
+        finally:
+            db.close()
+        with self.store() as store:
+            self.assertEqual(store.recall("fresh"), "new")
+            self.assertEqual(store.recall("original"), "kept")
+
 
 if __name__ == "__main__":
     unittest.main()

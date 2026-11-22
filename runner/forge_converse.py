@@ -45,11 +45,19 @@ FIELDS = {
     "remember": {"key", "value"}, "correct": {"key", "old_value", "new_value"},
     "forget": {"key"}, "clear_scope": set(), "start": {"turn_id"},
     "acknowledge": {"turn_id", "sequence", "text"}, "finish": {"turn_id", "interrupted"},
+    "propose": {"proposal_id", "key", "value"}, "preview": {"proposal_id"},
+    "decide": {"proposal_id", "accept"},
 }
 
 
-def execute(memory, request, profile, user):
+def execute(memory, request, profile, user, channel="host"):
     action = request.get("action")
+    if not isinstance(action, str):
+        raise Blocked("REQUEST_FIELDS")
+    if channel == "speech" and action not in ("context", "propose"):
+        raise Blocked("SPEECH_CHANNEL_ACTION")
+    if (channel == "review") != (action in ("preview", "decide")):
+        raise Blocked("REVIEW_CHANNEL_ACTION")
     if action == "context":
         if set(request) - {"action", "keys", "query", "anchors"}:
             raise Blocked("REQUEST_FIELDS")
@@ -71,6 +79,12 @@ def execute(memory, request, profile, user):
         raise Blocked("REQUEST_FIELDS")
     if action == "remember":
         memory.remember(request["key"], request["value"])
+    elif action == "propose":
+        return {"proposal": memory.propose(request["proposal_id"], request["key"], request["value"])}
+    elif action == "preview":
+        return {"proposal": memory.proposal(request["proposal_id"])}
+    elif action == "decide":
+        return {"proposal": memory.decide(request["proposal_id"], request["accept"])}
     elif action == "correct":
         return {"updated": memory.correct(request["key"], request["old_value"], request["new_value"])}
     elif action == "forget":
@@ -91,12 +105,14 @@ def main():
     parser.add_argument("--db", required=True, type=Path, help="Local SQLite memory database")
     parser.add_argument("--user", required=True, help="User identity assigned by the trusted host")
     parser.add_argument("--profile", required=True, type=Path, help="Operator-owned project JSON")
+    parser.add_argument("--channel", choices=("host", "speech", "review"), default="host",
+                        help="Selected by the trusted host, outside the request")
     args = parser.parse_args()
     try:
         request = read_json(sys.stdin.buffer)
         profile = load_profile(args.profile)
         with ConversationMemory(args.db, args.user, profile["project"]) as memory:
-            result = execute(memory, request, profile, args.user)
+            result = execute(memory, request, profile, args.user, args.channel)
         print(canonical({"ok": True, **result}).decode())
     except Exception as exc:
         reason = str(exc) if isinstance(exc, Blocked) else type(exc).__name__

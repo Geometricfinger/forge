@@ -37,10 +37,10 @@ class ClientLookup(unittest.TestCase):
                    "source_root": "sources", "work": "run", "sources": ["guide"]}}
         (self.root / "profile.json").write_bytes(core.canonical(profile))
 
-    def call(self, request, expected=0):
+    def call(self, request, expected=0, channel="host"):
         process = subprocess.run([sys.executable, "-B", str(RUNNER / "forge_converse.py"),
                                   "--db", str(self.root / "state.sqlite"), "--user", "speaker",
-                                  "--profile", str(self.root / "profile.json")],
+                                  "--profile", str(self.root / "profile.json"), "--channel", channel],
                                  input=core.canonical(request), capture_output=True)
         self.assertEqual(process.returncode, expected, process.stdout)
         return json.loads(process.stdout)
@@ -72,3 +72,19 @@ class ClientLookup(unittest.TestCase):
         self.assertEqual(ctx["facts"], {"place": "north"})
         self.assertEqual(ctx["last_turn"]["spoken_text"], "Go north.")
         self.assertFalse(ctx["evidence"]["claims_verified"])
+
+    def test_proposal_requires_a_separate_host_selected_review(self):
+        suggest = {"action": "propose", "proposal_id": "p1", "key": "room", "value": "blue"}
+        accept = {"action": "decide", "proposal_id": "p1", "accept": True}
+        recall = {"action": "context", "keys": ["room"]}
+        self.assertEqual(self.call(suggest, channel="speech")["proposal"]["status"], "pending")
+        preview = {"action": "preview", "proposal_id": "p1"}
+        self.assertEqual(self.call(preview, channel="review")["proposal"]["value"], "blue")
+        self.assertFalse(self.call(preview, expected=2, channel="speech")["ok"])
+        self.assertFalse(self.call(accept, expected=2, channel="speech")["ok"])
+        self.assertFalse(self.call(dict(accept, channel="review"), expected=2, channel="speech")["ok"])
+        self.assertIsNone(self.call(recall)["facts"]["room"])
+        self.assertEqual(self.call(accept, channel="review")["proposal"]["status"], "applied")
+        self.assertEqual(self.call(recall)["facts"]["room"], "blue")
+        self.assertFalse(self.call({"action": "clear_scope"}, expected=2, channel="speech")["ok"])
+        self.assertFalse(self.call(recall, expected=2, channel="review")["ok"])

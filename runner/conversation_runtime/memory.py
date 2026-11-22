@@ -5,11 +5,11 @@ import os
 import sqlite3
 import stat
 
-from research_runner.core import Blocked, check_int, no_links
+from research_runner.core import Blocked, check_int, digest, no_links
 
 
 _APPLICATION_ID = int.from_bytes(b"FGCM", "big")
-_SCHEMA_VERSION = 1
+_SCHEMA_VERSION = 2
 
 
 def _text(value, field, limit):
@@ -60,6 +60,9 @@ class ConversationMemory:
                 version = self._db.execute("PRAGMA user_version").fetchone()[0]
                 if app_id == _APPLICATION_ID and version == _SCHEMA_VERSION:
                     return
+                if app_id == _APPLICATION_ID and version == 1:
+                    self._add_proposals()
+                    return
                 previous = self._db.execute("SELECT 1 FROM sqlite_master LIMIT 1").fetchone()
                 if app_id or version or previous:
                     raise Blocked("NOT_A_SUPPORTED_CONVERSATION_DATABASE")
@@ -81,10 +84,34 @@ class ConversationMemory:
                         text TEXT NOT NULL, PRIMARY KEY (turn, sequence)
                     ) WITHOUT ROWID""")
                 self._db.execute(f"PRAGMA application_id={_APPLICATION_ID}")
-                self._db.execute(f"PRAGMA user_version={_SCHEMA_VERSION}")
+                self._add_proposals()
         except BaseException:
             self._db.close()
             raise
+
+    def _add_proposals(self):
+        self._db.execute("""
+            CREATE TABLE proposals (
+                user TEXT NOT NULL, project TEXT NOT NULL, proposal_id TEXT NOT NULL,
+                key TEXT NOT NULL, request_hash TEXT NOT NULL, value TEXT, base_hash TEXT,
+                status TEXT NOT NULL CHECK(status IN ('pending','applied','rejected','stale')),
+                PRIMARY KEY (user, project, proposal_id)
+            ) WITHOUT ROWID""")
+        self._db.execute("""
+            CREATE INDEX pending_fact_proposals ON proposals(user, project, key)
+            WHERE status='pending'""")
+        # A v1 connection that was already open during migration can still
+        # write facts. The invalidation must happen inside the database for
+        # those writes as well, including a change followed by a change back.
+        for event, row in (("INSERT", "NEW"), ("UPDATE", "OLD"), ("DELETE", "OLD")):
+            self._db.execute(f"""
+                CREATE TRIGGER stale_proposals_after_{event} AFTER {event} ON facts
+                BEGIN
+                    UPDATE proposals SET status='stale', value=NULL, base_hash=NULL
+                    WHERE user={row}.user AND project={row}.project AND key={row}.key
+                        AND status='pending';
+                END""")
+        self._db.execute(f"PRAGMA user_version={_SCHEMA_VERSION}")
 
     def __enter__(self):
         return self
@@ -100,10 +127,19 @@ class ConversationMemory:
         key = _text(key, "key", 128)
         value = _text(value, "value", 4096)
         with self._db:
-            self._db.execute("""
-                INSERT INTO facts VALUES (?, ?, ?, ?)
-                ON CONFLICT(user, project, key) DO UPDATE SET value=excluded.value
-            """, (*self._scope, key, value))
+            self._set_fact(key, value)
+
+    def _set_fact(self, key, value):
+        self._db.execute("""
+            INSERT INTO facts VALUES (?, ?, ?, ?)
+            ON CONFLICT(user, project, key) DO UPDATE SET value=excluded.value
+        """, (*self._scope, key, value))
+
+    def _stale_proposals(self, key):
+        self._db.execute("""
+            UPDATE proposals SET status='stale', value=NULL, base_hash=NULL
+            WHERE user=? AND project=? AND key=? AND status='pending'
+        """, (*self._scope, key))
 
     def recall(self, key):
         key = _text(key, "key", 128)
@@ -128,6 +164,8 @@ class ConversationMemory:
         with self._db:
             result = self._db.execute("DELETE FROM facts WHERE user=? AND project=? AND key=?",
                                       (*self._scope, key))
+            if not result.rowcount:
+                self._stale_proposals(key)
             return bool(result.rowcount)
 
     def clear_scope(self):
@@ -139,6 +177,80 @@ class ConversationMemory:
             """, self._scope)
             self._db.execute("DELETE FROM turns WHERE user=? AND project=?", self._scope)
             self._db.execute("DELETE FROM facts WHERE user=? AND project=?", self._scope)
+            self._db.execute("DELETE FROM proposals WHERE user=? AND project=?", self._scope)
+
+    @staticmethod
+    def _proposal_receipt(proposal_id, key, value, status):
+        result = {"proposal_id": proposal_id, "key": key, "status": status}
+        if status == "pending":
+            result["value"] = value
+        return result
+
+    def _proposal_row(self, proposal_id):
+        return self._db.execute("""
+            SELECT key, value, status, request_hash, base_hash FROM proposals
+            WHERE user=? AND project=? AND proposal_id=?
+        """, (*self._scope, proposal_id)).fetchone()
+
+    def proposal(self, proposal_id):
+        """Preview a change for review, including after the reviewing client restarts."""
+        proposal_id = _text(proposal_id, "proposal_id", 128)
+        row = self._proposal_row(proposal_id)
+        if row is None:
+            raise Blocked("UNKNOWN_PROPOSAL")
+        return self._proposal_receipt(proposal_id, *row[:3])
+
+    def propose(self, proposal_id, key, value):
+        """Record a possible change for explicit host confirmation. None requests removal."""
+        proposal_id = _text(proposal_id, "proposal_id", 128)
+        key = _text(key, "key", 128)
+        if value is not None:
+            value = _text(value, "value", 4096)
+        request_hash = digest([key, value])
+        with self._db:
+            self._db.execute("BEGIN IMMEDIATE")
+            row = self._proposal_row(proposal_id)
+            if row is not None:
+                if row[3] != request_hash:
+                    raise Blocked("CONFLICTING_PROPOSAL_ID")
+                return self._proposal_receipt(proposal_id, *row[:3])
+            self._db.execute("""
+                INSERT INTO proposals(user, project, proposal_id, key, request_hash,
+                                      value, base_hash, status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')
+            """, (*self._scope, proposal_id, key, request_hash, value, digest(self.recall(key))))
+            return self._proposal_receipt(proposal_id, key, value, "pending")
+
+    def decide(self, proposal_id, accept):
+        """Finalize a specific proposal using an independent trusted confirmation."""
+        proposal_id = _text(proposal_id, "proposal_id", 128)
+        if type(accept) is not bool:
+            raise Blocked("INVALID_PROPOSAL_DECISION")
+        requested = "applied" if accept else "rejected"
+        with self._db:
+            self._db.execute("BEGIN IMMEDIATE")
+            row = self._proposal_row(proposal_id)
+            if row is None:
+                raise Blocked("UNKNOWN_PROPOSAL")
+            key, value, status, _, base_hash = row
+            if status != "pending":
+                if status not in (requested, "stale"):
+                    raise Blocked("CONFLICTING_PROPOSAL_DECISION")
+                return self._proposal_receipt(proposal_id, key, None, status)
+            outcome = requested if digest(self.recall(key)) == base_hash else "stale"
+            self._db.execute("""
+                UPDATE proposals SET status=?, value=NULL, base_hash=NULL
+                WHERE user=? AND project=? AND proposal_id=?
+            """, (outcome, *self._scope, proposal_id))
+            if outcome == "applied":
+                if value is None:
+                    removed = self._db.execute("DELETE FROM facts WHERE user=? AND project=? AND key=?",
+                                               (*self._scope, key)).rowcount
+                    if not removed:
+                        self._stale_proposals(key)
+                else:
+                    self._set_fact(key, value)
+            return self._proposal_receipt(proposal_id, key, None, outcome)
 
     def start_turn(self, turn_id):
         """A new reply interrupts its predecessor; retries never reopen old turns."""
