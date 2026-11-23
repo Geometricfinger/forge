@@ -186,6 +186,19 @@ def main():
     a=s.add_parser('opportunity-export');a.add_argument('run_id');a.add_argument('--out',type=Path,required=True)
     a=s.add_parser('opportunity-feedback');a.add_argument('run_id');a.add_argument('--file',type=Path,required=True)
     a=s.add_parser('opportunity-draft',help='turn plain-text notes (or a JSON source record) into draft cues');a.add_argument('--file',type=Path,required=True,help='plain-text notes, or a JSON source record')
+    a=s.add_parser('quest-start',help='look for product building blocks in a saved corpus')
+    a.add_argument('--run-id',required=True)
+    mode=a.add_mutually_exclusive_group(required=True)
+    mode.add_argument('--idea',help='short product idea, up to 200 characters')
+    mode.add_argument('--scout',action='store_true',help='sample available definitions across modules')
+    a.add_argument('--out',type=Path,required=True)
+    a=s.add_parser('quest-build',help='assemble reviewed modules and a builder-written entry point into a Python zipapp')
+    a.add_argument('--quest',type=Path,required=True)
+    a.add_argument('--recipe',type=Path,required=True)
+    a.add_argument('--entry',type=Path,required=True)
+    a.add_argument('--check-file',type=Path,help='record the digest of an external acceptance test')
+    a.add_argument('--source-root',type=Path,required=True)
+    a.add_argument('--out',type=Path,required=True)
     s.add_parser('corpus-demo')
     a=s.add_parser('corpus-run');a.add_argument('--source-root',type=Path,required=True,help='folder holding the sources');a.add_argument('--manifest',type=Path,help='manifest JSON; omit it to analyse every .py/.pyi/.pyw/.ipynb/.zip/.txt/.md/.rst file in --source-root as provider "local"');a.add_argument('--run-id',required=True);a.add_argument('--max-containers',type=int,default=20);a.add_argument('--profile',type=Path,help='data-only exact-API profile JSON (schema 1); default templates/corpus_profile.json')
     a=s.add_parser('corpus-search');a.add_argument('--run-id',required=True);a.add_argument('--query',required=True);a.add_argument('--include-tests',action='store_true');a.add_argument('--out',type=Path)
@@ -214,6 +227,15 @@ def main():
     a.human='--human' in argv;a.pretty='--pretty' in argv
     OUTPUT_MODE='human' if a.human else 'pretty' if a.pretty else 'json'
     home=a.home.absolute()
+    if a.command in ('quest-start','quest-build'):
+        from forge_core import creation_quest
+        current=Workbench(home)
+        if not current.home.is_dir():raise Blocked('QUEST_EXISTING_CORPUS_REQUIRED')
+        if a.command=='quest-start':
+            value=creation_quest.start(current,a.run_id,a.idea,a.out)
+        else:
+            value=creation_quest.build(current,a.quest,a.recipe,a.entry,a.source_root,a.out,a.check_file)
+        emit(value);return 0
     if a.command=='reviewed-trial-verify':
         from forge_core.reviewed_evaluator import verify
         emit(verify(a.prepared,a.result));return 0
