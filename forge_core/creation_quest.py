@@ -7,7 +7,7 @@ import re
 import tempfile
 from zipfile import ZipFile, ZipInfo
 
-from . import corpus
+from . import corpus, opportunities
 from .common import Blocked, canonical, loads, path_in_repo, read, safe_path, sha, text, write
 from .mixed_intake import DEFAULTS
 from .reviewed_evaluator import preflight
@@ -67,6 +67,83 @@ def _quest(report, digest, run_id, idea):
                          'independent acceptance check on the resulting archive.'}
 
 
+def _opportunity_quest(workbench, report, digest, run_id, opportunity_run, workflow_id):
+    opportunities.key(workflow_id)
+    record = opportunities.OpportunityStore(workbench)._record(opportunity_run)
+    saved = record['report']
+    corpora = []
+    for binding in saved['corpus_bindings']:
+        current = corpus.get(workbench, binding['name'])
+        if sha(canonical(current)) != binding['sha256']:
+            raise Blocked('QUEST_OPPORTUNITY_CORPUS')
+        corpora.append((binding['name'], current))
+    if run_id not in {name for name, _ in corpora}:
+        raise Blocked('QUEST_OPPORTUNITY_CORPUS')
+    if opportunities.evaluate(record['bundle'], corpora) != saved:
+        raise Blocked('QUEST_OPPORTUNITY_BINDING')
+    workflows = [w for w in record['bundle']['workflows'] if w['id'] == workflow_id]
+    if len(workflows) != 1:
+        raise Blocked('QUEST_OPPORTUNITY_WORKFLOW')
+    workflow = workflows[0]
+    hypotheses = [h for h in saved['hypotheses'] if h['workflow'] == workflow_id]
+    eligible = {row['definition_id'] for row in corpus.rows(report) if _eligible(row)}
+    leads = [
+        {**candidate, 'need': hypothesis['need']['id'], 'mechanism': group['mechanism']}
+        for hypothesis in hypotheses for group in hypothesis['code_leads']
+        for candidate in group['candidates']
+        if candidate['corpus'] == run_id and candidate.get('definition_id') in eligible
+    ]
+    return {
+        'schema': 1, 'run_id': run_id, 'corpus_sha256': digest, 'idea': None,
+        'mode': 'opportunity', 'coverage_status': report['status'],
+        'lead_basis': 'Source leads for the selected whole workflow in the saved opportunity run.',
+        'leads': leads,
+        'opportunity': {
+            'run_id': opportunity_run, 'workflow_id': workflow_id,
+            'bundle_sha256': saved['bundle_sha256'], 'report_sha256': sha(canonical(saved)),
+            'workflow': workflow, 'hypotheses': hypotheses,
+            'sources': record['bundle']['sources'], 'source_register': saved['source_register'],
+        },
+        'next_step': 'Review the complete workflow and existing alternatives. Choose the needs to '
+                     'address, map each need to selected source components and a useful outcome, '
+                     'and record the remaining gaps. Write the adapter and independent checks, '
+                     'then package and evaluate the resulting prototype.',
+    }
+
+
+def _opportunity_responses(quest, recipe):
+    origin = quest['opportunity']
+    expected = {key: origin[key] for key in ('run_id', 'workflow_id')}
+    if recipe.get('opportunity') != expected:
+        raise Blocked('QUEST_OPPORTUNITY_RECIPE')
+    responses = recipe.get('need_responses')
+    if not isinstance(responses, list) or not 1 <= len(responses) <= 80:
+        raise Blocked('QUEST_NEED_RESPONSES')
+    needs = {h['need']['id'] for h in origin['hypotheses']}
+    seen = set()
+    for response in responses:
+        if (not isinstance(response, dict) or set(response) != {'need', 'outcome', 'components'}
+                or not isinstance(response['need'], str) or response['need'] not in needs
+                or response['need'] in seen):
+            raise Blocked('QUEST_NEED_RESPONSES')
+        text(response['outcome'])
+        selected = response['components']
+        available = {lead['definition_id'] for lead in quest['leads'] if lead['need'] == response['need']}
+        if (not isinstance(selected, list) or not selected
+                or not all(isinstance(key, str) for key in selected)
+                or len(set(selected)) != len(selected)
+                or not set(selected) <= set(recipe['components'])
+                or not set(selected) <= available):
+            raise Blocked('QUEST_NEED_COMPONENTS')
+        seen.add(response['need'])
+    return {
+        'opportunity': origin, 'need_responses': responses,
+        'unaddressed_needs': sorted(needs - seen),
+        'outcome_status': 'BUILDER_PROPOSED_NOT_EVALUATED',
+        'market_validation': 'NOT_ESTABLISHED',
+    }
+
+
 def _publish(out, files):
     """Stage everything before exclusively reserving and filling a new directory."""
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -86,11 +163,24 @@ def _publish(out, files):
             raise
 
 
-def start(workbench, run_id, idea, out):
+def start(workbench, run_id, idea, out, *, opportunity_run=None, workflow=None):
     out = preflight(workbench.home, out)['out']
     report, digest = corpus.get_with_digest(workbench, run_id)
-    quest = _quest(report, digest, run_id, idea)
+    if (opportunity_run is None) != (workflow is None) or (opportunity_run is not None and idea is not None):
+        raise Blocked('QUEST_OPPORTUNITY_ARGUMENTS')
     recipe = {'schema': 1, 'audience': '', 'purpose': '', 'acceptance': [], 'components': []}
+    if opportunity_run is None:
+        quest = _quest(report, digest, run_id, idea)
+    else:
+        quest = _opportunity_quest(workbench, report, digest, run_id, opportunity_run, workflow)
+        origin = quest['opportunity']
+        recipe.update({
+            'audience': origin['workflow']['actor'], 'purpose': origin['workflow']['purpose'],
+            'opportunity': {key: origin[key] for key in ('run_id', 'workflow_id')},
+            'need_responses': [],
+        })
+    if len(canonical(quest)) > 4_000_000:
+        raise Blocked('QUEST_INPUT_SIZE')
     _publish(out, {'quest.json': canonical(quest), 'recipe.template.json': canonical(recipe)})
     return {'status': 'QUEST_STARTED', 'quest': str(out / 'quest.json'), 'mode': quest['mode'],
             'leads': len(quest['leads']), 'coverage_status': report['status']}
@@ -100,7 +190,7 @@ def _recipe(raw):
     recipe = loads(raw)
     required = {'schema', 'audience', 'purpose', 'acceptance', 'components'}
     if (not isinstance(recipe, dict) or required - recipe.keys()
-            or recipe.keys() - (required | {'support_modules'})
+            or recipe.keys() - (required | {'support_modules', 'opportunity', 'need_responses'})
             or type(recipe['schema']) is not int or recipe['schema'] != 1):
         raise Blocked('QUEST_RECIPE')
     text(recipe['audience'])
@@ -206,11 +296,24 @@ def build(workbench, quest_file, recipe_file, entry_file, source_root, out, chec
             or (quest['idea'] is not None and not isinstance(quest['idea'], str))):
         raise Blocked('QUEST_BINDING')
     report, digest = corpus.get_with_digest(workbench, quest['run_id'])
-    expected = _quest(report, digest, quest['run_id'], quest['idea'])
+    if quest.get('mode') == 'opportunity':
+        origin = quest.get('opportunity')
+        if (not isinstance(origin, dict) or not isinstance(origin.get('run_id'), str)
+                or not isinstance(origin.get('workflow_id'), str)):
+            raise Blocked('QUEST_BINDING')
+        expected = _opportunity_quest(workbench, report, digest, quest['run_id'],
+                                      origin['run_id'], origin['workflow_id'])
+    else:
+        expected = _quest(report, digest, quest['run_id'], quest['idea'])
     if canonical(quest) != canonical(expected):
         raise Blocked('QUEST_BINDING')
     raw_recipe = read(recipe_file, 256_000)
     recipe = _recipe(raw_recipe)
+    purpose = None
+    if quest['mode'] == 'opportunity':
+        purpose = _opportunity_responses(quest, recipe)
+    elif 'opportunity' in recipe or 'need_responses' in recipe:
+        raise Blocked('QUEST_OPPORTUNITY_RECIPE')
     entry = read(entry_file, DEFAULTS['max_source_bytes'])
     try:
         compile(entry, '__main__.py', 'exec', dont_inherit=True)
@@ -225,6 +328,8 @@ def build(workbench, quest_file, recipe_file, entry_file, source_root, out, chec
                'modules': [{'path': path, 'sha256': sha(data), 'bytes': len(data)} for path, data in modules.items()],
                'definitions': definitions, 'product_sha256': sha(artifact), 'product_bytes': len(artifact),
                'source_code_executed': False, 'runtime_validation': 'NOT_RUN', 'acceptance_file': None}
+    if purpose is not None:
+        receipt['purpose_evidence'] = purpose
     if check_file is not None:
         check = read(check_file, 4_000_000)
         receipt['acceptance_file'] = {'sha256': sha(check), 'bytes': len(check)}

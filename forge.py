@@ -191,6 +191,8 @@ def main():
     mode=a.add_mutually_exclusive_group(required=True)
     mode.add_argument('--idea',help='short product idea, up to 200 characters')
     mode.add_argument('--scout',action='store_true',help='sample available definitions across modules')
+    mode.add_argument('--opportunity-run',help='saved opportunity run containing the product workflow')
+    a.add_argument('--workflow',help='workflow ID from the selected opportunity run')
     a.add_argument('--out',type=Path,required=True)
     a=s.add_parser('quest-build',help='assemble reviewed modules and a builder-written entry point into a Python zipapp')
     a.add_argument('--quest',type=Path,required=True)
@@ -232,7 +234,8 @@ def main():
         current=Workbench(home)
         if not current.home.is_dir():raise Blocked('QUEST_EXISTING_CORPUS_REQUIRED')
         if a.command=='quest-start':
-            value=creation_quest.start(current,a.run_id,a.idea,a.out)
+            value=creation_quest.start(current,a.run_id,a.idea,a.out,
+                                       opportunity_run=a.opportunity_run,workflow=a.workflow)
         else:
             value=creation_quest.build(current,a.quest,a.recipe,a.entry,a.source_root,a.out,a.check_file)
         emit(value);return 0
