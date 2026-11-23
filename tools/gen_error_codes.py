@@ -14,6 +14,20 @@ SKIP={'third_party','dependencies','history','evidence','review','__pycache__'}
 
 # Hand-written meanings for the codes a newcomer is most likely to hit.
 KNOWN={
+ 'QUEST_ACCEPTANCE':'List one to 32 observable acceptance checks in the recipe.',
+ 'QUEST_BINDING':'Use the original quest.json from this corpus run and workspace.',
+ 'QUEST_COMPONENT_SELECTION':'Choose one or more distinct definition IDs from this run. Use at most 32 selections including support paths.',
+ 'QUEST_ENTRY_SYNTAX':'Supply an entry point that the current Python interpreter can compile.',
+ 'QUEST_EXISTING_CORPUS_REQUIRED':'Index your source with corpus-run and use its workspace for the quest.',
+ 'QUEST_IMPORT_PATH_COLLISION':'Choose a package layout with an unambiguous Python import path for each selected module.',
+ 'QUEST_PRODUCT_SIZE':'Select modules whose combined source fits the product byte limit.',
+ 'QUEST_RECIPE':'Fill the schema-1 recipe template with the audience, purpose, acceptance checks and components.',
+ 'QUEST_SELECT_PACKAGE_INITIALIZER':'Add the indexed package initializer to support_modules so the assembled package preserves its import behavior.',
+ 'QUEST_SEPARATE_SOURCE_ROOT':'Keep the source directory, workspace and product directory separate.',
+ 'QUEST_SUPPORT_MODULES':'Use distinct indexed Python module paths for support_modules.',
+ 'QUEST_UNINDEXED_MODULE':'Index the missing support module and begin a new quest with that corpus.',
+ 'QUEST_UNKNOWN_DEFINITION':'Select definition IDs from this exact corpus run.',
+ 'QUEST_WHOLE_MODULE_REQUIRED':'Choose a regular .py module from a source folder for inclusion in the archive.',
  'INVALID_SYMBOL_NAME':'Use a literal Python function or method name, for example process_item or Worker.process_item.',
  'REVIEWED_TRIAL_SEPARATE_OUTPUT':'Keep the checkout, workspace, prepared packet and result packet separate in both containment directions. Keep outputs away from original indexed source roots. Reject an unsafe layout before initialization or execution.',
  'REVIEWED_TRIAL_OUTPUT_EXISTS':'Use a new prepared/result directory. Existing evidence is never overwritten and a completed run is never silently retried.',

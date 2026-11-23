@@ -42,3 +42,28 @@ An unusual idea, low keyword similarity, or a high model score proves none of th
 A concept dossier should retain the problem and episode, sources and counterevidence, competing options, a purpose/mechanism explanation, exact code leads, unknown prerequisites, a bounded experiment, actual results when available, reasons not to build, and a next decision. The current build supplies the reviewed-record, code-lead and plan parts; it does not automatically execute interviews or generated product experiments.
 
 The user can use judgment to redirect the investigation without having to write technical system prompts. Store the reason for accepting or rejecting a proposal so subsequent investigations can reuse the decision context. Preference must never overwrite contradictory evidence.
+
+## Run a creation quest
+
+An agent or a person can drive a quest. Give the builder a job and permission to finish it. For an idea-first quest, try “Build a tool that tells me which files changed after I handed off a folder.” For a files-first quest, try “Look through these modules. Find two that solve a concrete job together. Pick a user, show the input and useful output, and build the smallest version I can try.” Either quest can end with a recorded reason to stop if the pieces do not support a useful product.
+
+Start in the Forge checkout, with a physical work directory outside the checkout. Set `SOURCE` to the folder of Python modules you have permission to reuse. Pick one starting mode for each run.
+
+```sh
+python3 forge.py --home "$WORK/home" corpus-run --source-root "$SOURCE" --run-id parts
+python3 forge.py --home "$WORK/home" quest-start --run-id parts --out "$WORK/idea" \
+  --idea "find changed files by comparing content fingerprints"
+python3 forge.py --home "$WORK/home" quest-start --run-id parts --out "$WORK/scout" --scout
+```
+
+Read the leads in `quest.json`. Idea mode searches the index. Scout mode samples up to 40 definitions across eligible modules. A builder can search the same corpus for additional definitions and inspect the original modules, imports and dependencies. Choose a user, a purpose, and at least one observable acceptance check. Copy `recipe.template.json` to `recipe.json`, fill those fields, and put the selected definition IDs in `components`. Each selected definition brings its **whole module** into the product. Use the optional `support_modules` list for indexed dependencies and package initializers. This builder supports ordinary Python files from a directory.
+
+Write `main.py` to connect the selected code. Keep a separate acceptance check with expected results, including what should happen on bad input. The example below uses the files-first quest.
+
+```sh
+python3 forge.py --home "$WORK/home" quest-build --quest "$WORK/scout/quest.json" \
+  --recipe "$WORK/recipe.json" --entry "$WORK/main.py" --source-root "$SOURCE" \
+  --check-file "$WORK/check.py" --out "$WORK/product"
+```
+
+The new output directory contains `product.pyz` and `receipt.json`. The receipt lists the exact module, entry-point and archive hashes. If supplied, `--check-file` records the acceptance file's hash. Run a reviewed product separately using `python3 "$WORK/product/product.pyz"` with its expected arguments. Execute the acceptance checks against those same archive bytes and keep the results. A build receipt alone establishes what was packaged.

@@ -14,6 +14,10 @@ What Forge does **not** do:
 - Its parser limits are consistency controls, not a sandbox for hostile code.
 - Its output is a set of leads for human review. It is not proof of a vulnerability, a quality score, or permission to reuse code. A missing match does not prove a capability is absent.
 
+## Driving a creation quest
+
+When the user asks you to make something from a folder, start with a saved corpus. Use `quest-start --idea` for a stated job or `quest-start --scout` to explore the available modules. Inspect the candidates, select a user and an observable outcome, write the adapter, and run `quest-build`. When authorized to run the reviewed prototype, test the exact packaged archive and report what worked or failed. The [creation quest playbook](docs/INVENTOR_PLAYBOOK.md#run-a-creation-quest) gives the commands and recipe fields.
+
 ## Requirements
 
 - Python 3.11 or newer with SQLite FTS5 (included in standard CPython builds). Check with `python3 --version`.

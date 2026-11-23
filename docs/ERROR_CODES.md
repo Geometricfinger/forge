@@ -286,7 +286,7 @@ If `reason` is a Python exception name instead of a code:
 | <a id="opportunity_schema"></a>`OPPORTUNITY_SCHEMA` | Wrong or missing `schema` version. | forge_core/opportunities.py |
 | <a id="opportunity_source_kind"></a>`OPPORTUNITY_SOURCE_KIND` | Source `kind` must be one of firsthand, product_listing, product_docs, issue, research, source_review, synthetic, and `public` a boolean. | forge_core/opportunities.py |
 | <a id="origin_denied"></a>`ORIGIN_DENIED` | Input or stored state failed a validation check (see the raising module). | forge_core/server.py |
-| <a id="output_conflict"></a>`OUTPUT_CONFLICT` | The output path already exists. Forge never overwrites; pick a new path. | forge.py, forge_core/common.py |
+| <a id="output_conflict"></a>`OUTPUT_CONFLICT` | The output path already exists. Forge never overwrites; pick a new path. | forge.py, forge_core/common.py, forge_core/creation_quest.py |
 | <a id="packet_authority"></a>`PACKET_AUTHORITY` | The record claims an authority Forge never grants (e.g. release approval, execution). | forge_core/contract_trial.py, forge_core/reuse.py |
 | <a id="packet_binding"></a>`PACKET_BINDING` | A stored record is bound to different inputs/code than the current ones (integrity check). | forge_core/reuse.py |
 | <a id="packet_changed"></a>`PACKET_CHANGED` | A pinned input changed after it was recorded (hash/identity no longer matches). Start a new run/home, or restore the original file. | forge_core/reuse.py |
@@ -313,6 +313,20 @@ If `reason` is a Python exception name instead of a code:
 | <a id="query_count"></a>`QUERY_COUNT` | Wrong number of items for this field. | forge_core/policy.py |
 | <a id="query_terms_required"></a>`QUERY_TERMS_REQUIRED` | A required input or precondition is missing. | forge_core/corpus.py, forge_core/retrieval.py |
 | <a id="query_term_limit"></a>`QUERY_TERM_LIMIT` | A safety size/count limit was exceeded. | forge_core/retrieval.py |
+| <a id="quest_acceptance"></a>`QUEST_ACCEPTANCE` | List one to 32 observable acceptance checks in the recipe. | forge_core/creation_quest.py |
+| <a id="quest_binding"></a>`QUEST_BINDING` | Use the original quest.json from this corpus run and workspace. | forge_core/creation_quest.py |
+| <a id="quest_component_selection"></a>`QUEST_COMPONENT_SELECTION` | Choose one or more distinct definition IDs from this run. Use at most 32 selections including support paths. | forge_core/creation_quest.py |
+| <a id="quest_entry_syntax"></a>`QUEST_ENTRY_SYNTAX` | Supply an entry point that the current Python interpreter can compile. | forge_core/creation_quest.py |
+| <a id="quest_existing_corpus_required"></a>`QUEST_EXISTING_CORPUS_REQUIRED` | Index your source with corpus-run and use its workspace for the quest. | forge.py |
+| <a id="quest_import_path_collision"></a>`QUEST_IMPORT_PATH_COLLISION` | Choose a package layout with an unambiguous Python import path for each selected module. | forge_core/creation_quest.py |
+| <a id="quest_product_size"></a>`QUEST_PRODUCT_SIZE` | Select modules whose combined source fits the product byte limit. | forge_core/creation_quest.py |
+| <a id="quest_recipe"></a>`QUEST_RECIPE` | Fill the schema-1 recipe template with the audience, purpose, acceptance checks and components. | forge_core/creation_quest.py |
+| <a id="quest_select_package_initializer"></a>`QUEST_SELECT_PACKAGE_INITIALIZER` | Add the indexed package initializer to support_modules so the assembled package preserves its import behavior. | forge_core/creation_quest.py |
+| <a id="quest_separate_source_root"></a>`QUEST_SEPARATE_SOURCE_ROOT` | Keep the source directory, workspace and product directory separate. | forge_core/creation_quest.py |
+| <a id="quest_support_modules"></a>`QUEST_SUPPORT_MODULES` | Use distinct indexed Python module paths for support_modules. | forge_core/creation_quest.py |
+| <a id="quest_unindexed_module"></a>`QUEST_UNINDEXED_MODULE` | Index the missing support module and begin a new quest with that corpus. | forge_core/creation_quest.py |
+| <a id="quest_unknown_definition"></a>`QUEST_UNKNOWN_DEFINITION` | Select definition IDs from this exact corpus run. | forge_core/creation_quest.py |
+| <a id="quest_whole_module_required"></a>`QUEST_WHOLE_MODULE_REQUIRED` | Choose a regular .py module from a source folder for inclusion in the archive. | forge_core/creation_quest.py |
 | <a id="receipt_authority"></a>`RECEIPT_AUTHORITY` | The record claims an authority Forge never grants (e.g. release approval, execution). | forge_core/interop.py |
 | <a id="receipt_digest"></a>`RECEIPT_DIGEST` | A receipt does not match its packet. | forge_core/interop.py |
 | <a id="receipt_fields"></a>`RECEIPT_FIELDS` | A JSON object has missing or unexpected fields. | forge_core/interop.py |
@@ -441,7 +455,7 @@ If `reason` is a Python exception name instead of a code:
 | <a id="source_changed_during_read"></a>`SOURCE_CHANGED_DURING_READ` | A pinned input changed after it was recorded (hash/identity no longer matches). Start a new run/home, or restore the original file. | forge_core/corpus.py, forge_core/source_inspection.py |
 | <a id="source_encoding"></a>`SOURCE_ENCODING` | A source record or file failed validation. | forge_core/discovery.py |
 | <a id="source_envelope_changed"></a>`SOURCE_ENVELOPE_CHANGED` | A pinned input changed after it was recorded (hash/identity no longer matches). Start a new run/home, or restore the original file. | forge_core/contract_trial.py |
-| <a id="source_escape"></a>`SOURCE_ESCAPE` | A manifest `path` points outside `--source-root`. | forge_core/corpus.py, forge_core/source_inspection.py |
+| <a id="source_escape"></a>`SOURCE_ESCAPE` | A manifest `path` points outside `--source-root`. | forge_core/corpus.py, forge_core/creation_quest.py, forge_core/source_inspection.py |
 | <a id="source_hash_mismatch"></a>`SOURCE_HASH_MISMATCH` | Recorded hash, size or identity does not match what was read. | forge_core/discovery.py |
 | <a id="source_limit"></a>`SOURCE_LIMIT` | A safety size/count limit was exceeded. | forge_core/engine.py |
 | <a id="source_lineage"></a>`SOURCE_LINEAGE` | A source record or file failed validation. | forge_core/opportunities.py |
@@ -451,7 +465,7 @@ If `reason` is a Python exception name instead of a code:
 | <a id="source_roundtrip_mismatch"></a>`SOURCE_ROUNDTRIP_MISMATCH` | Recorded hash, size or identity does not match what was read. | forge_core/corpus.py |
 | <a id="source_text_bounds"></a>`SOURCE_TEXT_BOUNDS` | Notes/source text is empty, contains NUL bytes, or is over 24,000 characters. | forge_core/opportunities.py |
 | <a id="source_uri"></a>`SOURCE_URI` | Source `uri` must be https, fixture, conversation or file-ref, with a host and no credentials. | forge_core/opportunities.py |
-| <a id="source_version_mismatch"></a>`SOURCE_VERSION_MISMATCH` | A file in `--source-root` does not match the `size`/`sha256` recorded in the manifest. Re-create the manifest (`forge.py make-manifest DIR --out FILE`) or restore the file. | forge_core/corpus.py, forge_core/source_inspection.py, loop/forge_cycle.py, tools/run_self_recovery_trial.py |
+| <a id="source_version_mismatch"></a>`SOURCE_VERSION_MISMATCH` | A file in `--source-root` does not match the `size`/`sha256` recorded in the manifest. Re-create the manifest (`forge.py make-manifest DIR --out FILE`) or restore the file. | forge_core/corpus.py, forge_core/creation_quest.py, forge_core/source_inspection.py, loop/forge_cycle.py, tools/run_self_recovery_trial.py |
 | <a id="stale_claim"></a>`STALE_CLAIM` | The packet token no longer matches (it expired or was re-issued). Run `packet` again. | forge_core/store.py |
 | <a id="stale_evidence_head"></a>`STALE_EVIDENCE_HEAD` | An evidence citation is invalid, stale or points at the wrong target. | forge_core/reuse.py, tools/reproduce_fault_controls.py |
 | <a id="stale_source_review_required"></a>`STALE_SOURCE_REVIEW_REQUIRED` | A required input or precondition is missing. | forge_core/reuse.py |
