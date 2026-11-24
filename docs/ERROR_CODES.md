@@ -319,6 +319,14 @@ If `reason` is a Python exception name instead of a code:
 | <a id="quest_entry_syntax"></a>`QUEST_ENTRY_SYNTAX` | Supply an entry point that the current Python interpreter can compile. | forge_core/creation_quest.py |
 | <a id="quest_existing_corpus_required"></a>`QUEST_EXISTING_CORPUS_REQUIRED` | Index your source with corpus-run and use its workspace for the quest. | forge.py |
 | <a id="quest_import_path_collision"></a>`QUEST_IMPORT_PATH_COLLISION` | Choose a package layout with an unambiguous Python import path for each selected module. | forge_core/creation_quest.py |
+| <a id="quest_input_size"></a>`QUEST_INPUT_SIZE` | Narrow the observation bundle or workflow so the retained quest fits the input byte limit. | forge_core/creation_quest.py |
+| <a id="quest_need_components"></a>`QUEST_NEED_COMPONENTS` | Map each proposed outcome to selected definition IDs that are source leads for that same workflow need. | forge_core/creation_quest.py |
+| <a id="quest_need_responses"></a>`QUEST_NEED_RESPONSES` | Describe at least one distinct workflow need and the observable outcome your prototype should provide. | forge_core/creation_quest.py |
+| <a id="quest_opportunity_arguments"></a>`QUEST_OPPORTUNITY_ARGUMENTS` | Supply opportunity-run and workflow together as the quest starting mode. | forge_core/creation_quest.py |
+| <a id="quest_opportunity_binding"></a>`QUEST_OPPORTUNITY_BINDING` | The saved opportunity differs from recomputation with its original annotations and corpus records. | forge_core/creation_quest.py |
+| <a id="quest_opportunity_corpus"></a>`QUEST_OPPORTUNITY_CORPUS` | Use a corpus recorded in the saved opportunity. Its indexed bytes must still match. | forge_core/creation_quest.py |
+| <a id="quest_opportunity_recipe"></a>`QUEST_OPPORTUNITY_RECIPE` | Keep the original opportunity and workflow reference in the recipe for this quest. | forge_core/creation_quest.py |
+| <a id="quest_opportunity_workflow"></a>`QUEST_OPPORTUNITY_WORKFLOW` | Choose a workflow ID from the saved opportunity bundle. | forge_core/creation_quest.py |
 | <a id="quest_product_size"></a>`QUEST_PRODUCT_SIZE` | Select modules whose combined source fits the product byte limit. | forge_core/creation_quest.py |
 | <a id="quest_recipe"></a>`QUEST_RECIPE` | Fill the schema-1 recipe template with the audience, purpose, acceptance checks and components. | forge_core/creation_quest.py |
 | <a id="quest_select_package_initializer"></a>`QUEST_SELECT_PACKAGE_INITIALIZER` | Add the indexed package initializer to support_modules so the assembled package preserves its import behavior. | forge_core/creation_quest.py |

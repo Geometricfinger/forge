@@ -16,7 +16,7 @@ What Forge does **not** do:
 
 ## Driving a creation quest
 
-When the user asks you to make something from a folder, start with a saved corpus. Use `quest-start --idea` for a stated job or `quest-start --scout` to explore the available modules. Inspect the candidates, select a user and an observable outcome, write the adapter, and run `quest-build`. When authorized to run the reviewed prototype, test the exact packaged archive and report what worked or failed. The [creation quest playbook](docs/INVENTOR_PLAYBOOK.md#run-a-creation-quest) gives the commands and recipe fields.
+When the user asks you to make something from a folder, start with a saved corpus. Use `quest-start --idea` for a stated job or `quest-start --scout` to explore the available modules. Use `quest-start --opportunity-run ID --workflow ID` to carry an observed complete workflow from Opportunity Lab into creation. Map proposed outcomes to the selected needs and source leads in the recipe. Inspect the candidates, select a user and an observable outcome, write the adapter, and run `quest-build`. When authorized to run the reviewed prototype, test the exact packaged archive and report what worked or failed. The [creation quest playbook](docs/INVENTOR_PLAYBOOK.md#run-a-creation-quest) gives the commands and recipe fields.
 
 ## Requirements
 

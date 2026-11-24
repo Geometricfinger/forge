@@ -67,3 +67,65 @@ python3 forge.py --home "$WORK/home" quest-build --quest "$WORK/scout/quest.json
 ```
 
 The new output directory contains `product.pyz` and `receipt.json`. The receipt lists the exact module, entry-point and archive hashes. If supplied, `--check-file` records the acceptance file's hash. Run a reviewed product separately using `python3 "$WORK/product/product.pyz"` with its expected arguments. Execute the acceptance checks against those same archive bytes and keep the results. A build receipt alone establishes what was packaged.
+
+## Start from a complete observed workflow
+
+Use the observation to choose a useful outcome before selecting a small set of
+functions. Record who does the work, what decision they need to make, the inputs
+they receive, where they lose time or information, and what their current tools
+already accomplish. Include the source and the date of each observation.
+An agent supplies this interpretation through the existing Opportunity Lab bundle.
+
+Search for mechanisms at several levels. A module may provide interval arithmetic.
+A package may provide a scheduling service. A complete workflow might connect a
+failure diary, service calendar, work history and review queue so a coordinator
+can decide what to inspect. Check each conversion between representations and
+preserve the original evidence behind the resulting recommendation.
+
+A saved opportunity can now start a creation quest for an entire workflow.
+
+```sh
+python3 forge.py --home "$WORK/home" opportunity-run --bundle "$WORK/observations.json" \
+  --corpus-run parts
+python3 forge.py --home "$WORK/home" quest-start --run-id parts \
+  --opportunity-run OPPORTUNITY_RUN_ID --workflow WORKFLOW_ID --out "$WORK/quest"
+```
+
+The quest retains the workflow's purpose, operator, needs, sources, competing
+options, conflicting evidence, missing prerequisites and matching code leads.
+The recipe template carries the opportunity identity and intended purpose.
+For each need the prototype will address, add a response with its useful outcome
+and the selected definition IDs. For example, using identifiers from that quest,
+
+```json
+{
+  "need": "operation_intervals",
+  "outcome": "Show the remaining scheduled periods after applying confirmed interruptions.",
+  "components": ["definition_ID_FROM_THIS_NEED"]
+}
+```
+
+Place those objects in the recipe's `need_responses` list, alongside the ordinary
+recipe fields and the supplied `opportunity` reference. Each response must use
+source leads for that need and components selected in the recipe. Build with the
+same `quest-build` command. Its receipt retains the original purpose and sources,
+the proposed outcomes and every remaining need. The separate acceptance run must
+show which proposed outcomes the packaged product actually achieves.
+
+For arbitrary repositories and ZIPs, begin with `corpus-run`, inspect promising
+source definitions and their dependency context, and preserve the archive's exact
+identity. Direct assembly currently uses ordinary Python files. A reviewed
+extraction into a separate source folder can supply those files. Retain a mapping
+from each original archive member to the extracted bytes, include its license and
+index the extracted pool before building. Documents and non-Python components need
+their own review. Archive discovery alone does not assemble a complete application.
+
+## Learn from the result
+
+Keep the candidate and the reason for its next decision. A failed experiment can
+expose a missing input, an incompatible mechanism or an existing product that
+already solves the job. A successful experiment establishes behavior for the
+observed task. Adoption needs a practitioner using the result in their own work.
+Feed those observations into a revised bundle and use `opportunity-compare` to
+show what changed. Investigation priorities should follow the unresolved question
+that could most affect the decision to build.

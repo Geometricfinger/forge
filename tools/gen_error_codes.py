@@ -14,6 +14,14 @@ SKIP={'third_party','dependencies','history','evidence','review','__pycache__'}
 
 # Hand-written meanings for the codes a newcomer is most likely to hit.
 KNOWN={
+ 'QUEST_OPPORTUNITY_CORPUS':'Use a corpus recorded in the saved opportunity. Its indexed bytes must still match.',
+ 'QUEST_OPPORTUNITY_BINDING':'The saved opportunity differs from recomputation with its original annotations and corpus records.',
+ 'QUEST_OPPORTUNITY_WORKFLOW':'Choose a workflow ID from the saved opportunity bundle.',
+ 'QUEST_OPPORTUNITY_RECIPE':'Keep the original opportunity and workflow reference in the recipe for this quest.',
+ 'QUEST_NEED_RESPONSES':'Describe at least one distinct workflow need and the observable outcome your prototype should provide.',
+ 'QUEST_NEED_COMPONENTS':'Map each proposed outcome to selected definition IDs that are source leads for that same workflow need.',
+ 'QUEST_OPPORTUNITY_ARGUMENTS':'Supply opportunity-run and workflow together as the quest starting mode.',
+ 'QUEST_INPUT_SIZE':'Narrow the observation bundle or workflow so the retained quest fits the input byte limit.',
  'QUEST_ACCEPTANCE':'List one to 32 observable acceptance checks in the recipe.',
  'QUEST_BINDING':'Use the original quest.json from this corpus run and workspace.',
  'QUEST_COMPONENT_SELECTION':'Choose one or more distinct definition IDs from this run. Use at most 32 selections including support paths.',
