@@ -8,9 +8,10 @@ import sys
 import tempfile
 import unittest
 
-from forge_core.common import canonical, sha
+from forge_core.common import Blocked, canonical, sha
 from forge_core.engine import ROOT
 from forge_core.opportunity_examples import cite, source
+from forge_core.quest_assessment import validate_plan
 
 
 class QuestAssessmentTests(unittest.TestCase):
@@ -427,18 +428,22 @@ class QuestAssessmentTests(unittest.TestCase):
                     [reference | {'extra': True}], [{'path': reference['path']}]]
         for inputs in variants:
             self.recipe['evaluation_plan']['cases'][0]['inputs'] = inputs
-            self.recipe_file.write_bytes(canonical(self.recipe))
-            code, result = self.cli('quest-build', '--quest', self.quest, '--recipe', self.recipe_file,
-                                    '--entry', self.entry, '--source-root', self.pool, '--out', self.build_dir)
-            self.assertEqual((code, result['reason']), (2, 'QUEST_EVALUATION_INPUTS'))
-            self.assertFalse(self.build_dir.exists())
+            with self.subTest(inputs=inputs), self.assertRaisesRegex(Blocked, '^QUEST_EVALUATION_INPUTS$'):
+                validate_plan(self.recipe)
         for path in ('../outside', '/absolute', 'inputs//value.txt', 'inputs/./value.txt',
                      'inputs\\value.txt', 'inputs:value.txt'):
             self.recipe['evaluation_plan']['cases'][0]['inputs'] = [reference | {'path': path}]
+            with self.subTest(path=path), self.assertRaisesRegex(Blocked, '^REPOSITORY_PATH$'):
+                validate_plan(self.recipe)
+        # Exercise structural variants directly, then verify the public builder
+        # uses that validator and publishes no product on representative errors.
+        for inputs, reason in (([], 'QUEST_EVALUATION_INPUTS'),
+                               ([reference | {'path': '../outside'}], 'REPOSITORY_PATH')):
+            self.recipe['evaluation_plan']['cases'][0]['inputs'] = inputs
             self.recipe_file.write_bytes(canonical(self.recipe))
             code, result = self.cli('quest-build', '--quest', self.quest, '--recipe', self.recipe_file,
                                     '--entry', self.entry, '--source-root', self.pool, '--out', self.build_dir)
-            self.assertEqual((code, result['reason']), (2, 'REPOSITORY_PATH'))
+            self.assertEqual((code, result['reason']), (2, reason))
             self.assertFalse(self.build_dir.exists())
 
     def test_result_or_rehashed_receipt_cannot_replace_fixed_inputs(self):
