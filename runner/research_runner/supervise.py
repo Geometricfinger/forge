@@ -131,7 +131,7 @@ class Supervisor:
         result['results'] = []
         result['references'] = []
         for r in full.get('results', [])[:5]:
-            keep = {k: r[k] for k in ('id', 'source_id', 'source_sha256', 'origin', 'capture', 'name', 'path', 'start_line', 'end_line', 'record_kind', 'channels', 'analysis_view') if k in r}
+            keep = {k: r[k] for k in ('id', 'source_id', 'source_sha256', 'origin', 'capture', 'name', 'path', 'start_line', 'end_line', 'record_kind', 'channels', 'analysis_view', 'class_documentation_match') if k in r}
             keep['excerpt'] = r.get('snippet', '')[:192]
             keep['excerpt_truncated'] = len(r.get('snippet', '')) > 192
             result['results'].append(keep)

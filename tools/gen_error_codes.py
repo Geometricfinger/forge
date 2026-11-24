@@ -14,6 +14,8 @@ SKIP={'third_party','dependencies','history','evidence','review','__pycache__'}
 
 # Hand-written meanings for the codes a newcomer is most likely to hit.
 KNOWN={
+ 'BRIDGE_CLASS_DOCUMENTATION':'Reinspect the source with the current engine to retain bounded class-description terms and source positions.',
+ 'BRIDGE_CLASS_DOCUMENTATION_BINDING':'Retained class-description terms or attribution differ from the checksum-verified corpus. Preserve the original evidence and create a fresh inspection.',
  'DOC_LINK_DOCUMENT_ENCODING':'Save the Markdown document as UTF-8.',
  'DOC_LINK_DOCUMENT_SIZE':'Supply a document of at most 256,000 bytes.',
  'DOC_LINK_REFERENCE_LIMIT':'Split the document into sections containing at most 256 dotted reference occurrences per input.',

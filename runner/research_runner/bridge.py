@@ -4,12 +4,38 @@ The adapter never edits its engine. Full source stays in the local workspace;
 compact handoff records are bounded excerpts with source identities.
 """
 from __future__ import annotations
-import io, json, sqlite3, stat, sys, zipfile
+import io, json, re, sqlite3, stat, sys, zipfile
 from itertools import zip_longest
 from pathlib import Path
 from .core import *
 
 MAX_LEXICAL_CHARS=25_000_000
+
+
+def _class_documentation(owner):
+    """Bounded declaration metadata; never manufacture a retained docstring."""
+    if owner is None:return None
+    if not isinstance(owner,dict):raise Blocked('BRIDGE_CLASS_DOCUMENTATION')
+    if 'documentation_terms' not in owner:return None
+    frequencies=owner['documentation_terms']
+    if not isinstance(frequencies,dict) or len(frequencies)>256:
+        raise Blocked('BRIDGE_CLASS_DOCUMENTATION')
+    if any(not isinstance(token,str) or not re.fullmatch('[a-z][a-z0-9]{0,63}',token)
+           or type(count) is not int or not 1<=count<=100 for token,count in frequencies.items()):
+        raise Blocked('BRIDGE_CLASS_DOCUMENTATION')
+    if not frequencies:return None
+    start,end=owner.get('documentation_start_line'),owner.get('documentation_end_line')
+    if not isinstance(owner.get('name'),str) or type(start) is not int or type(end) is not int or not 1<=start<=end:
+        raise Blocked('BRIDGE_CLASS_DOCUMENTATION')
+    return {'class_name':owner['name'],'terms':dict(frequencies),
+            'start_line':start,'end_line':end,'line_basis':'SEGMENT_LOCAL',
+            'evidence':'ENCLOSING_CLASS_DOCUMENTATION_NOT_BEHAVIOR_PROOF'}
+
+
+def _class_terms(record):
+    context=record.get('class_documentation_context') or {}
+    # A missing older declaration does not become reconstructed documentation.
+    return sorted(context.get('terms',{}))
 
 def verify_base(root):
     """Verify the FORGE engine this runner drives (by default, the enclosing repository).
@@ -197,14 +223,17 @@ def inspect_source(s,root,work,forge_root):
                 continue
             if window.get('status')!='AVAILABLE' or len(selected)>corpus.DEFAULTS['max_source_bytes']:
                 raise Blocked('BRIDGE_DEFINITION_WINDOW_BINDING')
-            body=selected.decode('utf-8');retained_chars+=len(body)
+            context=_class_documentation(d.get('structure',{}).get('class_context'))
+            if context!=_class_documentation(mr.get('class_context')):
+                raise Blocked('BRIDGE_CLASS_DOCUMENTATION_BINDING')
+            body=selected.decode('utf-8');retained_chars+=len(body)+len(' '.join((context or {}).get('terms',{})))
             if retained_chars>MAX_LEXICAL_CHARS:raise Blocked('LEXICAL_EXPANSION_LIMIT')
-            owner=d.get('structure',{}).get('class_context') or {};classdoc=owner.get('documentation','')
             records.append({'id':mr['definition_id'],'record_kind':'function','source_id':s['id'],'source_sha256':mr['source_sha256'],
              'container_sha256':s['sha256'],'origin':s['origin'],'capture':s['capture'],'family':s['family'],
              'name':d['name'],'path':seg['path'],'start_line':start,'end_line':end,'kind':'implementation',
              'text':body,'text_complete':True,'text_sha256':sha(selected),'source_window':window,
-             'class_documentation':classdoc,'test_path':seg['test_path'],'cell_index':seg.get('cell_index'),
+             'class_documentation':'','class_documentation_context':context,
+             'test_path':seg['test_path'],'cell_index':seg.get('cell_index'),
              'runtime_validation':'NOT_RUN','observed_apis':mr.get('observed_apis',[]),**view_fields})
     if seen_scopes!={occurrence_id(row) for row in scope_rows}:raise Blocked('BRIDGE_SOURCE_SCOPE_BINDING')
     # Added module context must not evict the previously supported functions.
@@ -230,7 +259,7 @@ class Lexical:
         self.db.execute('CREATE VIRTUAL TABLE docs USING fts5(symbol,classdoc,source)')
         self.wordsets=[]
         for i,r in enumerate(records,1):
-            fs=[' '.join(terms(r['name'])),' '.join(terms(r.get('class_documentation',''))),' '.join(terms(r['text']))]
+            fs=[' '.join(terms(r['name'])),' '.join(_class_terms(r)),' '.join(terms(r['text']))]
             self.wordsets.append(set(' '.join(fs).split()));self.db.execute('INSERT INTO docs(rowid,symbol,classdoc,source) VALUES(?,?,?,?)',(i,*fs))
     def close(self):self.db.close()
     def search(self,query,limit=10):
@@ -247,8 +276,13 @@ class Lexical:
 
 
 def project(r,query,matched=None):
-    qt=set(terms(query));matched=matched if matched is not None else sorted(qt & set(terms(r['name']+' '+r.get('class_documentation','')+' '+r['text'])))
+    qt=set(terms(query));matched=matched if matched is not None else sorted(qt & (set(terms(r['name']+' '+r['text'])) | set(_class_terms(r))))
     view={'analysis_view':r['analysis_view']} if 'analysis_view' in r else {}
+    context=r.get('class_documentation_context')
+    class_matches=sorted(qt & set((context or {}).get('terms',{})))
+    if class_matches:
+        view['class_documentation_match']={k:context[k] for k in ('class_name','start_line','end_line','line_basis','evidence')}
+        view['class_documentation_match']['matched_terms']=class_matches
     return {k:r[k] for k in ('id','source_id','source_sha256','origin','capture','family','name','path','start_line','end_line','kind','observed_apis','runtime_validation')}|view|{'record_kind':r.get('record_kind','function'),'matched_terms':matched,'term_count':len(qt),'snippet':r['text'][:1600]}
 
 
@@ -257,7 +291,7 @@ def investigate(q,source_results,forge_root):
     records=[r for source in selected for r in source.get('records',[]) if not r.get('test_path')]
     refs=[r for source in selected for r in source.get('references',[])]
     gaps=[{'source':r['source']['id'],'state':r['status'],'gaps':r.get('gaps',[])} for r in selected if r['status'] in ('BLOCKED','UNSUPPORTED_BINARY','CODE_INDEXED_WITH_GAPS','TEXT_ONLY_UNSUPPORTED_LANGUAGE')]
-    lexical=[];forgerows=[];reference=[];observations={};directions={}
+    lexical=[];forgerows=[];reference=[];observations={};directions={};class_contexts={}
     evidence = {}
     if q['intent'] in ('code','mixed'):
         corpus=validate_questions([q],forge_root)
@@ -283,17 +317,28 @@ def investigate(q,source_results,forge_root):
                                 original.get('record_kind','function')!=metadata['record_kind'] or
                                 canonical(original.get('analysis_view'))!=canonical(metadata.get('analysis_view'))):
                             raise Blocked('BRIDGE_EVIDENCE_BINDING')
+                        class_contexts[rid]=_class_documentation(metadata.get('class_context'))
                         observations[rid]=metadata.get('observed_apis',[])
                         if requested and metadata.get('implementation_kind') != 'DECLARATION_OR_STUB':
                             support = directional.match(requested, metadata.get('conversion_endpoints', ()))
                             if support:
                                 directions[rid] = support
+                # Validate every retained copy before either channel can use
+                # its declaration terms, including copies with missing IDs.
+                if any(original.get('class_documentation_context') is not None and
+                       canonical(original['class_documentation_context'])!=canonical(class_contexts.get(original['id']))
+                       for original in source.get('records',[]) if not original.get('test_path')):
+                    raise Blocked('BRIDGE_CLASS_DOCUMENTATION_BINDING')
                 found=corpus.search(report,q['query'],limit=10,distinct=False,filters=query_filters(q))
                 for r in found['results']:
                     original=by_id.get(occurrence_id(r))
                     if original is not None:
                         source_rows.append(project(dict(original,observed_apis=observations[original['id']]),q['query']))
             if source_rows:lists.append(source_rows)
+        if any(original.get('class_documentation_context') is not None and
+               canonical(original['class_documentation_context'])!=canonical(class_contexts.get(original['id']))
+               for original in records):
+            raise Blocked('BRIDGE_CLASS_DOCUMENTATION_BINDING')
         # Both channels apply observed-API eligibility before their top-k cut.
         eligible=[dict(r,observed_apis=observations.get(r['id'],[])) for r in records
                   if not required_api or required_api in observations.get(r['id'],[])]
