@@ -14,6 +14,19 @@ SKIP={'third_party','dependencies','history','evidence','review','__pycache__'}
 
 # Hand-written meanings for the codes a newcomer is most likely to hit.
 KNOWN={
+ 'DOC_LINK_DOCUMENT_ENCODING':'Save the Markdown document as UTF-8.',
+ 'DOC_LINK_DOCUMENT_SIZE':'Supply a document of at most 256,000 bytes.',
+ 'DOC_LINK_REFERENCE_LIMIT':'Split the document into sections containing at most 256 dotted reference occurrences per input.',
+ 'OPPORTUNITY_COMPARE_AMBIGUOUS_ID':'Two records share an identifier in one run. Give the needs distinct IDs and rerun the reviewed brief before comparing it.',
+ 'QUEST_EVALUATION_PLAN':'Define distinct cases with an acceptance-list index, selected promised need IDs and a bounded expected JSON value.',
+ 'QUEST_ASSESS_RECEIPT':'Use the original schema-1 quest build receipt, retaining its packaging status and source identities.',
+ 'QUEST_ASSESS_RECIPE_BINDING':'The supplied recipe bytes or duplicated purpose, plan and need declarations differ from the build receipt.',
+ 'QUEST_ASSESS_ARTIFACT':'A recorded observation artifact is missing, exceeds its budget, or differs from its declared path, byte count or digest.',
+ 'QUEST_ASSESS_SEPARATE_OUTPUT':'Choose a new assessment directory outside the input artifact root and separate from every input file.',
+ 'QUEST_ASSESS_PRODUCT_BINDING':'Supply the exact product archive recorded by the original build receipt.',
+ 'QUEST_ASSESS_CHECKER_BINDING':'Supply the original checker when the build bound one; its exact bytes must match. Do not add an unbound checker.',
+ 'QUEST_ASSESS_RESULTS':'Use distinct known case IDs with OBSERVED, NOT_RUN or ERROR states and the appropriate artifact reference. Claimed pass flags are not accepted.',
+ 'QUEST_ASSESS_RESULT_BINDING':'The results refer to a different receipt, product, evaluation plan or checker. Preserve the original evidence and use matching records.',
  'QUEST_OPPORTUNITY_CORPUS':'Use a corpus recorded in the saved opportunity. Its indexed bytes must still match.',
  'QUEST_OPPORTUNITY_BINDING':'The saved opportunity differs from recomputation with its original annotations and corpus records.',
  'QUEST_OPPORTUNITY_WORKFLOW':'Choose a workflow ID from the saved opportunity bundle.',

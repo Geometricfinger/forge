@@ -1,0 +1,271 @@
+"""Compare recorded product outputs with the exact build's data-only checks.
+
+Artifacts and their bindings are verified; execution and the truth of externally
+supplied observations are not authenticated. No supplied program is executed.
+"""
+import re
+
+from .common import Blocked, canonical, loads, path_in_repo, read, safe_path, sha
+from .reviewed_evaluator import preflight
+
+
+MAX_CASES = 128
+MAX_ARTIFACT_BYTES = 1_000_000
+MAX_TOTAL_ARTIFACT_BYTES = 8_000_000
+PASS = 'REPORTED_PASS'
+FAIL = 'REPORTED_FAIL'
+INCOMPLETE = 'REPORTED_INCOMPLETE'
+
+
+def _fields(value, fields, code):
+    if not isinstance(value, dict) or set(value) != set(fields):
+        raise Blocked(code)
+
+
+def _digest(value, code):
+    if not isinstance(value, str) or not re.fullmatch('[0-9a-f]{64}', value):
+        raise Blocked(code)
+
+
+def _identifier(value):
+    return isinstance(value, str) and re.fullmatch('[A-Za-z0-9][A-Za-z0-9_-]{0,79}', value)
+
+
+def _same(left, right):
+    # Python equality equates True with 1. The contract requires JSON types too.
+    return canonical(left) == canonical(right)
+
+
+def _responses(recipe):
+    responses = recipe.get('need_responses', [])
+    if not isinstance(responses, list) or len(responses) > 80:
+        raise Blocked('QUEST_NEED_RESPONSES')
+    needs = []
+    for response in responses:
+        _fields(response, {'need', 'outcome', 'components'}, 'QUEST_NEED_RESPONSES')
+        if not _identifier(response['need']) or response['need'] in needs:
+            raise Blocked('QUEST_NEED_RESPONSES')
+        needs.append(response['need'])
+    return needs
+
+
+def validate_plan(recipe):
+    """A plan may omit mappings, but assessment must keep those gaps explicit."""
+    if 'evaluation_plan' not in recipe:
+        return None
+    plan = recipe['evaluation_plan']
+    _fields(plan, {'schema', 'cases'}, 'QUEST_EVALUATION_PLAN')
+    if (type(plan['schema']) is not int or plan['schema'] != 1
+            or not isinstance(plan['cases'], list) or not 1 <= len(plan['cases']) <= MAX_CASES):
+        raise Blocked('QUEST_EVALUATION_PLAN')
+    addressed = set(_responses(recipe))
+    seen = set()
+    for case in plan['cases']:
+        _fields(case, {'id', 'acceptance', 'needs', 'expected'}, 'QUEST_EVALUATION_PLAN')
+        if (not _identifier(case['id']) or case['id'] in seen
+                or type(case['acceptance']) is not int
+                or not 0 <= case['acceptance'] < len(recipe['acceptance'])
+                or not isinstance(case['needs'], list) or len(case['needs']) > 80
+                or not all(isinstance(need, str) for need in case['needs'])
+                or len(set(case['needs'])) != len(case['needs'])
+                or not set(case['needs']) <= addressed):
+            raise Blocked('QUEST_EVALUATION_PLAN')
+        if len(canonical(case['expected'])) > 64_000:
+            raise Blocked('QUEST_EVALUATION_PLAN')
+        seen.add(case['id'])
+    return plan
+
+
+def _receipt(raw, recipe_raw, recipe):
+    receipt = loads(raw)
+    required = {'schema', 'status', 'mode', 'run_id', 'corpus_sha256', 'quest_sha256',
+                'recipe_sha256', 'audience', 'purpose', 'acceptance', 'entry_sha256',
+                'modules', 'definitions', 'product_sha256', 'product_bytes',
+                'source_code_executed', 'runtime_validation', 'acceptance_file'}
+    if (not isinstance(receipt, dict) or required - receipt.keys()
+            or receipt.keys() - (required | {'purpose_evidence', 'evaluation_plan'})
+            or type(receipt['schema']) is not int or receipt['schema'] != 1
+            or receipt['status'] != 'PROTOTYPE_PACKAGED'
+            or receipt['mode'] not in ('idea', 'scout', 'opportunity')
+            or not isinstance(receipt['run_id'], str)
+            or not re.fullmatch('[A-Za-z0-9_-]{1,80}', receipt['run_id'])
+            or receipt['source_code_executed'] is not False or receipt['runtime_validation'] != 'NOT_RUN'):
+        raise Blocked('QUEST_ASSESS_RECEIPT')
+    for field in ('corpus_sha256', 'quest_sha256', 'recipe_sha256', 'entry_sha256', 'product_sha256'):
+        _digest(receipt[field], 'QUEST_ASSESS_RECEIPT')
+    if receipt['recipe_sha256'] != sha(recipe_raw):
+        raise Blocked('QUEST_ASSESS_RECIPE_BINDING')
+    for field in ('audience', 'purpose', 'acceptance'):
+        if not _same(receipt[field], recipe[field]):
+            raise Blocked('QUEST_ASSESS_RECIPE_BINDING')
+    plan = validate_plan(recipe)
+    if (('evaluation_plan' in receipt) != ('evaluation_plan' in recipe)
+            or not _same(receipt.get('evaluation_plan'), plan)):
+        raise Blocked('QUEST_ASSESS_RECIPE_BINDING')
+    if type(receipt['product_bytes']) is not int or not 0 <= receipt['product_bytes'] <= 20_000_000:
+        raise Blocked('QUEST_ASSESS_RECEIPT')
+    if not isinstance(receipt['definitions'], list):
+        raise Blocked('QUEST_ASSESS_RECEIPT')
+    ids = [row.get('definition_id') for row in receipt['definitions'] if isinstance(row, dict)]
+    if (len(ids) != len(receipt['definitions']) or not all(isinstance(i, str) for i in ids)
+            or sorted(ids) != sorted(recipe['components'])):
+        raise Blocked('QUEST_ASSESS_RECIPE_BINDING')
+    addressed = _responses(recipe)
+    if receipt['mode'] == 'opportunity':
+        purpose = receipt.get('purpose_evidence')
+        _fields(purpose, {'opportunity', 'need_responses', 'unaddressed_needs',
+                          'outcome_status', 'market_validation'}, 'QUEST_ASSESS_RECEIPT')
+        origin = purpose['opportunity']
+        if (not isinstance(origin, dict) or not isinstance(origin.get('hypotheses'), list)
+                or not isinstance(origin.get('workflow_id'), str) or not isinstance(origin.get('run_id'), str)
+                or not _same(purpose['need_responses'], recipe.get('need_responses'))
+                or not _same(recipe.get('opportunity'), {k: origin[k] for k in ('run_id', 'workflow_id')})
+                or purpose['outcome_status'] != 'BUILDER_PROPOSED_NOT_EVALUATED'
+                or purpose['market_validation'] != 'NOT_ESTABLISHED'):
+            raise Blocked('QUEST_ASSESS_RECIPE_BINDING')
+        needs = []
+        for hypothesis in origin['hypotheses']:
+            if (not isinstance(hypothesis, dict) or not isinstance(hypothesis.get('need'), dict)
+                    or not _identifier(hypothesis['need'].get('id'))):
+                raise Blocked('QUEST_ASSESS_RECEIPT')
+            needs.append(hypothesis['need']['id'])
+        if (len(set(needs)) != len(needs) or not set(addressed) <= set(needs)
+                or not _same(purpose['unaddressed_needs'], sorted(set(needs) - set(addressed)))):
+            raise Blocked('QUEST_ASSESS_RECIPE_BINDING')
+    elif 'purpose_evidence' in receipt or 'need_responses' in recipe or 'opportunity' in recipe:
+        raise Blocked('QUEST_ASSESS_RECIPE_BINDING')
+    return receipt, plan, addressed
+
+
+def _artifact(record, root, files):
+    _fields(record, {'path', 'bytes', 'sha256'}, 'QUEST_ASSESS_ARTIFACT')
+    path = path_in_repo(record['path'])
+    _digest(record['sha256'], 'QUEST_ASSESS_ARTIFACT')
+    if type(record['bytes']) is not int or not 0 <= record['bytes'] <= MAX_ARTIFACT_BYTES:
+        raise Blocked('QUEST_ASSESS_ARTIFACT')
+    full = safe_path(root / path)
+    if not full.is_relative_to(root) or not full.is_file():
+        raise Blocked('QUEST_ASSESS_ARTIFACT')
+    data = read(full, MAX_ARTIFACT_BYTES)
+    if len(data) != record['bytes'] or sha(data) != record['sha256']:
+        raise Blocked('QUEST_ASSESS_ARTIFACT')
+    name = 'artifacts/' + path
+    if name in files and files[name] != data:
+        raise Blocked('QUEST_ASSESS_ARTIFACT')
+    files[name] = data
+    if sum(len(value) for key, value in files.items() if key.startswith('artifacts/')) > MAX_TOTAL_ARTIFACT_BYTES:
+        raise Blocked('QUEST_ASSESS_ARTIFACT')
+    return data
+
+
+def _aggregate(statuses):
+    if FAIL in statuses:
+        return FAIL
+    if not statuses or INCOMPLETE in statuses:
+        return INCOMPLETE
+    return PASS
+
+
+def assess(workbench, receipt_file, recipe_file, product_file, results_file, artifact_root, out, check_file=None):
+    """Publish a separate assessment, preserving all supplied result artifact bytes."""
+    from .creation_quest import _publish, _recipe
+    workbench.guard()
+    out = preflight(workbench.home, out)['out']
+    root = safe_path(artifact_root)
+    inputs = [safe_path(path) for path in (receipt_file, recipe_file, product_file, results_file)]
+    if check_file is not None:
+        inputs.append(safe_path(check_file))
+    if (not root.is_dir() or out.is_relative_to(root) or root.is_relative_to(out)
+            or any(out == path or out.is_relative_to(path) or path.is_relative_to(out) for path in inputs)):
+        raise Blocked('QUEST_ASSESS_SEPARATE_OUTPUT')
+    receipt_raw = read(receipt_file, 8_000_000)
+    recipe_raw = read(recipe_file, 256_000)
+    recipe = _recipe(recipe_raw)
+    receipt, plan, addressed = _receipt(receipt_raw, recipe_raw, recipe)
+    product = read(product_file, 20_000_000)
+    if len(product) != receipt['product_bytes'] or sha(product) != receipt['product_sha256']:
+        raise Blocked('QUEST_ASSESS_PRODUCT_BINDING')
+    files = {'build-receipt.json': receipt_raw, 'recipe.json': recipe_raw}
+    checker = receipt['acceptance_file']
+    checker_digest = None
+    if checker is None:
+        if check_file is not None:
+            raise Blocked('QUEST_ASSESS_CHECKER_BINDING')
+    else:
+        _fields(checker, {'sha256', 'bytes'}, 'QUEST_ASSESS_CHECKER_BINDING')
+        _digest(checker['sha256'], 'QUEST_ASSESS_CHECKER_BINDING')
+        if (check_file is None or type(checker['bytes']) is not int
+                or not 0 <= checker['bytes'] <= 4_000_000):
+            raise Blocked('QUEST_ASSESS_CHECKER_BINDING')
+        check = read(check_file, 4_000_000)
+        if len(check) != checker['bytes'] or sha(check) != checker['sha256']:
+            raise Blocked('QUEST_ASSESS_CHECKER_BINDING')
+        checker_digest = checker['sha256']
+        files['check-file'] = check
+    results_raw = read(results_file, 1_000_000)
+    results = loads(results_raw)
+    _fields(results, {'schema', 'receipt_sha256', 'product_sha256', 'evaluation_plan_sha256',
+                      'checker_sha256', 'cases'}, 'QUEST_ASSESS_RESULTS')
+    bindings = {'receipt_sha256': sha(receipt_raw), 'product_sha256': receipt['product_sha256'],
+                'evaluation_plan_sha256': sha(canonical(plan)) if plan is not None else None,
+                'checker_sha256': checker_digest}
+    if (type(results['schema']) is not int or results['schema'] != 1
+            or any(not _same(results[key], value) for key, value in bindings.items())):
+        raise Blocked('QUEST_ASSESS_RESULT_BINDING')
+    if not isinstance(results['cases'], list) or len(results['cases']) > MAX_CASES:
+        raise Blocked('QUEST_ASSESS_RESULTS')
+    cases = plan['cases'] if plan is not None else []
+    known = {case['id'] for case in cases}
+    recorded = {}
+    for row in results['cases']:
+        _fields(row, {'id', 'status', 'artifact'}, 'QUEST_ASSESS_RESULTS')
+        if (not isinstance(row['id'], str) or row['id'] not in known or row['id'] in recorded
+                or row['status'] not in ('OBSERVED', 'NOT_RUN', 'ERROR')):
+            raise Blocked('QUEST_ASSESS_RESULTS')
+        if ((row['status'] == 'OBSERVED' and row['artifact'] is None)
+                or (row['status'] == 'NOT_RUN' and row['artifact'] is not None)):
+            raise Blocked('QUEST_ASSESS_RESULTS')
+        artifact = _artifact(row['artifact'], root, files) if row['artifact'] is not None else None
+        recorded[row['id']] = (row, loads(artifact) if row['status'] == 'OBSERVED' else None)
+    case_results = []
+    for case in cases:
+        item = {**case, 'status': INCOMPLETE, 'reported_state': 'MISSING', 'artifact': None}
+        if case['id'] in recorded:
+            row, observed = recorded[case['id']]
+            item.update({'reported_state': row['status'], 'artifact': row['artifact']})
+            if row['status'] == 'OBSERVED':
+                item.update({'observed': observed, 'status': PASS if _same(observed, case['expected']) else FAIL})
+        case_results.append(item)
+    acceptance_results = []
+    for index, description in enumerate(recipe['acceptance']):
+        selected = [case for case in case_results if case['acceptance'] == index]
+        acceptance_results.append({'acceptance': index, 'description': description,
+                                   'cases': [case['id'] for case in selected],
+                                   'status': _aggregate([case['status'] for case in selected])})
+    need_results = []
+    for need in addressed:
+        selected = [case for case in case_results if need in case['needs']]
+        need_results.append({'need': need, 'cases': [case['id'] for case in selected],
+                             'status': _aggregate([case['status'] for case in selected])})
+    status = _aggregate([row['status'] for row in case_results + acceptance_results + need_results])
+    unaddressed = receipt.get('purpose_evidence', {}).get('unaddressed_needs', [])
+    decision = ('REVISE' if status == FAIL else 'COMPLETE_EVALUATION' if status == INCOMPLETE else
+                'REVIEW_UNADDRESSED_NEEDS' if unaddressed else 'READY_FOR_FIELD_TRIAL')
+    assessment = {
+        'schema': 1, 'status': 'QUEST_ASSESSED', 'outcome_status': status, 'next_step': decision,
+        **bindings, 'recipe_sha256': sha(recipe_raw), 'results_sha256': sha(results_raw),
+        'product_bytes': len(product), 'audience': receipt['audience'], 'purpose': receipt['purpose'],
+        'evaluation_plan': plan, 'case_results': case_results, 'acceptance_results': acceptance_results,
+        'need_results': need_results, 'unaddressed_needs': unaddressed,
+        'source_code_executed': False, 'runtime_execution_authenticated': False,
+        'market_validation': 'NOT_ESTABLISHED', 'release_approved': False,
+        'scope': 'Exact supplied bytes and JSON comparisons verified. Observations, execution, '
+                 'translation and chronological preregistration are externally supplied, not authenticated.',
+    }
+    if 'purpose_evidence' in receipt:
+        assessment['purpose_evidence'] = receipt['purpose_evidence']
+    files['recorded-results.json'] = results_raw
+    files['assessment.json'] = canonical(assessment)
+    _publish(out, files)
+    return {'status': assessment['status'], 'outcome_status': status, 'next_step': decision,
+            'assessment': str(out / 'assessment.json'), 'assessment_sha256': sha(files['assessment.json'])}

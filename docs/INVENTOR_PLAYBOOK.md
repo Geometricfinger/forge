@@ -68,6 +68,13 @@ python3 forge.py --home "$WORK/home" quest-build --quest "$WORK/scout/quest.json
 
 The new output directory contains `product.pyz` and `receipt.json`. The receipt lists the exact module, entry-point and archive hashes. If supplied, `--check-file` records the acceptance file's hash. Run a reviewed product separately using `python3 "$WORK/product/product.pyz"` with its expected arguments. Execute the acceptance checks against those same archive bytes and keep the results. A build receipt alone establishes what was packaged.
 
+To connect those results to the intended outcomes, add an `evaluation_plan` to
+the recipe before building. Give each case a fixed expected JSON observation,
+an acceptance-check index and any promised needs it exercises. After the external
+run, use `quest-assess` with the original recipe, receipt, archive, checker and
+recorded artifacts. It retains passing, failing, incomplete and unaddressed work
+in a separate assessment. See [Assess a creation quest](QUEST_ASSESSMENT.md).
+
 ## Start from a complete observed workflow
 
 Use the observation to choose a useful outcome before selecting a small set of
@@ -122,7 +129,9 @@ their own review. Archive discovery alone does not assemble a complete applicati
 
 ## Learn from the result
 
-Keep the candidate and the reason for its next decision. A failed experiment can
+Keep the candidate and the reason for its next decision. Quest assessment carries
+the original purpose evidence into a per-need outcome record and proposes the
+next evaluation decision. A failed experiment can
 expose a missing input, an incompatible mechanism or an existing product that
 already solves the job. A successful experiment establishes behavior for the
 observed task. Adoption needs a practitioner using the result in their own work.
