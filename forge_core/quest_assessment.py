@@ -5,7 +5,7 @@ supplied observations are not authenticated. No supplied program is executed.
 """
 import re
 
-from .common import Blocked, canonical, loads, path_in_repo, read, safe_path, sha
+from .common import Blocked, canonical, loads, path_in_repo, read, safe_path, sha, text
 from .reviewed_evaluator import preflight
 
 
@@ -103,6 +103,83 @@ def validate_plan(recipe):
     return plan
 
 
+def _source_files(receipt, recipe):
+    """Check internal provenance consistency; original-source custody is not authenticated."""
+    expected = 'module_files' in recipe or 'assets' in recipe
+    if ('source_files' in receipt) != expected:
+        raise Blocked('QUEST_ASSESS_SOURCE_FILES')
+    if not expected:
+        return
+    from .quest_sources import ASSET_LIMIT, _path, chain, check_paths
+    records = receipt['source_files']
+    if not isinstance(records, list) or not 1 <= len(records) <= 32 + ASSET_LIMIT:
+        raise Blocked('QUEST_ASSESS_SOURCE_FILES')
+    modules, assets = {}, {}
+    try:
+        for row in records:
+            _fields(row, {'path', 'sha256', 'bytes', 'role', 'origin'}, 'QUEST_ASSESS_SOURCE_FILES')
+            _path(row['path']); _digest(row['sha256'], 'QUEST_ASSESS_SOURCE_FILES')
+            if (type(row['bytes']) is not int or not 0 <= row['bytes'] <= 8_000_000
+                    or row['role'] not in ('module', 'resource', 'notice')):
+                raise Blocked('QUEST_ASSESS_SOURCE_FILES')
+            origin = row['origin']
+            fields = {'file_id', 'container_path', 'container_sha256', 'member_chain'}
+            if row['role'] == 'module':
+                fields |= {'source_id', 'analysis_source_sha256'}
+            _fields(origin, fields, 'QUEST_ASSESS_SOURCE_FILES')
+            text(origin['file_id'], 200); _path(origin['container_path'])
+            _digest(origin['container_sha256'], 'QUEST_ASSESS_SOURCE_FILES'); chain(origin['member_chain'])
+            raw_digest = (origin['member_chain'][-1]['sha256'] if origin['member_chain']
+                          else origin['container_sha256'])
+            if row['sha256'] != raw_digest:
+                raise Blocked('QUEST_ASSESS_SOURCE_FILES')
+            if row['role'] == 'module':
+                source_id = origin['source_id']
+                if (not isinstance(source_id, str) or not re.fullmatch('source_[0-9a-f]{64}', source_id)
+                        or source_id in modules):
+                    raise Blocked('QUEST_ASSESS_SOURCE_FILES')
+                _digest(origin['analysis_source_sha256'], 'QUEST_ASSESS_SOURCE_FILES')
+                modules[source_id] = row
+            else:
+                assets[row['path']] = row
+        check_paths([row['path'] for row in records] + ['__main__.py'],
+                    [row['path'] for row in modules.values()] + ['__main__.py'])
+    except Blocked as exc:
+        raise Blocked('QUEST_ASSESS_SOURCE_FILES') from exc
+    if len(modules) > 32 or sum(row['bytes'] for row in records) > 8_000_000:
+        raise Blocked('QUEST_ASSESS_SOURCE_FILES')
+    for mapping in recipe.get('module_files', []):
+        if modules.get(mapping['source_id'], {}).get('path') != mapping['path']:
+            raise Blocked('QUEST_ASSESS_SOURCE_FILES')
+    if not set(recipe.get('support_modules', [])) <= {row['path'] for row in modules.values()}:
+        raise Blocked('QUEST_ASSESS_SOURCE_FILES')
+    described = sorted([{key: row[key] for key in ('path', 'sha256', 'bytes')}
+                        for row in modules.values()], key=lambda row: row['path'])
+    if not _same(receipt['modules'], described) or len(assets) != len(recipe.get('assets', [])):
+        raise Blocked('QUEST_ASSESS_SOURCE_FILES')
+    for reference in recipe.get('assets', []):
+        row = assets.get(reference['path'])
+        if row is None or not _same(reference, {**{key: row[key] for key in ('path', 'sha256', 'bytes', 'role')},
+                                               **{key: row['origin'][key] for key in ('file_id', 'member_chain')}}):
+            raise Blocked('QUEST_ASSESS_SOURCE_FILES')
+    for definition in receipt['definitions']:
+        source_id = definition.get('source_id')
+        if not isinstance(source_id, str):
+            raise Blocked('QUEST_ASSESS_SOURCE_FILES')
+        module = modules.get(source_id)
+        if module is None or definition.get('product_path') != module['path']:
+            raise Blocked('QUEST_ASSESS_SOURCE_FILES')
+        origin = module['origin']
+        original_path = (origin['member_chain'][-1]['path'] if origin['member_chain'] else origin['container_path'])
+        if definition.get('path') != original_path:
+            raise Blocked('QUEST_ASSESS_SOURCE_FILES')
+    selected = {row['source_id'] for row in recipe.get('module_files', [])}
+    selected.update(row['source_id'] for row in receipt['definitions'])
+    for source_id, row in modules.items():
+        if source_id not in selected and row['path'] not in recipe.get('support_modules', []):
+            raise Blocked('QUEST_ASSESS_SOURCE_FILES')
+
+
 def _receipt(raw, recipe_raw, recipe):
     receipt = loads(raw)
     required = {'schema', 'status', 'mode', 'run_id', 'corpus_sha256', 'quest_sha256',
@@ -110,7 +187,7 @@ def _receipt(raw, recipe_raw, recipe):
                 'modules', 'definitions', 'product_sha256', 'product_bytes',
                 'source_code_executed', 'runtime_validation', 'acceptance_file'}
     if (not isinstance(receipt, dict) or required - receipt.keys()
-            or receipt.keys() - (required | {'purpose_evidence', 'evaluation_plan'})
+            or receipt.keys() - (required | {'purpose_evidence', 'evaluation_plan', 'source_files'})
             or type(receipt['schema']) is not int or receipt['schema'] != 1
             or receipt['status'] != 'PROTOTYPE_PACKAGED'
             or receipt['mode'] not in ('idea', 'scout', 'opportunity')
@@ -137,6 +214,7 @@ def _receipt(raw, recipe_raw, recipe):
     if (len(ids) != len(receipt['definitions']) or not all(isinstance(i, str) for i in ids)
             or sorted(ids) != sorted(recipe['components'])):
         raise Blocked('QUEST_ASSESS_RECIPE_BINDING')
+    _source_files(receipt, recipe)
     addressed = _responses(recipe)
     if receipt['mode'] == 'opportunity':
         purpose = receipt.get('purpose_evidence')

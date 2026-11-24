@@ -56,7 +56,7 @@ python3 forge.py --home "$WORK/home" quest-start --run-id parts --out "$WORK/ide
 python3 forge.py --home "$WORK/home" quest-start --run-id parts --out "$WORK/scout" --scout
 ```
 
-Read the leads in `quest.json`. Idea mode searches the index. Scout mode samples up to 40 definitions across eligible modules. A builder can search the same corpus for additional definitions and inspect the original modules, imports and dependencies. Choose a user, a purpose, and at least one observable acceptance check. Copy `recipe.template.json` to `recipe.json`, fill those fields, and put the selected definition IDs in `components`. Each selected definition brings its **whole module** into the product. Use the optional `support_modules` list for indexed dependencies and package initializers. This builder supports ordinary Python files from a directory.
+Read the leads in `quest.json`. Idea mode searches the index. Scout mode samples up to 40 definitions across eligible modules. A builder can search the same corpus for additional definitions and inspect the original modules, imports and dependencies. Choose a user, a purpose, and at least one observable acceptance check. Copy `recipe.template.json` to `recipe.json`, fill those fields, and put the selected definition IDs in `components`. Each selected definition brings its **whole module** into the product. Plain Python files keep their original import paths by default; `support_modules` selects indexed dependencies and package initializers at those paths. For archived modules, explicit path mappings, resources and notices, use the recipe fields below.
 
 Write `main.py` to connect the selected code. Keep a separate acceptance check with expected results, including what should happen on bad input. The example below uses the files-first quest.
 
@@ -67,6 +67,70 @@ python3 forge.py --home "$WORK/home" quest-build --quest "$WORK/scout/quest.json
 ```
 
 The new output directory contains `product.pyz` and `receipt.json`. The receipt lists the exact module, entry-point and archive hashes. If supplied, `--check-file` records the acceptance file's hash. Run a reviewed product separately using `python3 "$WORK/product/product.pyz"` with its expected arguments. Execute the acceptance checks against those same archive bytes and keep the results. A build receipt alone establishes what was packaged.
+
+### Assemble directly from an indexed ZIP
+
+Keep `--source-root` pointed at the original corpus files. Add `module_files` to
+map each selected archived module's `source_id` to its intended Python import
+path. A mapping also explicitly selects an indexed support module, including an
+initializer without any functions. Leads carry their source ID and member chain;
+the retained `corpus.json` lists every indexed module under `sources[].segments`.
+Use a complete `.py` module, not a notebook cell, stub or document code fence.
+
+This is a recipe fragment; replace the placeholders with actual retained IDs and
+the hashes and sizes of the original member bytes:
+
+```json
+{
+  "module_files": [
+    {"source_id": "<indexed module source_id>", "path": "package/reader.py"},
+    {"source_id": "<indexed initializer source_id>", "path": "package/__init__.py"}
+  ],
+  "assets": [
+    {
+      "file_id": "<corpus container file_id>",
+      "member_chain": [{"path": "project-1.0/package/data.json", "sha256": "<member SHA-256>"}],
+      "path": "package/data.json", "bytes": 24, "sha256": "<member SHA-256>", "role": "resource"
+    },
+    {
+      "file_id": "<corpus container file_id>",
+      "member_chain": [{"path": "project-1.0/LICENSE", "sha256": "<member SHA-256>"}],
+      "path": "licenses/package/LICENSE", "bytes": 1000, "sha256": "<member SHA-256>", "role": "notice"
+    }
+  ]
+}
+```
+
+For a nested ZIP, include each member from the outer archive to the final file,
+with the raw SHA-256 at each step. For an ordinary resource or notice file,
+include that file in the corpus manifest and use an empty `member_chain`.
+Automatic folder intake selects supported code/text formats; an extensionless
+license or JSON resource needs an explicit manifest entry. Resource and notice
+contents are opaque bytes and need not be analyzed as code.
+
+The existing `quest-build` command verifies the original container and selected
+members, then writes their unchanged bytes into the final archive. It creates no
+extraction directory and requires no second corpus scan. Raw module encodings,
+line endings, resources and selected notices are preserved. The optional
+`source_files` receipt records each packaged path, raw digest, original container
+and member chain; module origins separately label the normalized analysis hash.
+
+Select the original package initializers explicitly and map them to their
+corresponding destination packages. An unrelated initializer cannot substitute
+for the one belonging to a selected module. Output paths must be unambiguous:
+file/directory overlaps, case-folded duplicate paths and module/package collisions
+are refused. Python and native importable files cannot be supplied as opaque
+assets; Python modules must come through the indexed module selection.
+
+The product accepts at most 32 whole modules and 64 assets. Modules, assets and
+the entry point share an 8,000,000-byte payload budget. ZIP member reads retain the
+intake size, nesting, entry-count, compression-ratio and path restrictions.
+
+The builder still reviews reuse rights, chooses the needed notices and resources,
+writes the adapter and supplies dependencies. Retaining a notice is not license
+clearance. Mapping a package does not establish dependency closure or repair its
+imports. Code requiring native extensions or filesystem-only resources needs a
+separate execution and packaging approach. Test the exact completed archive.
 
 To connect those results to the intended outcomes, add an `evaluation_plan` to
 the recipe before building. Give each case a fixed expected JSON observation,
@@ -121,11 +185,10 @@ show which proposed outcomes the packaged product actually achieves.
 
 For arbitrary repositories and ZIPs, begin with `corpus-run`, inspect promising
 source definitions and their dependency context, and preserve the archive's exact
-identity. Direct assembly currently uses ordinary Python files. A reviewed
-extraction into a separate source folder can supply those files. Retain a mapping
-from each original archive member to the extracted bytes, include its license and
-index the extracted pool before building. Documents and non-Python components need
-their own review. Archive discovery alone does not assemble a complete application.
+identity. The explicit module and asset mappings above carry selected Python
+modules, resources and notices directly into the product. Documents and
+non-Python components need their own review. Archive discovery alone does not
+establish that all application dependencies have been selected.
 
 ## Learn from the result
 

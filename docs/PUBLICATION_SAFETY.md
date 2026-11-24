@@ -42,8 +42,14 @@ blocks the publication check rather than becoming an unscanned success.
 The gate admits UTF-8 and BOM-marked UTF-16 text, ZIP/gzip containers and SQLite
 data. Other opaque binary formats are refused. Limits include 32 MB per file,
 256 MB of selected input, 512 MB of cumulative scan data, four nested levels and
-four million JSON nodes. These are publication budgets, not a promise that every
-possible secret encoding is recognized.
+four million processed JSON nodes. An exact repeated JSON payload can reuse a
+completed, finding-free JSON check in the same document or JSON-lines mode.
+The cache holds only byte digests and parsing modes, with at most one entry per
+admitted payload. Novel or changed bytes still consume the unchanged node budget;
+malformed, incomplete or finding-bearing checks are never cached. Every occurrence
+still passes its filename, raw-text, container-depth, file-count and byte checks.
+The report exposes processed JSON values and reused checks separately. These are
+publication budgets, not a promise that every possible secret encoding is recognized.
 
 ## Failed tests and failed publication checks
 

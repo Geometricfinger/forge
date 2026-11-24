@@ -5,6 +5,7 @@ import hashlib
 import io
 import json
 from pathlib import Path
+import re
 import sqlite3
 import stat
 import tempfile
@@ -111,6 +112,106 @@ class PublicEvidenceTests(unittest.TestCase):
     def test_escaped_json_field_name_preserves_credential_context(self):
         key = ''.join('\\u%04x' % ord(c) for c in 'api_' + 'key')
         self.blocked({'result.json': ('{"' + key + '":"fixture-value-only-9472"}').encode()})
+
+    def test_repeated_clean_json_reuses_checks_and_preserves_staged_bytes(self):
+        body = b'{"items":[1,2,3],"label":"\\u0063lean"}\n'
+        result = self.prepare({'first.json': body, 'second.json': body})
+        self.assertEqual(result['status'], 'PUBLIC_EVIDENCE_PREPARED')
+        self.assertEqual(result['json_checks_reused'], 1)
+        self.assertGreater(result['json_values_processed'], 0)
+        self.assertEqual((self.out / 'first.json').read_bytes(), body)
+        self.assertEqual((self.out / 'second.json').read_bytes(), body)
+        self.assertEqual(gate.collect(self.source), gate.collect(self.out))
+
+    def test_novel_json_still_consumes_the_cumulative_node_budget(self):
+        scanner = gate.Scanner({})
+        with patch.object(gate, 'MAX_JSON_VALUES', 3):
+            scanner.scan('first', 'first.json', b'{"items":[1]}')
+            scanner.scan('same', 'same.json', b'{"items":[1]}')
+            self.assertEqual(scanner.report()['json_values_processed'], 3)
+            self.assertEqual(scanner.report()['json_checks_reused'], 1)
+            with self.assertRaisesRegex(gate.PublicationError, 'JSON_SCAN_LIMIT'):
+                scanner.scan('changed', 'changed.json', b'{"items":[2]}')
+        self.assertEqual(gate.MAX_JSON_VALUES, 4_000_000)
+
+    def test_escaped_secret_after_cached_clean_json_is_checked(self):
+        scanner = gate.Scanner({'fixture_token': re.compile(re.escape(self.token))})
+        clean = b'{"value":"clean"}'
+        scanner.scan('first', 'first.json', clean)
+        scanner.scan('repeat', 'repeat.json', clean)
+        escaped = ''.join('\\u%04x' % ord(c) for c in self.token)
+        scanner.scan('changed', 'changed.json', ('{"value":"' + escaped + '"}').encode())
+        self.assertGreater(scanner.report()['findings'], 0)
+        self.assertEqual(scanner.report()['json_checks_reused'], 1)
+
+    def test_cached_json_does_not_cross_document_and_line_modes(self):
+        scanner = gate.Scanner({})
+        body = b'{\n  "value": "clean"\n}\n'
+        scanner.scan('document', 'document.json', body)
+        scanner.scan('same-mode', 'same-mode.har', body)
+        with self.assertRaisesRegex(gate.PublicationError, 'UNREADABLE_JSON_CONTENT'):
+            scanner.scan('lines', 'lines.jsonl', body)
+        self.assertEqual(scanner.report()['json_checks_reused'], 1)
+
+    def test_deep_and_partial_json_failures_are_never_reused(self):
+        for name, body, reason in (
+            ('deep.json', b'[' * 65 + b'0' + b']' * 65, 'JSON_SCAN_LIMIT'),
+            ('partial.jsonl', b'{"value":"clean"}\n{', 'UNREADABLE_JSON_CONTENT'),
+        ):
+            with self.subTest(name=name):
+                scanner = gate.Scanner({})
+                for attempt in range(2):
+                    with self.assertRaisesRegex(gate.PublicationError, reason):
+                        scanner.scan(str(attempt), name, body)
+                self.assertEqual(scanner.report()['json_checks_reused'], 0)
+
+    def test_finding_bearing_json_checks_are_never_reused(self):
+        scanner = gate.Scanner({'fixture_token': re.compile(re.escape(self.token))})
+        escaped = ''.join('\\u%04x' % ord(c) for c in self.token)
+        body = ('{"value":"' + escaped + '"}').encode()
+        scanner.scan('first', 'first.json', body)
+        first_findings = scanner.report()['findings']
+        self.assertGreater(first_findings, 0)
+        scanner.scan('second', 'second.json', body)
+        self.assertEqual(scanner.report()['findings'], 2 * first_findings)
+        self.assertEqual(scanner.report()['json_checks_reused'], 0)
+
+    def test_cached_json_still_checks_names_and_raw_source_context(self):
+        scanner = gate.Scanner({})
+        body = b'{"value":"clean"}'
+        scanner.scan('ordinary', 'ordinary.json', body)
+        scanner.scan('credential-name', '.env.fixture.json', body)
+        self.assertGreater(scanner.report()['rules']['credential_file_name'], 0)
+        self.assertEqual(scanner.report()['json_checks_reused'], 1)
+        body = json.dumps({'value': self.token}).encode()
+        allowance = {'path': 'approved.json', 'contains': self.token}
+        scanner = gate.Scanner({'fixture_token': re.compile(re.escape(self.token))},
+                               {digest(body): [('approved.json', allowance)]})
+        scanner.scan('approved', 'approved.json', body)
+        self.assertEqual(scanner.report()['findings'], 0)
+        scanner.scan('wrong-context', 'other.json', body)
+        self.assertGreater(scanner.report()['findings'], 0)
+        self.assertEqual(scanner.report()['json_checks_reused'], 1)
+
+    def test_cached_json_still_obeys_payload_and_archive_limits(self):
+        body = b'{"value":"clean"}'
+        for limit, value in (('MAX_SCAN_BYTES', 2 * len(body)), ('MAX_FILES', 2)):
+            with self.subTest(limit=limit), patch.object(gate, limit, value):
+                scanner = gate.Scanner({})
+                scanner.scan('first', 'first.json', body)
+                scanner.scan('second', 'second.json', body)
+                with self.assertRaisesRegex(gate.PublicationError, 'SCAN_LIMIT'):
+                    scanner.scan('third', 'third.json', body)
+        scanner = gate.Scanner({})
+        scanner.scan('plain', 'plain.json', body)
+        nested = body
+        name = 'nested.json'
+        for _ in range(gate.MAX_DEPTH + 1):
+            nested = gzip.compress(nested)
+            name += '.gz'
+        with self.assertRaisesRegex(gate.PublicationError, 'NESTING_LIMIT'):
+            scanner.scan('nested', name, nested)
+        self.assertEqual(scanner.report()['json_checks_reused'], 0)
 
     def test_notebook_and_har_json_strings_are_decoded(self):
         escaped = ''.join('\\u%04x' % ord(c) for c in self.token)

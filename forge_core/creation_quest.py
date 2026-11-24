@@ -26,8 +26,12 @@ def _plain_module(path):
 
 
 def _eligible(row):
-    return (not row['test_path'] and row['format'] == 'python_file' and not row['member_chain']
-            and row['container'] == row['path'] and _plain_module(row['path']))
+    return (not row['test_path'] and row['format'] == 'python_file'
+            and PurePosixPath(row['path']).suffix == '.py')
+
+
+def _source_lead(row):
+    return {key: row[key] for key in ('source_id', 'file_id', 'container', 'member_chain')}
 
 
 def _quest(report, digest, run_id, idea):
@@ -36,7 +40,7 @@ def _quest(report, digest, run_id, idea):
         groups = defaultdict(list)
         for row in corpus.rows(report):
             if _eligible(row):
-                groups[row['path']].append(row)
+                groups[(row['container'], row['path'], row['source_id'])].append(row)
         paths = sorted(groups)
         selected = []
         for i in range(max(map(len, groups.values()), default=0)):
@@ -55,6 +59,7 @@ def _quest(report, digest, run_id, idea):
     leads = []
     for row in selected:
         leads.append({'name': row['name'], 'definition_id': row['definition_id'], 'path': row['path'],
+                      **_source_lead(row),
                       'start_line': row['start_line'], 'end_line': row['end_line'],
                       'parameters': row['parameters'][:16], 'documented_terms': row['documented_terms'][:24],
                       'matched_terms': row.get('matched_query_terms', [])})
@@ -86,9 +91,10 @@ def _opportunity_quest(workbench, report, digest, run_id, opportunity_run, workf
         raise Blocked('QUEST_OPPORTUNITY_WORKFLOW')
     workflow = workflows[0]
     hypotheses = [h for h in saved['hypotheses'] if h['workflow'] == workflow_id]
-    eligible = {row['definition_id'] for row in corpus.rows(report) if _eligible(row)}
+    eligible = {row['definition_id']: row for row in corpus.rows(report) if _eligible(row)}
     leads = [
-        {**candidate, 'need': hypothesis['need']['id'], 'mechanism': group['mechanism']}
+        {**candidate, **_source_lead(eligible[candidate['definition_id']]),
+         'need': hypothesis['need']['id'], 'mechanism': group['mechanism']}
         for hypothesis in hypotheses for group in hypothesis['code_leads']
         for candidate in group['candidates']
         if candidate['corpus'] == run_id and candidate.get('definition_id') in eligible
@@ -190,7 +196,8 @@ def _recipe(raw):
     recipe = loads(raw)
     required = {'schema', 'audience', 'purpose', 'acceptance', 'components'}
     if (not isinstance(recipe, dict) or required - recipe.keys()
-            or recipe.keys() - (required | {'support_modules', 'opportunity', 'need_responses', 'evaluation_plan'})
+            or recipe.keys() - (required | {'support_modules', 'module_files', 'assets',
+                                           'opportunity', 'need_responses', 'evaluation_plan'})
             or type(recipe['schema']) is not int or recipe['schema'] != 1):
         raise Blocked('QUEST_RECIPE')
     text(recipe['audience'])
@@ -210,62 +217,78 @@ def _recipe(raw):
             or not all(isinstance(path, str) and _plain_module(path_in_repo(path)) for path in support)
             or len(support) != len(set(support))):
         raise Blocked('QUEST_SUPPORT_MODULES')
+    from .quest_sources import validate
+    validate(recipe, _plain_module, COMPONENT_LIMIT)
     return recipe
 
 
-def _module_bytes(record, root):
-    source = record['source']
-    corpus.manifest({'schema': 1, 'files': [source]})
-    path = source['path']
-    segments = record['segments']
-    if (not _plain_module(path) or len(segments) != 1 or segments[0]['format'] != 'python_file'
-            or segments[0]['member_chain'] or segments[0]['path'] != path):
-        raise Blocked('QUEST_WHOLE_MODULE_REQUIRED')
-    file = safe_path(root / path)
-    if not file.is_relative_to(root):
-        raise Blocked('SOURCE_ESCAPE')
-    data = read(file, DEFAULTS['max_container_bytes'])
-    if len(data) != source['size'] or sha(data) != source['sha256']:
-        raise Blocked('SOURCE_VERSION_MISMATCH')
-    return data
-
-
 def _modules(report, root, recipe):
+    from .quest_sources import Sources, check_paths
+    sources = Sources(report, root)
     selected = set(recipe['components'])
-    records = {item['source']['path']: item for item in report['sources']}
-    paths = set(recipe.get('support_modules', []))
+    mappings = {row['source_id']: row['path'] for row in recipe.get('module_files', [])}
+    plain = {segment['path']: source_id for source_id, (_, segment) in sources.segments.items()
+             if not segment['member_chain'] and segment['format'] == 'python_file'}
+    for path in recipe.get('support_modules', []):
+        if path not in plain:
+            raise Blocked('QUEST_UNINDEXED_MODULE')
+        source_id = plain[path]
+        if source_id in mappings and mappings[source_id] != path:
+            raise Blocked('QUEST_MODULE_FILES')
+        mappings[source_id] = path
     definitions = []
     for row in corpus.rows(report):
         if row['definition_id'] in selected:
             if not _eligible(row):
                 raise Blocked('QUEST_WHOLE_MODULE_REQUIRED')
             inspection = corpus.inspect_definition(report, row['definition_id'], root)
-            paths.add(row['path'])
+            source_id = row['source_id']
+            if source_id not in mappings:
+                if row['member_chain'] or not _plain_module(row['path']):
+                    raise Blocked('QUEST_MODULE_MAPPING_REQUIRED')
+                mappings[source_id] = row['path']
             definitions.append({'definition_id': row['definition_id'], 'name': row['name'],
-                                'path': row['path'], 'definition_sha256': inspection['source_window']['sha256']})
+                                'path': row['path'], 'source_id': source_id,
+                                'product_path': mappings[source_id],
+                                'definition_sha256': inspection['source_window']['sha256']})
     if len(definitions) != len(selected):
         raise Blocked('QUEST_UNKNOWN_DEFINITION')
-    if paths - records.keys():
-        raise Blocked('QUEST_UNINDEXED_MODULE')
-    modules = {}
+    if len(mappings) > COMPONENT_LIMIT:
+        raise Blocked('QUEST_COMPONENT_SELECTION')
+    paths = list(mappings.values()) + [row['path'] for row in recipe.get('assets', [])] + ['__main__.py']
+    check_paths(paths, [*mappings.values(), '__main__.py'])
+    modules, assets, source_files = {}, {}, []
     size = 0
-    for path in sorted(paths):
-        module = _module_bytes(records[path], root)
+    for source_id, path in sorted(mappings.items(), key=lambda item: item[1]):
+        module, origin = sources.module(source_id)
         size += len(module)
         if size > APP_BYTES:
             raise Blocked('QUEST_PRODUCT_SIZE')
         modules[path] = module
-        # Keep package semantics. Extra executable package initializers must be
-        # explicitly selected, including ones that have no function definitions.
-        for parent in PurePosixPath(path).parents:
-            if parent == PurePosixPath('.'):
+        source_files.append({'path': path, 'sha256': sha(module), 'bytes': len(module),
+                             'role': 'module', 'origin': origin})
+        # A mapped package root still needs its original initializer. Merely
+        # selecting an unrelated initializer at that destination is insufficient.
+        original = PurePosixPath(sources.segments[source_id][1]['path'])
+        destination_parents = list(PurePosixPath(path).parents)
+        for level, original_parent in enumerate(original.parents):
+            if original_parent == PurePosixPath('.'):
                 break
-            init = (parent / '__init__.py').as_posix()
-            if init not in paths and (init in records or safe_path(root / init).exists()):
-                raise Blocked('QUEST_SELECT_PACKAGE_INITIALIZER')
-            if parent.as_posix() + '.py' in paths:
-                raise Blocked('QUEST_IMPORT_PATH_COLLISION')
-    return modules, definitions
+            initializer = sources.initializer(source_id, (original_parent / '__init__.py').as_posix())
+            if initializer is not None:
+                parent = destination_parents[level] if level < len(destination_parents) else PurePosixPath('.')
+                if parent == PurePosixPath('.') or mappings.get(initializer) != (parent / '__init__.py').as_posix():
+                    raise Blocked('QUEST_SELECT_PACKAGE_INITIALIZER')
+    for reference in recipe.get('assets', []):
+        data, origin = sources.asset(reference)
+        size += len(data)
+        if size > APP_BYTES:
+            raise Blocked('QUEST_PRODUCT_SIZE')
+        assets[reference['path']] = data
+        source_files.append({'path': reference['path'], 'bytes': len(data), 'sha256': sha(data),
+                             'role': reference['role'], 'origin': origin})
+    sources.verify_unchanged()
+    return modules, definitions, assets, sorted(source_files, key=lambda row: row['path'])
 
 
 def _archive(modules, entry):
@@ -321,8 +344,10 @@ def build(workbench, quest_file, recipe_file, entry_file, source_root, out, chec
         compile(entry, '__main__.py', 'exec', dont_inherit=True)
     except (SyntaxError, ValueError, UnicodeError, LookupError, RecursionError) as ex:
         raise Blocked('QUEST_ENTRY_SYNTAX') from ex
-    modules, definitions = _modules(report, root, recipe)
-    artifact = _archive(modules, entry)
+    modules, definitions, assets, source_files = _modules(report, root, recipe)
+    if len(entry) + sum(map(len, modules.values())) + sum(map(len, assets.values())) > APP_BYTES:
+        raise Blocked('QUEST_PRODUCT_SIZE')
+    artifact = _archive({**modules, **assets}, entry)
     receipt = {'schema': 1, 'status': 'PROTOTYPE_PACKAGED', 'mode': quest['mode'],
                'run_id': quest['run_id'], 'corpus_sha256': digest, 'quest_sha256': sha(quest_bytes),
                'recipe_sha256': sha(raw_recipe), 'audience': recipe['audience'], 'purpose': recipe['purpose'],
@@ -330,6 +355,8 @@ def build(workbench, quest_file, recipe_file, entry_file, source_root, out, chec
                'modules': [{'path': path, 'sha256': sha(data), 'bytes': len(data)} for path, data in modules.items()],
                'definitions': definitions, 'product_sha256': sha(artifact), 'product_bytes': len(artifact),
                'source_code_executed': False, 'runtime_validation': 'NOT_RUN', 'acceptance_file': None}
+    if 'module_files' in recipe or 'assets' in recipe:
+        receipt['source_files'] = source_files
     if purpose is not None:
         receipt['purpose_evidence'] = purpose
     if evaluation_plan is not None:

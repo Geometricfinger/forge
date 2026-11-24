@@ -18,6 +18,14 @@ What Forge does **not** do:
 
 When the user asks you to make something from a folder, start with a saved corpus. Use `quest-start --idea` for a stated job or `quest-start --scout` to explore the available modules. Use `quest-start --opportunity-run ID --workflow ID` to carry an observed complete workflow from Opportunity Lab into creation. Map proposed outcomes to the selected needs and source leads in the recipe. Inspect the candidates, select a user and an observable outcome, write the adapter, and run `quest-build`. When authorized to run the reviewed prototype, test the exact packaged archive and report what worked or failed. The [creation quest playbook](docs/INVENTOR_PLAYBOOK.md#run-a-creation-quest) gives the commands and recipe fields.
 
+Use `module_files` to map whole indexed module source IDs to product import paths,
+including explicit support modules and package initializers. Archived modules
+require these mappings. Use `assets` for explicitly pinned resource and notice
+bytes from the same indexed source containers. The existing build command reads
+the original files or bounded ZIP members without extracting or executing them.
+It preserves raw bytes and records their source-to-product mapping. Dependency
+completion, package-data selection and reuse-rights review remain builder work.
+
 Before building, add an `evaluation_plan` to map fixed expected observations to
 the recipe's acceptance checks and promised needs. Declare each case's input
 file paths, byte counts and hashes when available; assessment verifies and retains

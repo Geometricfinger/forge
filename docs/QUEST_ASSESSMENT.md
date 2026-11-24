@@ -5,6 +5,13 @@ of what externally recorded observations say about that product's acceptance
 checks and original needs. It reads data and artifacts without running the
 product, checker or any supplied code.
 
+For a build using `module_files` or `assets`, assessment also checks that the
+receipt's retained source-file mappings agree with the recipe, module inventory,
+raw member hashes and selected definitions. The original build receipt remains
+in the assessment packet. This is internal byte/declaration consistency, not
+authentication of the stated source origin or an assertion that dependencies and
+reuse rights are complete.
+
 ## Define observable cases before building
 
 Add an optional `evaluation_plan` to a completed creation recipe. Each case has a

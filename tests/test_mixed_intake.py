@@ -41,6 +41,14 @@ class IntakeTests(unittest.TestCase):
     def test_traversal(self):
         r=self.scan(zipped([('../x.py',CODE)]),'o.zip');self.assertFalse(r['segments']);self.assertIn('UNSAFE_MEMBER',{x['status'] for x in r['inventory']})
     def test_windows_path(self):self.assertFalse(self.scan(zipped([('C:\\x.py',CODE)]),'o.zip')['segments'])
+    def test_nul_member_names_are_not_truncated_into_source_aliases(self):
+        for name,data in [('x.py',CODE),('payload.bin',b'opaque'),('inner.zip',zipped([('x.py',CODE)]))]:
+            with self.subTest(name=name):
+                original=name+'_suffix';invalid=name+'\x00suffix'
+                payload=zipped([(original,data)]).replace(original.encode(),invalid.encode())
+                result=self.scan(payload,'outer.zip')
+                self.assertFalse(result['segments'])
+                self.assertEqual([(row['path'],row['status']) for row in result['inventory']],[(invalid,'UNSAFE_MEMBER')])
     def test_duplicate_member(self):
         import warnings
         with warnings.catch_warnings():
