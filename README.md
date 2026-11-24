@@ -6,6 +6,14 @@ For usage questions, open a GitHub issue. For security concerns, follow [SECURIT
 
 Forge is a local, deterministic, model-free static-analysis workbench for **Python source code**. It reads Python files you explicitly give it (plain files, ZIPs, notebooks and Python code blocks in text files), records structure (definitions, classes, imports, calls) and the call sites of APIs you name in a data-only profile, lets you search that metadata, and packages source-identified leads for human review. Files in other languages are listed but not analysed.
 
+Its product direction is to help a person or supervising agent turn an observed
+workflow problem into a useful, tested prototype using existing knowledge and
+components. Opportunity Lab retains the problem and alternatives; creation quests
+connect those needs to selected code and packaged products. Quest assessment links
+recorded test observations back to the promised outcomes. The builder supplies the
+interpretation, adapter and authorized execution. See the
+[product direction](docs/PRODUCT_DIRECTION.md) and [inventor's playbook](docs/INVENTOR_PLAYBOOK.md).
+
 It never executes the code it inspects and makes no model calls. The analysis commands below work offline after cloning the repository. The only network feature in Forge is optional, operator-started GitHub discovery of public example code; see [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) for exactly what it sends and its limits.
 
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
@@ -23,6 +31,7 @@ It never executes the code it inspects and makes no model calls. The analysis co
 - **Mixed-source corpus intake.** Plain files, ZIP archives, notebooks and saved transcripts, each pinned by size and SHA-256 in a manifest.
 - **Local search.** BM25 with reciprocal-rank fusion over definitions, imports and call sites, backed by SQLite FTS5.
 - **Creation quests.** Start from an idea, available Python components, or a complete workflow recorded in Opportunity Lab. A builder maps workflow needs to source components, writes an entry point and packages the verified source into a runnable Python archive. The receipt carries the originating observations and proposed outcomes. [Run a quest](docs/INVENTOR_PLAYBOOK.md#start-from-a-complete-observed-workflow).
+- **Assess product outcomes.** Save expected observations and need mappings in the recipe before building. `quest-assess` verifies the product, recipe, receipt, checker and recorded observation files, then reports passing, failing and incomplete outcomes for each acceptance check and need. The original build receipt stays unchanged. [Assess a quest](docs/QUEST_ASSESSMENT.md).
 - **Local web UI.** `forge.py serve` binds to `127.0.0.1` only.
 - **Declared transfer review.** `opportunity-review` checks source-bound input/output, unit, frame, timing and effect declarations before recommending experiment components. It does not verify the truth of those declarations.
 - **Compare opportunity evidence.** After reviewing revised source material, save both briefs as runs in the same workbench. Use the comparison form in the Opportunity Lab or run `python3 forge.py --home "$WORK" opportunity-compare BEFORE_RUN_ID AFTER_RUN_ID`. Each idea shows the citations that moved, disappeared, changed source, or need review. The comparison also reports added and retired ideas.

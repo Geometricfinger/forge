@@ -190,7 +190,7 @@ def _recipe(raw):
     recipe = loads(raw)
     required = {'schema', 'audience', 'purpose', 'acceptance', 'components'}
     if (not isinstance(recipe, dict) or required - recipe.keys()
-            or recipe.keys() - (required | {'support_modules', 'opportunity', 'need_responses'})
+            or recipe.keys() - (required | {'support_modules', 'opportunity', 'need_responses', 'evaluation_plan'})
             or type(recipe['schema']) is not int or recipe['schema'] != 1):
         raise Blocked('QUEST_RECIPE')
     text(recipe['audience'])
@@ -314,6 +314,8 @@ def build(workbench, quest_file, recipe_file, entry_file, source_root, out, chec
         purpose = _opportunity_responses(quest, recipe)
     elif 'opportunity' in recipe or 'need_responses' in recipe:
         raise Blocked('QUEST_OPPORTUNITY_RECIPE')
+    from .quest_assessment import validate_plan
+    evaluation_plan = validate_plan(recipe)
     entry = read(entry_file, DEFAULTS['max_source_bytes'])
     try:
         compile(entry, '__main__.py', 'exec', dont_inherit=True)
@@ -330,6 +332,8 @@ def build(workbench, quest_file, recipe_file, entry_file, source_root, out, chec
                'source_code_executed': False, 'runtime_validation': 'NOT_RUN', 'acceptance_file': None}
     if purpose is not None:
         receipt['purpose_evidence'] = purpose
+    if evaluation_plan is not None:
+        receipt['evaluation_plan'] = evaluation_plan
     if check_file is not None:
         check = read(check_file, 4_000_000)
         receipt['acceptance_file'] = {'sha256': sha(check), 'bytes': len(check)}

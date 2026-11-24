@@ -201,6 +201,14 @@ def main():
     a.add_argument('--check-file',type=Path,help='record the digest of an external acceptance test')
     a.add_argument('--source-root',type=Path,required=True)
     a.add_argument('--out',type=Path,required=True)
+    a=s.add_parser('quest-assess',help='compare recorded JSON outputs with a packaged quest acceptance plan; no execution')
+    a.add_argument('--receipt',type=Path,required=True)
+    a.add_argument('--recipe',type=Path,required=True)
+    a.add_argument('--product',type=Path,required=True)
+    a.add_argument('--results',type=Path,required=True)
+    a.add_argument('--artifact-root',type=Path,required=True)
+    a.add_argument('--check-file',type=Path)
+    a.add_argument('--out',type=Path,required=True)
     s.add_parser('corpus-demo')
     a=s.add_parser('corpus-run');a.add_argument('--source-root',type=Path,required=True,help='folder holding the sources');a.add_argument('--manifest',type=Path,help='manifest JSON; omit it to analyse every .py/.pyi/.pyw/.ipynb/.zip/.txt/.md/.rst file in --source-root as provider "local"');a.add_argument('--run-id',required=True);a.add_argument('--max-containers',type=int,default=20);a.add_argument('--profile',type=Path,help='data-only exact-API profile JSON (schema 1); default templates/corpus_profile.json')
     a=s.add_parser('corpus-search');a.add_argument('--run-id',required=True);a.add_argument('--query',required=True);a.add_argument('--include-tests',action='store_true');a.add_argument('--out',type=Path)
@@ -229,15 +237,18 @@ def main():
     a.human='--human' in argv;a.pretty='--pretty' in argv
     OUTPUT_MODE='human' if a.human else 'pretty' if a.pretty else 'json'
     home=a.home.absolute()
-    if a.command in ('quest-start','quest-build'):
+    if a.command in ('quest-start','quest-build','quest-assess'):
         from forge_core import creation_quest
         current=Workbench(home)
         if not current.home.is_dir():raise Blocked('QUEST_EXISTING_CORPUS_REQUIRED')
         if a.command=='quest-start':
             value=creation_quest.start(current,a.run_id,a.idea,a.out,
                                        opportunity_run=a.opportunity_run,workflow=a.workflow)
-        else:
+        elif a.command=='quest-build':
             value=creation_quest.build(current,a.quest,a.recipe,a.entry,a.source_root,a.out,a.check_file)
+        else:
+            from forge_core.quest_assessment import assess
+            value=assess(current,a.receipt,a.recipe,a.product,a.results,a.artifact_root,a.out,a.check_file)
         emit(value);return 0
     if a.command=='reviewed-trial-verify':
         from forge_core.reviewed_evaluator import verify
