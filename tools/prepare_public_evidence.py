@@ -183,6 +183,7 @@ class Scanner:
         self.ci_runner_paths = ci_runner_paths
         self.counts = Counter(); self.rules = Counter(); self.details = []
         self.bytes = 0; self.payloads = 0; self.json_values = 0; self.sqlite_rows = 0
+        self.json_checked = set(); self.json_reused = 0
 
     def finding(self, rule, label):
         self.rules[rule] += 1
@@ -222,7 +223,16 @@ class Scanner:
         suffix = PurePosixPath(name).suffix.lower()
         if suffix not in ('.json', '.ipynb', '.har', '.jsonl', '.ndjson', '.cast'):
             return
-        records = [data] if suffix in ('.json', '.ipynb', '.har') else data.splitlines()
+        document = suffix in ('.json', '.ipynb', '.har')
+        cache_key = (sha(data), document)
+        # scan() still checks each occurrence's name, raw text, container depth
+        # and payload/byte budgets. Only a completed clean JSON check is reused;
+        # parsing modes differ even when the original bytes are identical.
+        if cache_key in self.json_checked:
+            self.json_reused += 1
+            return
+        prior_findings = sum(self.rules.values())
+        records = [data] if document else data.splitlines()
         for raw in records:
             if not raw.strip():
                 continue
@@ -255,6 +265,10 @@ class Scanner:
                         pending.append((child, depth + 1))
                 elif isinstance(item, list):
                     pending.extend((child, depth + 1) for child in item)
+        # At most one entry per admitted logical payload; retain no decoded
+        # objects, partial traversals, parsing failures or finding-bearing checks.
+        if sum(self.rules.values()) == prior_findings and len(self.json_checked) < MAX_FILES:
+            self.json_checked.add(cache_key)
 
     def sqlite(self, label, data, depth):
         self.counts['sqlite_databases'] += 1
@@ -409,6 +423,7 @@ class Scanner:
 
     def report(self):
         return {'logical_payloads_scanned': self.payloads, 'logical_bytes_scanned': self.bytes,
+                'json_values_processed': self.json_values, 'json_checks_reused': self.json_reused,
                 'container_counts': dict(sorted(self.counts.items())),
                 'findings': sum(self.rules.values()), 'rules': dict(sorted(self.rules.items())),
                 'details': self.details}
