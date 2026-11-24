@@ -36,7 +36,7 @@ assessment commands do not start a model or execute inspected code.
 | Find mechanisms | Corpus intake, lexical search, source inspection and dependency context | Retrieval relevance is not demonstrated usefulness or complete dependency resolution |
 | Preserve the product's purpose | An opportunity-backed creation quest retains the whole selected workflow and proposed responses | The proposed response still needs an experiment |
 | Assemble a prototype | `quest-build` verifies selected whole Python modules and packages the supplied entry point | The builder writes adapters and prepares supported source pools |
-| Assess recorded outcomes | `quest-assess` compares fixed expected JSON with bound observation artifacts and aggregates acceptance/need results | Artifact consistency does not authenticate external execution or the meaning of a case |
+| Assess recorded outcomes | `quest-assess` verifies declared case input bytes when supplied, compares fixed expected JSON with bound observations, and aggregates acceptance/need results | Artifact consistency does not authenticate external execution, input consumption or the meaning of a case |
 | Choose what comes next | Assessment exposes failed, incomplete and unaddressed work with a next decision | A persistent investigation scheduler and practitioner feedback loop remain future work |
 
 ## Improvement order

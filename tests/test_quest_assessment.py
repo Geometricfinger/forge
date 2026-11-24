@@ -8,9 +8,10 @@ import sys
 import tempfile
 import unittest
 
-from forge_core.common import canonical, sha
+from forge_core.common import Blocked, canonical, sha
 from forge_core.engine import ROOT
 from forge_core.opportunity_examples import cite, source
+from forge_core.quest_assessment import validate_plan
 
 
 class QuestAssessmentTests(unittest.TestCase):
@@ -159,6 +160,8 @@ class QuestAssessmentTests(unittest.TestCase):
         self.assertEqual(self.receipt['runtime_validation'], 'NOT_RUN')
         self.assertFalse(report['source_code_executed'])
         self.assertFalse(report['runtime_execution_authenticated'])
+        self.assertFalse(report['execution_input_usage_authenticated'])
+        self.assertTrue(all(case['input_status'] == 'NOT_DECLARED' for case in report['case_results']))
         self.assertFalse(report['release_approved'])
         self.assertEqual((self.out/'build-receipt.json').read_bytes(), original_receipt)
         self.assertEqual((self.out/'recorded-results.json').read_bytes(), self.results_file.read_bytes())
@@ -346,6 +349,168 @@ class QuestAssessmentTests(unittest.TestCase):
             code, result = self.assess(results, out=out)
             self.assertEqual(code, 2, result)
             self.assertFalse(out.exists())
+
+    def test_declared_inputs_retained_for_exact_archive_observations(self):
+        self.entry.write_text('from amounts import double\nimport json,sys\nfrom pathlib import Path\n'
+                              "print(json.dumps({'amount': double(int(Path(sys.argv[1]).read_text()))}))\n")
+        for case, value in zip(self.recipe['evaluation_plan']['cases'], (6, 0)):
+            case['inputs'] = [self.artifact('inputs/'+case['id']+'.txt', (str(value)+'\n').encode())]
+        self.build()
+        rows = []
+        for case in self.recipe['evaluation_plan']['cases']:
+            path = self.artifacts/case['inputs'][0]['path']
+            completed = subprocess.run([sys.executable, '-I', str(self.product), str(path)],
+                                       cwd=self.work, capture_output=True, check=True, timeout=10)
+            rows.append({'id': case['id'], 'status': 'OBSERVED',
+                         'artifact': self.artifact(case['id']+'.json', completed.stdout)})
+        original_receipt = self.receipt_file.read_bytes()
+        code, result = self.assess(self.results(rows))
+        self.assertEqual((code, result['outcome_status']), (0, 'REPORTED_PASS'))
+        report = self.load()
+        self.assertFalse(report['execution_input_usage_authenticated'])
+        self.assertEqual(self.receipt_file.read_bytes(), original_receipt)
+        for planned, observed in zip(self.recipe['evaluation_plan']['cases'], report['case_results']):
+            self.assertEqual(observed['input_status'], 'VERIFIED_DECLARED_INPUT_BYTES')
+            self.assertEqual(observed['inputs'], planned['inputs'])
+            reference = observed['inputs'][0]
+            self.assertEqual((self.out/'artifacts'/reference['path']).read_bytes(),
+                             (self.artifacts/reference['path']).read_bytes())
+
+    def test_unobserved_cases_still_verify_and_retain_declared_inputs(self):
+        self.recipe['evaluation_plan']['cases'][1]['inputs'] = [self.artifact('inputs/zero.txt', b'0\n')]
+        self.build()
+        base = self.results()
+        variants = [base['cases'][:1], [base['cases'][0], {'id': 'zero', 'status': 'NOT_RUN', 'artifact': None}],
+                    [base['cases'][0], {'id': 'zero', 'status': 'ERROR', 'artifact': None}]]
+        for index, rows in enumerate(variants):
+            out = self.work/('unobserved-'+str(index))
+            code, result = self.assess(self.results(rows), out=out)
+            self.assertEqual((code, result['outcome_status']), (0, 'REPORTED_INCOMPLETE'))
+            report = json.loads((out/'assessment.json').read_bytes())
+            self.assertEqual(report['case_results'][0]['input_status'], 'NOT_DECLARED')
+            self.assertEqual(report['case_results'][1]['input_status'], 'VERIFIED_DECLARED_INPUT_BYTES')
+            self.assertEqual((out/'artifacts/inputs/zero.txt').read_bytes(), b'0\n')
+
+    def test_changed_or_missing_inputs_block_even_without_observations(self):
+        reference = self.artifact('inputs/value.txt', b'6\n')
+        self.recipe['evaluation_plan']['cases'][0]['inputs'] = [reference]
+        self.build()
+        results = self.results(rows=[])
+        path = self.artifacts/reference['path']
+        for content in (b'7\n', b'6\n '):
+            path.write_bytes(content)
+            code, result = self.assess(results)
+            self.assertEqual((code, result['reason']), (2, 'QUEST_ASSESS_ARTIFACT'))
+            self.assertFalse(self.out.exists())
+        path.unlink()
+        code, result = self.assess(results)
+        self.assertEqual((code, result['reason']), (2, 'QUEST_ASSESS_ARTIFACT'))
+        self.assertFalse(self.out.exists())
+
+    def test_declared_input_symlinks_are_refused(self):
+        reference = self.artifact('inputs/value.txt', b'6\n')
+        self.recipe['evaluation_plan']['cases'][0]['inputs'] = [reference]
+        self.build()
+        path = self.artifacts/reference['path']
+        target = self.work/'outside.txt'
+        target.write_bytes(path.read_bytes())
+        path.unlink()
+        path.symlink_to(target)
+        code, result = self.assess(self.results())
+        self.assertEqual((code, result['reason']), (2, 'SYMLINK_PATH'))
+        self.assertFalse(self.out.exists())
+
+    def test_invalid_input_references_prevent_a_build(self):
+        reference = {'path': 'inputs/value.txt', 'bytes': 2, 'sha256': sha(b'6\n')}
+        variants = [None, {}, [], [reference]*17, [reference, reference],
+                    [reference | {'bytes': True}], [reference | {'bytes': -1}],
+                    [reference | {'bytes': 1_000_001}], [reference | {'sha256': 'invalid'}],
+                    [reference | {'extra': True}], [{'path': reference['path']}]]
+        for inputs in variants:
+            self.recipe['evaluation_plan']['cases'][0]['inputs'] = inputs
+            with self.subTest(inputs=inputs), self.assertRaisesRegex(Blocked, '^QUEST_EVALUATION_INPUTS$'):
+                validate_plan(self.recipe)
+        for path in ('../outside', '/absolute', 'inputs//value.txt', 'inputs/./value.txt',
+                     'inputs\\value.txt', 'inputs:value.txt'):
+            self.recipe['evaluation_plan']['cases'][0]['inputs'] = [reference | {'path': path}]
+            with self.subTest(path=path), self.assertRaisesRegex(Blocked, '^REPOSITORY_PATH$'):
+                validate_plan(self.recipe)
+        # Exercise structural variants directly, then verify the public builder
+        # uses that validator and publishes no product on representative errors.
+        for inputs, reason in (([], 'QUEST_EVALUATION_INPUTS'),
+                               ([reference | {'path': '../outside'}], 'REPOSITORY_PATH')):
+            self.recipe['evaluation_plan']['cases'][0]['inputs'] = inputs
+            self.recipe_file.write_bytes(canonical(self.recipe))
+            code, result = self.cli('quest-build', '--quest', self.quest, '--recipe', self.recipe_file,
+                                    '--entry', self.entry, '--source-root', self.pool, '--out', self.build_dir)
+            self.assertEqual((code, result['reason']), (2, reason))
+            self.assertFalse(self.build_dir.exists())
+
+    def test_result_or_rehashed_receipt_cannot_replace_fixed_inputs(self):
+        reference = self.artifact('inputs/value.txt', b'6\n')
+        self.recipe['evaluation_plan']['cases'][0]['inputs'] = [reference]
+        self.build()
+        results = self.results()
+        results['cases'][0]['inputs'] = [reference | {'sha256': sha(b'7\n')}]
+        code, result = self.assess(results)
+        self.assertEqual((code, result['reason']), (2, 'QUEST_ASSESS_RESULTS'))
+        self.assertFalse(self.out.exists())
+        changed = copy.deepcopy(self.receipt)
+        changed['evaluation_plan']['cases'][0]['inputs'][0]['sha256'] = sha(b'7\n')
+        self.receipt_file.write_bytes(canonical(changed))
+        results = self.results()
+        results['evaluation_plan_sha256'] = sha(canonical(changed['evaluation_plan']))
+        code, result = self.assess(results)
+        self.assertEqual((code, result['reason']), (2, 'QUEST_ASSESS_RECIPE_BINDING'))
+        self.assertFalse(self.out.exists())
+
+    def test_shared_inputs_count_once_in_artifact_budget(self):
+        references = [self.artifact('inputs/part-'+str(i), b'x'*1_000_000) for i in range(4)]
+        for case in self.recipe['evaluation_plan']['cases']:
+            case['inputs'] = references
+        self.build()
+        code, result = self.assess(self.results())
+        self.assertEqual((code, result['outcome_status']), (0, 'REPORTED_PASS'))
+        self.assertEqual(len(list((self.out/'artifacts/inputs').iterdir())), 4)
+        self.assertTrue(all(case['input_status'] == 'VERIFIED_DECLARED_INPUT_BYTES'
+                            for case in self.load()['case_results']))
+
+    def test_declared_inputs_and_observations_share_total_budget(self):
+        self.recipe['evaluation_plan']['cases'][0]['inputs'] = [
+            self.artifact('inputs/part-'+str(i), b'x'*1_000_000) for i in range(8)]
+        self.build()
+        code, result = self.assess(self.results())
+        self.assertEqual((code, result['reason']), (2, 'QUEST_ASSESS_ARTIFACT'))
+        self.assertFalse(self.out.exists())
+
+    def test_conflicting_or_over_budget_inputs_prevent_build(self):
+        reference = {'path': 'inputs/value.txt', 'bytes': 2, 'sha256': sha(b'6\n')}
+        self.recipe['evaluation_plan']['cases'][0]['inputs'] = [reference]
+        self.recipe['evaluation_plan']['cases'][1]['inputs'] = [reference | {'sha256': sha(b'7\n')}]
+        for phase in ('conflict', 'budget'):
+            if phase == 'budget':
+                self.recipe['evaluation_plan']['cases'][0]['inputs'] = [
+                    reference | {'path': 'inputs/part-'+str(i), 'bytes': 1_000_000} for i in range(9)]
+                del self.recipe['evaluation_plan']['cases'][1]['inputs']
+            self.recipe_file.write_bytes(canonical(self.recipe))
+            code, result = self.cli('quest-build', '--quest', self.quest, '--recipe', self.recipe_file,
+                                    '--entry', self.entry, '--source-root', self.pool, '--out', self.build_dir)
+            self.assertEqual((code, result['reason']), (2, 'QUEST_EVALUATION_INPUTS'))
+            self.assertFalse(self.build_dir.exists())
+
+    def test_input_artifacts_are_opaque_bytes_and_never_executed(self):
+        payload = b"raise AssertionError('input must never execute')\n"
+        references = [self.artifact('inputs/program.py', payload),
+                      self.artifact('inputs/binary.dat', b'\x00\xff\xfe\n')]
+        self.recipe['evaluation_plan']['cases'][0]['inputs'] = references
+        self.build()
+        code, result = self.assess(self.results())
+        self.assertEqual((code, result['outcome_status']), (0, 'REPORTED_PASS'))
+        for reference in references:
+            self.assertEqual((self.out/'artifacts'/reference['path']).read_bytes(),
+                             (self.artifacts/reference['path']).read_bytes())
+        self.assertFalse(self.load()['source_code_executed'])
+        self.assertFalse(self.load()['execution_input_usage_authenticated'])
 
 
 if __name__ == '__main__':

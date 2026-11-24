@@ -26,9 +26,11 @@ def main():
     if out.exists() or out.is_relative_to(ROOT):raise Blocked('NEW_EXTERNAL_OUTPUT_REQUIRED')
     out.mkdir(parents=True);report={'started_utc':datetime.now(timezone.utc).isoformat(),'status':'RUNNING','model_calls':0,'live_network_requests':0,'release_approved':False,'independent_evaluation':False};before=code_binding()
     try:
-        command([sys.executable,str(ROOT/'run_tests.py'),'--out',str(out/'workbench-tests')],ROOT,out/'workbench-tests.log',150)
+        # The integration suite starts many subprocesses. Allow runner variation
+        # while retaining a bounded watchdog and process-group termination.
+        command([sys.executable,str(ROOT/'run_tests.py'),'--out',str(out/'workbench-tests')],ROOT,out/'workbench-tests.log',300)
         t=loads(read(out/'workbench-tests/tests.json'))
-        if t['tests_run']!=1312 or any(t[k] for k in ('failures','errors','skips')):raise Blocked('WORKBENCH_TESTS_FAILED')
+        if t['tests_run']!=1322 or any(t[k] for k in ('failures','errors','skips')):raise Blocked('WORKBENCH_TESTS_FAILED')
         report['workbench_tests']=t
         w=initialize(out/'home')
         from forge_core import corpus,corpus_demo
