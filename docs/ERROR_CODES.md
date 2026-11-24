@@ -539,6 +539,8 @@ If `reason` is a Python exception name instead of a code:
 | <a id="baseline_not_evaluated"></a>`BASELINE_NOT_EVALUATED` | Input or stored state failed a validation check (see the raising module). | loop/forge_cycle.py |
 | <a id="behavior_qualification"></a>`BEHAVIOR_QUALIFICATION` | Input or stored state failed a validation check (see the raising module). | verify.py |
 | <a id="bridge_analysis_view_binding"></a>`BRIDGE_ANALYSIS_VIEW_BINDING` | A stored record is bound to different inputs/code than the current ones (integrity check). | runner/research_runner/bridge.py |
+| <a id="bridge_class_documentation"></a>`BRIDGE_CLASS_DOCUMENTATION` | Reinspect the source with the current engine to retain bounded class-description terms and source positions. | runner/research_runner/bridge.py |
+| <a id="bridge_class_documentation_binding"></a>`BRIDGE_CLASS_DOCUMENTATION_BINDING` | Retained class-description terms or attribution differ from the checksum-verified corpus. Preserve the original evidence and create a fresh inspection. | runner/research_runner/bridge.py |
 | <a id="bridge_corpus_binding"></a>`BRIDGE_CORPUS_BINDING` | A stored record is bound to different inputs/code than the current ones (integrity check). | runner/research_runner/bridge.py |
 | <a id="bridge_definition_not_unique"></a>`BRIDGE_DEFINITION_NOT_UNIQUE` | Input or stored state failed a validation check (see the raising module). | runner/research_runner/bridge.py |
 | <a id="bridge_definition_window_binding"></a>`BRIDGE_DEFINITION_WINDOW_BINDING` | A stored record is bound to different inputs/code than the current ones (integrity check). | runner/research_runner/bridge.py |

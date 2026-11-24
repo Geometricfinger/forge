@@ -152,6 +152,17 @@ instead of a prefix labeled complete. Unsupported languages remain text-only
 references, and retained source remains private in the Runner workspace; the
 core corpus still stores no source bodies.
 
+Search also retains the core's bounded terms and source locations for a method's
+direct enclosing class description. Intake compares this declaration metadata
+between the fresh parse and the checksum-verified corpus; queries check it again
+against that corpus. The words can match in both search channels, while
+`class_documentation_match` identifies their class, matched terms and segment-local
+documentation lines in results, compact packets and supervisor answers. This is
+declared context, not evidence that every method implements the description.
+No raw class docstring is reconstructed. Nested functions and overriding methods
+do not inherit another class's description. Missing older metadata adds no new
+class terms. Added class words count toward the existing retained-search budget.
+
 The added result fields retain report schema 1. Runner code is part of mission
 identity, so existing completed missions must be recreated in a fresh external
 workspace after this update; do not rewrite their binding or checkpoint files.
