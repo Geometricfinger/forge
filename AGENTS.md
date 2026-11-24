@@ -19,7 +19,9 @@ What Forge does **not** do:
 When the user asks you to make something from a folder, start with a saved corpus. Use `quest-start --idea` for a stated job or `quest-start --scout` to explore the available modules. Use `quest-start --opportunity-run ID --workflow ID` to carry an observed complete workflow from Opportunity Lab into creation. Map proposed outcomes to the selected needs and source leads in the recipe. Inspect the candidates, select a user and an observable outcome, write the adapter, and run `quest-build`. When authorized to run the reviewed prototype, test the exact packaged archive and report what worked or failed. The [creation quest playbook](docs/INVENTOR_PLAYBOOK.md#run-a-creation-quest) gives the commands and recipe fields.
 
 Before building, add an `evaluation_plan` to map fixed expected observations to
-the recipe's acceptance checks and promised needs. After authorized execution,
+the recipe's acceptance checks and promised needs. Declare each case's input
+file paths, byte counts and hashes when available; assessment verifies and retains
+those bytes without authenticating their use by the external product. After authorized execution,
 use `quest-assess` to compare the recorded observation artifacts and retain the
 next decision. Preserve failures, incomplete cases and unaddressed needs. See
 [quest assessment](docs/QUEST_ASSESSMENT.md) for the schema and evidence limits,

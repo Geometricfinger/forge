@@ -314,7 +314,7 @@ If `reason` is a Python exception name instead of a code:
 | <a id="query_terms_required"></a>`QUERY_TERMS_REQUIRED` | A required input or precondition is missing. | forge_core/corpus.py, forge_core/retrieval.py |
 | <a id="query_term_limit"></a>`QUERY_TERM_LIMIT` | A safety size/count limit was exceeded. | forge_core/retrieval.py |
 | <a id="quest_acceptance"></a>`QUEST_ACCEPTANCE` | List one to 32 observable acceptance checks in the recipe. | forge_core/creation_quest.py |
-| <a id="quest_assess_artifact"></a>`QUEST_ASSESS_ARTIFACT` | A recorded observation artifact is missing, exceeds its budget, or differs from its declared path, byte count or digest. | forge_core/quest_assessment.py |
+| <a id="quest_assess_artifact"></a>`QUEST_ASSESS_ARTIFACT` | A declared input or recorded observation artifact is missing, exceeds its budget, or differs from its declared path, byte count or digest. | forge_core/quest_assessment.py |
 | <a id="quest_assess_checker_binding"></a>`QUEST_ASSESS_CHECKER_BINDING` | Supply the original checker when the build bound one; its exact bytes must match. Do not add an unbound checker. | forge_core/quest_assessment.py |
 | <a id="quest_assess_product_binding"></a>`QUEST_ASSESS_PRODUCT_BINDING` | Supply the exact product archive recorded by the original build receipt. | forge_core/quest_assessment.py |
 | <a id="quest_assess_receipt"></a>`QUEST_ASSESS_RECEIPT` | Use the original schema-1 quest build receipt, retaining its packaging status and source identities. | forge_core/quest_assessment.py |
@@ -325,6 +325,7 @@ If `reason` is a Python exception name instead of a code:
 | <a id="quest_binding"></a>`QUEST_BINDING` | Use the original quest.json from this corpus run and workspace. | forge_core/creation_quest.py |
 | <a id="quest_component_selection"></a>`QUEST_COMPONENT_SELECTION` | Choose one or more distinct definition IDs from this run. Use at most 32 selections including support paths. | forge_core/creation_quest.py |
 | <a id="quest_entry_syntax"></a>`QUEST_ENTRY_SYNTAX` | Supply an entry point that the current Python interpreter can compile. | forge_core/creation_quest.py |
+| <a id="quest_evaluation_inputs"></a>`QUEST_EVALUATION_INPUTS` | Declare one to 16 distinct input artifact paths per case with exact byte counts and SHA-256 digests. Keep shared declarations consistent and unique inputs within the artifact byte budget. | forge_core/quest_assessment.py |
 | <a id="quest_evaluation_plan"></a>`QUEST_EVALUATION_PLAN` | Define distinct cases with an acceptance-list index, selected promised need IDs and a bounded expected JSON value. | forge_core/quest_assessment.py |
 | <a id="quest_existing_corpus_required"></a>`QUEST_EXISTING_CORPUS_REQUIRED` | Index your source with corpus-run and use its workspace for the quest. | forge.py |
 | <a id="quest_import_path_collision"></a>`QUEST_IMPORT_PATH_COLLISION` | Choose a package layout with an unambiguous Python import path for each selected module. | forge_core/creation_quest.py |

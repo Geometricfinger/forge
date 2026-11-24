@@ -10,6 +10,7 @@ from .reviewed_evaluator import preflight
 
 
 MAX_CASES = 128
+MAX_INPUTS_PER_CASE = 16
 MAX_ARTIFACT_BYTES = 1_000_000
 MAX_TOTAL_ARTIFACT_BYTES = 8_000_000
 PASS = 'REPORTED_PASS'
@@ -36,6 +37,15 @@ def _same(left, right):
     return canonical(left) == canonical(right)
 
 
+def _artifact_reference(record, code):
+    _fields(record, {'path', 'bytes', 'sha256'}, code)
+    path = path_in_repo(record['path'])
+    _digest(record['sha256'], code)
+    if type(record['bytes']) is not int or not 0 <= record['bytes'] <= MAX_ARTIFACT_BYTES:
+        raise Blocked(code)
+    return path
+
+
 def _responses(recipe):
     responses = recipe.get('need_responses', [])
     if not isinstance(responses, list) or len(responses) > 80:
@@ -60,8 +70,12 @@ def validate_plan(recipe):
         raise Blocked('QUEST_EVALUATION_PLAN')
     addressed = set(_responses(recipe))
     seen = set()
+    input_files = {}
     for case in plan['cases']:
-        _fields(case, {'id', 'acceptance', 'needs', 'expected'}, 'QUEST_EVALUATION_PLAN')
+        required = {'id', 'acceptance', 'needs', 'expected'}
+        if (not isinstance(case, dict) or required - case.keys()
+                or case.keys() - (required | {'inputs'})):
+            raise Blocked('QUEST_EVALUATION_PLAN')
         if (not _identifier(case['id']) or case['id'] in seen
                 or type(case['acceptance']) is not int
                 or not 0 <= case['acceptance'] < len(recipe['acceptance'])
@@ -72,6 +86,19 @@ def validate_plan(recipe):
             raise Blocked('QUEST_EVALUATION_PLAN')
         if len(canonical(case['expected'])) > 64_000:
             raise Blocked('QUEST_EVALUATION_PLAN')
+        if 'inputs' in case:
+            inputs = case['inputs']
+            if not isinstance(inputs, list) or not 1 <= len(inputs) <= MAX_INPUTS_PER_CASE:
+                raise Blocked('QUEST_EVALUATION_INPUTS')
+            paths = set()
+            for record in inputs:
+                path = _artifact_reference(record, 'QUEST_EVALUATION_INPUTS')
+                if path in paths or (path in input_files and input_files[path] != record):
+                    raise Blocked('QUEST_EVALUATION_INPUTS')
+                paths.add(path)
+                input_files[path] = record
+            if sum(record['bytes'] for record in input_files.values()) > MAX_TOTAL_ARTIFACT_BYTES:
+                raise Blocked('QUEST_EVALUATION_INPUTS')
         seen.add(case['id'])
     return plan
 
@@ -138,11 +165,7 @@ def _receipt(raw, recipe_raw, recipe):
 
 
 def _artifact(record, root, files):
-    _fields(record, {'path', 'bytes', 'sha256'}, 'QUEST_ASSESS_ARTIFACT')
-    path = path_in_repo(record['path'])
-    _digest(record['sha256'], 'QUEST_ASSESS_ARTIFACT')
-    if type(record['bytes']) is not int or not 0 <= record['bytes'] <= MAX_ARTIFACT_BYTES:
-        raise Blocked('QUEST_ASSESS_ARTIFACT')
+    path = _artifact_reference(record, 'QUEST_ASSESS_ARTIFACT')
     full = safe_path(root / path)
     if not full.is_relative_to(root) or not full.is_file():
         raise Blocked('QUEST_ASSESS_ARTIFACT')
@@ -215,6 +238,9 @@ def assess(workbench, receipt_file, recipe_file, product_file, results_file, art
     if not isinstance(results['cases'], list) or len(results['cases']) > MAX_CASES:
         raise Blocked('QUEST_ASSESS_RESULTS')
     cases = plan['cases'] if plan is not None else []
+    for case in cases:
+        for record in case.get('inputs', []):
+            _artifact(record, root, files)
     known = {case['id'] for case in cases}
     recorded = {}
     for row in results['cases']:
@@ -229,7 +255,8 @@ def assess(workbench, receipt_file, recipe_file, product_file, results_file, art
         recorded[row['id']] = (row, loads(artifact) if row['status'] == 'OBSERVED' else None)
     case_results = []
     for case in cases:
-        item = {**case, 'status': INCOMPLETE, 'reported_state': 'MISSING', 'artifact': None}
+        item = {**case, 'status': INCOMPLETE, 'reported_state': 'MISSING', 'artifact': None,
+                'input_status': 'VERIFIED_DECLARED_INPUT_BYTES' if 'inputs' in case else 'NOT_DECLARED'}
         if case['id'] in recorded:
             row, observed = recorded[case['id']]
             item.update({'reported_state': row['status'], 'artifact': row['artifact']})
@@ -258,8 +285,10 @@ def assess(workbench, receipt_file, recipe_file, product_file, results_file, art
         'evaluation_plan': plan, 'case_results': case_results, 'acceptance_results': acceptance_results,
         'need_results': need_results, 'unaddressed_needs': unaddressed,
         'source_code_executed': False, 'runtime_execution_authenticated': False,
+        'execution_input_usage_authenticated': False,
         'market_validation': 'NOT_ESTABLISHED', 'release_approved': False,
-        'scope': 'Exact supplied bytes and JSON comparisons verified. Observations, execution, '
+        'scope': 'Exact supplied bytes and JSON comparisons verified. Declared input files are checked '
+                 'when present; their use by the product is not authenticated. Observations, execution, '
                  'translation and chronological preregistration are externally supplied, not authenticated.',
     }
     if 'purpose_evidence' in receipt:

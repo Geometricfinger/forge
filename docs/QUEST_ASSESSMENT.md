@@ -37,6 +37,46 @@ expected values independently of the product's result. A file containing a
 single claimed `passed: true` value provides little evidence about the user's
 task; retain the actual relevant output instead.
 
+### Bind the case's input files
+
+When a case uses input files, prepare them before building and add an optional
+`inputs` list to that case. Each reference identifies the exact bytes relative to
+the `--artifact-root` used later for assessment:
+
+```json
+{
+  "inputs": [
+    {
+      "path": "inputs/six.txt",
+      "bytes": 2,
+      "sha256": "<SHA-256 of the actual two bytes: 6 followed by a newline>"
+    }
+  ]
+}
+```
+
+This is a case-field excerpt. Measure the actual file size and hash; replace the
+placeholder before building. The build validates these declarations and retains
+them inside the recipe and receipt. It does not read the input files or run them.
+Assessment reads and checks every declared input, including inputs for cases
+whose observations are missing, `NOT_RUN` or `ERROR`. Missing or changed declared
+input files block assessment before publication. Intact inputs without an
+observation still leave that case incomplete.
+
+An `inputs` list must contain 1 to 16 strict `path`, `bytes`, `sha256` references.
+Paths are normalized relative paths, without traversal, backslashes or a drive
+prefix. Duplicate paths within a case and conflicting declarations of one path
+across cases are refused. Each input or observation artifact is at most 1 MB;
+their combined unique retained bytes are at most 8 MB. A shared file declared by
+several cases counts once. Input files are opaque bytes: CSV, JSON, binary data
+and source text are retained without importing or executing them.
+
+Every assessed case records `input_status` as
+`VERIFIED_DECLARED_INPUT_BYTES` or `NOT_DECLARED`. Older plans without `inputs`
+retain their existing outcome behavior and explicitly report `NOT_DECLARED`.
+The assessment always records `execution_input_usage_authenticated: false`:
+matching retained input bytes does not prove the external product consumed them.
+
 Build using the existing command and bind the reviewed external checker:
 
 ```sh
@@ -121,7 +161,8 @@ or a field trial. These decisions describe follow-up work, not release approval.
 ## What the record establishes
 
 The assessment preserves the original purpose and evidence, expected and observed
-values, verified artifact identities and remaining work. It does not modify the
+values, verified artifact identities, declared input bytes when supplied, and
+remaining work. It does not modify the
 build receipt's `runtime_validation: NOT_RUN`: packaging and assessment are
 different events.
 
@@ -130,3 +171,21 @@ when expectations were written, authenticate an external execution, verify that
 an observation adapter interpreted the raw output correctly, or establish that
 the cases fully represent a practitioner's needs. Review that interpretation and
 compare the prototype with the existing workflow before claiming useful advantage.
+
+## Use shared cases for a workflow comparison
+
+For a baseline and a prototype, freeze a common set of task inputs and semantic
+expected outcomes derived from the user's needs. Declare those input artifacts
+in each applicable evaluation plan and retain each tool's raw outputs and reviewed
+observation adapter. Matching input references can establish that the same task
+material was retained for both arms; execution and its use of those files remain
+external claims. If an adapter converts the common material into a tool-specific
+input format, retain that conversion and the resulting native input too.
+
+Keep implementation-specific checks, such as one product's export layout, return
+codes or provenance fields, separate from the common comparison. Declare units,
+time boundaries and precision before interpreting results. A daily estimate and
+a continuous-time interval answer different questions unless the comparison
+explicitly brings them to the same granularity. Preserve missing coverage and
+unfavorable outcomes. Software runtime alone does not measure operator effort,
+practical usefulness or adoption.
