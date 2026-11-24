@@ -272,7 +272,9 @@ class Reader:
                     self.entries+=len(es);counts=collections.Counter(e.filename for e in es)
                     for e in es:
                         label=e.filename
-                        if not _path_ok(label) or stat.S_IFMT(e.external_attr>>16) not in (0,stat.S_IFREG,stat.S_IFDIR):self.note(label,'UNSAFE_MEMBER',chain);continue
+                        if (e.orig_filename!=label or not _path_ok(e.orig_filename)
+                                or stat.S_IFMT(e.external_attr>>16) not in (0,stat.S_IFREG,stat.S_IFDIR)):
+                            self.note(e.orig_filename,'UNSAFE_MEMBER',chain);continue
                         if counts[label]!=1:self.note(label,'AMBIGUOUS_MEMBER',chain);continue
                         if e.is_dir():continue
                         ex=_excluded(label)
