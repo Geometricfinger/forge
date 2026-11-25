@@ -321,6 +321,8 @@ def rows(report):
                        'term_frequencies':d.get('structure',{}).get('term_frequencies',{}),
                        **({'conversion_endpoints': d['structure']['conversion_endpoints']}
                           if 'conversion_endpoints' in d.get('structure', {}) else {}),
+                       **({'return_type_declarations': d['structure']['return_type_declarations']}
+                          if 'return_type_declarations' in d.get('structure', {}) else {}),
                        'class_context':_class_context(d.get('structure',{}),s),
                        'implementation_kind':d.get('structure',{}).get('implementation_kind','NOT_CAPTURED'),
                        'method_role':d.get('structure',{}).get('method_role','UNCLASSIFIED'),

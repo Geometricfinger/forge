@@ -257,29 +257,40 @@ class Lexical:
     def __init__(self,records):
         self.rows=records;self.db=sqlite3.connect(':memory:')
         self.db.execute('CREATE VIRTUAL TABLE docs USING fts5(symbol,classdoc,source)')
-        self.wordsets=[]
+        self.wordsets=[];self.symbolsets=[]
         for i,r in enumerate(records,1):
             fs=[' '.join(terms(r['name'])),' '.join(_class_terms(r)),' '.join(terms(r['text']))]
-            self.wordsets.append(set(' '.join(fs).split()));self.db.execute('INSERT INTO docs(rowid,symbol,classdoc,source) VALUES(?,?,?,?)',(i,*fs))
+            self.wordsets.append(set(' '.join(fs).split()));self.symbolsets.append(set(fs[0].split()))
+            self.db.execute('INSERT INTO docs(rowid,symbol,classdoc,source) VALUES(?,?,?,?)',(i,*fs))
     def close(self):self.db.close()
-    def search(self,query,limit=10):
+    def search(self,query,limit=10,expansion=None,symbol_expansion=None):
         qt=set(terms(query))
         if not qt:return []
-        expression=' OR '.join('"'+t+'"' for t in sorted(qt))
+        expansion=expansion or {t:[t] for t in qt}
+        symbol_expansion=symbol_expansion or expansion
+        global_terms={v for variants in expansion.values() for v in variants}
+        symbol_terms={v for variants in symbol_expansion.values() for v in variants} - global_terms
+        expression=' OR '.join(['"'+t+'"' for t in sorted(global_terms)] + ['symbol:"'+t+'"' for t in sorted(symbol_terms)])
         rows=self.db.execute('SELECT rowid,bm25(docs,4,1,1) FROM docs WHERE docs MATCH ?',(expression,)).fetchall()
         results=[]
         for i,score in rows:
-            r=self.rows[i-1];matched=sorted(qt & self.wordsets[i-1])
-            results.append(project(r,query,matched)|{'lexical_score':score,'exact_symbol':query.strip() in (r['name'],r['name'].split('.')[-1])})
+            r=self.rows[i-1];matched=sorted(t for t,variants in expansion.items() if set(variants) & self.wordsets[i-1]
+                                           or set(symbol_expansion[t]) & self.symbolsets[i-1])
+            if matched:
+                results.append(project(r,query,matched,expansion,symbol_expansion)|{'lexical_score':score,'exact_symbol':query.strip() in (r['name'],r['name'].split('.')[-1])})
         results.sort(key=lambda r:(-int(r['exact_symbol']),-len(r['matched_terms']),r['lexical_score'],r['path'],r['start_line']))
         return results[:limit]
 
 
-def project(r,query,matched=None):
-    qt=set(terms(query));matched=matched if matched is not None else sorted(qt & (set(terms(r['name']+' '+r['text'])) | set(_class_terms(r))))
+def project(r,query,matched=None,expansion=None,symbol_expansion=None):
+    qt=set(terms(query));expansion=expansion or {t:[t] for t in qt}
+    symbol_expansion=symbol_expansion or expansion
+    recorded=set(terms(r['name']+' '+r['text'])) | set(_class_terms(r))
+    matched=matched if matched is not None else sorted(t for t,variants in expansion.items() if set(variants) & recorded
+                                                      or set(symbol_expansion[t]) & set(terms(r['name'])))
     view={'analysis_view':r['analysis_view']} if 'analysis_view' in r else {}
     context=r.get('class_documentation_context')
-    class_matches=sorted(qt & set((context or {}).get('terms',{})))
+    class_matches=sorted(t for t,variants in expansion.items() if set(variants) & set((context or {}).get('terms',{})))
     if class_matches:
         view['class_documentation_match']={k:context[k] for k in ('class_name','start_line','end_line','line_basis','evidence')}
         view['class_documentation_match']['matched_terms']=class_matches
@@ -291,7 +302,7 @@ def investigate(q,source_results,forge_root):
     records=[r for source in selected for r in source.get('records',[]) if not r.get('test_path')]
     refs=[r for source in selected for r in source.get('references',[])]
     gaps=[{'source':r['source']['id'],'state':r['status'],'gaps':r.get('gaps',[])} for r in selected if r['status'] in ('BLOCKED','UNSUPPORTED_BINARY','CODE_INDEXED_WITH_GAPS','TEXT_ONLY_UNSUPPORTED_LANGUAGE')]
-    lexical=[];forgerows=[];reference=[];observations={};directions={};class_contexts={}
+    lexical=[];forgerows=[];reference=[];observations={};directions={};conflicts={};predicates={};outputs={};class_contexts={}
     evidence = {}
     if q['intent'] in ('code','mixed'):
         corpus=validate_questions([q],forge_root)
@@ -299,6 +310,14 @@ def investigate(q,source_results,forge_root):
         from forge_core import retrieval
         directional = getattr(retrieval, 'direction', None)
         requested = directional.phrase(q['query']) if directional else None
+        intention = getattr(retrieval, 'query_intent', None)
+        returning = getattr(retrieval, 'return_types', None)
+        requested_output = returning.request(q['query']) if returning else None
+        expander = getattr(retrieval, 'expand_query', None)
+        expansion = (expander(set(terms(q['query'])), (), retrieval.SYNONYMS)
+                     if expander else {t:[t] for t in terms(q['query'])})
+        symbol_expansion = (expander(set(terms(q['query'])), {t for r in records for t in terms(r['name'])}, retrieval.SYNONYMS)
+                            if expander else expansion)
         required_api=q.get('required_api')
         by_id={r['id']:r for r in records}
         lists=[]
@@ -307,6 +326,7 @@ def investigate(q,source_results,forge_root):
             path=source.get('forge_report_path')
             if path:
                 report=corpus.read_report(Path(path).parent)
+                legacy=any(metadata.get('context_status') == 'REINDEX_REQUIRED' for metadata in corpus.all_rows(report))
                 # API evidence comes from checksum-verified corpus rows, not
                 # declarations supplied by the lexical record. Keep it even
                 # when this query only matches full source text.
@@ -319,10 +339,23 @@ def investigate(q,source_results,forge_root):
                             raise Blocked('BRIDGE_EVIDENCE_BINDING')
                         class_contexts[rid]=_class_documentation(metadata.get('class_context'))
                         observations[rid]=metadata.get('observed_apis',[])
-                        if requested and metadata.get('implementation_kind') != 'DECLARATION_OR_STUB':
-                            support = directional.match(requested, metadata.get('conversion_endpoints', ()))
+                        if requested and not legacy and metadata.get('implementation_kind') != 'DECLARATION_OR_STUB':
+                            if hasattr(directional,'evaluate'):
+                                support,reverse = directional.evaluate(requested, metadata.get('conversion_endpoints', ()))
+                            else:
+                                support,reverse = directional.match(requested, metadata.get('conversion_endpoints', ())),None
                             if support:
                                 directions[rid] = support
+                            if reverse:
+                                conflicts[rid] = reverse
+                        if intention and not legacy and intention.predicate_request(q['query']) and metadata.get('context_status') == 'CAPTURED':
+                            support=intention.predicate_match(q['query'],metadata.get('name',''),metadata.get('implementation_kind'),symbol_expansion)
+                            if support:
+                                predicates[rid]=support
+                        if returning and not legacy and metadata.get('context_status') == 'CAPTURED':
+                            output=returning.compare(requested_output,metadata.get('return_type_declarations'),metadata.get('implementation_kind'))
+                            if output:
+                                outputs[rid]=output
                 # Validate every retained copy before either channel can use
                 # its declaration terms, including copies with missing IDs.
                 if any(original.get('class_documentation_context') is not None and
@@ -333,7 +366,8 @@ def investigate(q,source_results,forge_root):
                 for r in found['results']:
                     original=by_id.get(occurrence_id(r))
                     if original is not None:
-                        source_rows.append(project(dict(original,observed_apis=observations[original['id']]),q['query']))
+                        source_rows.append(project(dict(original,observed_apis=observations[original['id']]),q['query'],
+                                                   expansion=expansion,symbol_expansion=symbol_expansion))
             if source_rows:lists.append(source_rows)
         if any(original.get('class_documentation_context') is not None and
                canonical(original['class_documentation_context'])!=canonical(class_contexts.get(original['id']))
@@ -343,14 +377,15 @@ def investigate(q,source_results,forge_root):
         eligible=[dict(r,observed_apis=observations.get(r['id'],[])) for r in records
                   if not required_api or required_api in observations.get(r['id'],[])]
         index=Lexical(eligible)
-        try:lexical=index.search(q['query'],10)
+        try:lexical=index.search(q['query'],10,expansion,symbol_expansion)
         finally:index.close()
         forgerows=[row for layer in zip_longest(*lists) for row in layer if row is not None][:10]
         # Per-source list order is retained with deterministic round-robin policy;
         # no raw score equivalence across different source indexes is assumed.
     if q['intent'] in ('reference','mixed') or not records:
         reference=reference_hits(refs,q['query'],5)
-    fused=rank_fusion(lexical,forgerows,5,required_api=q.get('required_api'),forge_observations=observations,directional_matches=directions)
+    fused=rank_fusion(lexical,forgerows,5,required_api=q.get('required_api'),forge_observations=observations,directional_matches=directions,
+                      directional_conflicts=conflicts,predicate_matches=predicates,declared_outputs=outputs)
     if q['intent']=='reference':fused=[]
     else:
         # Older external workbenches keep their existing result format.
@@ -361,7 +396,16 @@ def investigate(q,source_results,forge_root):
             if requested:
                 evidence['query_evidence']['requested_direction'] = {
                     'input': requested[0], 'output': requested[1],
-                    'top_result_declaration': fused[0].get('directional_match') if fused else None}
+                    'top_result_declaration': fused[0].get('directional_match') if fused else None,
+                    'top_result_reverse_declaration': fused[0].get('directional_conflict') if fused else None}
+            if intention and intention.predicate_request(q['query']):
+                evidence['query_evidence']['requested_predicate'] = {
+                    'top_result_declaration': fused[0].get('predicate_match') if fused else None,
+                    'evidence':'PREDICATE_DECLARATION_NOT_BEHAVIOR_PROOF'}
+            if requested_output:
+                evidence['query_evidence']['requested_output'] = {'type': requested_output,
+                    'top_result_declaration': fused[0].get('declared_output') if fused else None,
+                    'runtime_type_relationship': 'NOT_ESTABLISHED'}
 
     full=any(len(r['matched_terms'])==r['term_count'] for r in fused)
     status=('STATIC_LEADS_REVIEW_REQUIRED' if full else 'PARTIAL_QUERY_ONLY' if fused else

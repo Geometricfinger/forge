@@ -245,6 +245,94 @@ class QueryContracts(unittest.TestCase):
         self.assertEqual(second['query_evidence']['requested_direction']['top_result_declaration'],
                          {'basis': 'DOCSTRING_SUMMARY', 'input': ['silver'], 'output': ['copper']})
 
+    def test_formatted_direction_and_reverse_conflict_reach_both_channels(self):
+        source = (b'def reverse(value):\n    """Convert hexadecimal values to integers."""\n    return value\n'
+                  b'def forward(value):\n    """Convert :class:`int` to hexadecimal."""\n    return value\n')
+        work, _, session = self.start(self.mission(source, query='convert integers to hexadecimal values'))
+        first = json.loads((work / 'report.json').read_bytes())['queries'][0]
+        self.assertEqual(first['results'][0]['name'], 'forward')
+        self.assertEqual(first['results'][0]['directional_match']['basis'], 'DOCSTRING_SUMMARY')
+        self.assertTrue(any('directional_conflict' in r for r in first['results']))
+        followup = session.execute(self.request('convert hexadecimal to integers'))['result']
+        self.assertEqual(followup['results'][0]['name'], 'reverse')
+        self.assertEqual(followup['runtime_validation'], 'NOT_RUN')
+
+    def test_subject_matching_predicate_reaches_supervisor_without_execution(self):
+        source = (b'def titleize(value):\n    """Convert a string to title case."""\n    return value\n'
+                  b'def is_titlecase(value):\n    """Determine whether a string already has the requested form."""\n    return bool(value)\n')
+        query = 'Determine whether a string uses title case without converting it'
+        work, _, session = self.start(self.mission(source, query=query))
+        first = json.loads((work / 'report.json').read_bytes())['queries'][0]
+        self.assertEqual(first['results'][0]['name'], 'is_titlecase')
+        self.assertEqual(first['results'][0]['predicate_match']['matched_subject_terms'], ['case', 'title'])
+        second = session.execute(self.request(query))['result']
+        self.assertEqual(second['results'][0]['name'], 'is_titlecase')
+        self.assertEqual(second['query_evidence']['requested_predicate']['evidence'],
+                         'PREDICATE_DECLARATION_NOT_BEHAVIOR_PROOF')
+        self.assertFalse(self.canary.exists())
+
+    def test_literal_only_query_is_admitted_and_preserves_lexical_evidence(self):
+        source = (b'def yes(value):\n    """Return True."""\n    return value\n'
+                  b'def no(value):\n    """Return False."""\n    return value\n')
+        work, _, session = self.start(self.mission(source, query='True'))
+        first = json.loads((work / 'report.json').read_bytes())['queries'][0]
+        self.assertEqual(first['results'][0]['name'], 'yes')
+        self.assertEqual(first['query_evidence']['matched_terms'], ['true'])
+        second = session.execute(self.request('False'))['result']
+        self.assertEqual(second['results'][0]['name'], 'no')
+        self.assertEqual(second['query_evidence']['matched_terms'], ['false'])
+
+    def test_return_declarations_reach_runner_and_supervisor_without_type_guarantee(self):
+        source = (b'def other(value) -> Stone:\n    """Parse text into a Jewel."""\n    return value\n'
+                  b'def matching(value) -> Jewel:\n    """Parse text."""\n    return None\n')
+        query = 'Parse text into a Jewel'
+        work, _, session = self.start(self.mission(source, query=query))
+        first = json.loads((work / 'report.json').read_bytes())['queries'][0]
+        self.assertEqual(first['results'][0]['name'], 'matching')
+        self.assertTrue(first['results'][0]['declared_output']['name_match'])
+        self.assertIn('other', [r['name'] for r in first['results']])
+        second = session.execute(self.request(query))['result']
+        output = second['query_evidence']['requested_output']
+        self.assertEqual(second['results'][0]['name'], 'matching')
+        self.assertEqual(output['runtime_type_relationship'], 'NOT_ESTABLISHED')
+        self.assertEqual(second['runtime_validation'], 'NOT_RUN')
+
+    def test_optional_return_annotation_does_not_become_an_exact_name(self):
+        source = b'def matching(value) -> Jewel | None:\n    """Parse text into a Jewel."""\n    return value\n'
+        work, _, _ = self.start(self.mission(source, query='Parse text into a Jewel'))
+        first = json.loads((work / 'report.json').read_bytes())['queries'][0]
+        self.assertNotIn('declared_output', first['results'][0])
+        self.assertIsNone(first['query_evidence']['requested_output']['top_result_declaration'])
+
+    def test_compound_symbols_do_not_become_source_body_or_call_matches(self):
+        source = (b'def lookup(value):\n    return is_titlecase(value)\n'
+                  b'def is_titlecase(value):\n    return bool(value)\n')
+        work, _, _ = self.start(self.mission(source, query='title case'))
+        first = json.loads((work / 'report.json').read_bytes())['queries'][0]
+        for field in ('results', 'lexical_results', 'forge_results'):
+            self.assertEqual([r['name'] for r in first[field]], ['is_titlecase'])
+
+    def test_mixed_legacy_report_does_not_gain_predicate_or_return_hints(self):
+        source = (b'def is_copper(value) -> Jewel:\n    """Check whether copper. Parse text into a Jewel."""\n    return value\n'
+                  b'def older(value):\n    return value\n')
+        mission = self.mission(source, query='check whether copper')
+        group = bridge.inspect_source(mission['sources'][0], self.sources, self.directory / 'intake', ROOT)
+        report_path = Path(group['forge_report_path'])
+        report = json.loads(report_path.read_bytes())
+        report['sources'][0]['segments'][0]['definitions'][1].pop('structure')
+        report_path.write_bytes(core.canonical(report))
+        receipt_path = report_path.with_name('receipt.json')
+        receipt = json.loads(receipt_path.read_bytes())
+        receipt['report_sha256'] = core.sha(report_path.read_bytes())
+        receipt_path.write_bytes(core.canonical(receipt))
+        for query in ('check whether copper', 'Parse text into a Jewel'):
+            question = dict(mission['questions'][0], query=query)
+            result = bridge.investigate(question, [group], ROOT)
+            self.assertTrue(result['results'])
+            for row in result['results']:
+                self.assertNotIn('predicate_match', row)
+                self.assertNotIn('declared_output', row)
+
     def test_cli_invalid_query_returns_reason_without_creating_ledger(self):
         work, manifest, _ = self.start(self.simple_mission())
         request = self.directory / 'request.json'

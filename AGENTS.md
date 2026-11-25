@@ -130,6 +130,14 @@ To look for other APIs, edit `$WORK/profile.json`. The format is:
 
 `id` uses lowercase letters, digits, `_` and `-`; `api` is a dotted name such as `module.function` or `module.Class.method` (use `builtins.` for built-ins); `capability` is your own lowercase label. Without `--profile`, Forge uses `templates/corpus_profile.json`.
 
+Builtin profile entries use the same declared-import binding rule. A profile
+containing `builtins.eval` or `builtins.exec` can match an explicit imported
+binding; ordinary bare `eval(...)` and `exec(...)` calls are not resolved API
+findings. `corpus-symbol --name eval` (or `exec`) can expose their recorded call
+spellings as review leads, including spellings that refer to a shadowed local
+name. Inspect the scope and source; a missing API match does not establish that
+evaluation or execution behavior is absent.
+
 ### 4. Run the scan
 
 ```sh
@@ -228,9 +236,19 @@ A bare name matches the last component of a definition or call spelling. A dotte
 For conversion questions that give a source and a destination, the Workbench
 and research runner check the declared order in a function name, conversion
 summary, or simple input and return types. A matching declaration can offset
-one missing query term among partial results. Full term coverage keeps priority.
-Inspect the function body to verify behavior. Older indexes without the new
-declarations keep their original ranking. A new scan captures this evidence.
+one missing query term among partial results. Full term coverage keeps priority
+except for an explicitly reversed declaration when a forward lead is available.
+An explicit single-type output request can also use a simple return annotation,
+`:rtype:` field, or positive `:return:` class declaration. A matching declared
+name can outrank a differently declared name, with alias and subtype relationships
+left unresolved. An explicit predicate question can similarly favor a subject-matching `is_`,
+`has_`, `can_`, `supports_`, or `contains_` name. Results identify this declaration
+evidence. `None`, `True`, and `False` remain searchable terms, and bounded spelling
+families and complete compound identifiers can supply lexical matches.
+Inspect the body and test required behavior. These cues do not enforce arbitrary
+requirements such as date-only parsing. A fresh scan is needed to capture newly
+retained terms; indexes without structural metadata retain their compatibility
+ranking. See [search intent and limits](docs/SEARCH_INTENT.md).
 
 ### 7. Rescan after the code changes
 
