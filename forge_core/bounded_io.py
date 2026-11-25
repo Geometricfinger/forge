@@ -32,6 +32,7 @@ class _Capture:
         self.output = bytearray()
         self.overflow = threading.Event()
         self.failed = threading.Event()
+        self.memory_failed = threading.Event()
         self.lock = threading.Lock()
 
     def accept(self, data: bytes, stdout: bool) -> None:
@@ -108,6 +109,8 @@ def run_bounded(cmd, home, env, timeout=40, input=None, output_limit=None):
                 capture.accept(chunk, keep)
                 if capture.overflow.is_set():
                     break
+        except MemoryError:
+            capture.memory_failed.set()
         except (OSError, ValueError):
             if not stopping.is_set():
                 capture.failed.set()
@@ -127,6 +130,8 @@ def run_bounded(cmd, home, env, timeout=40, input=None, output_limit=None):
         except BrokenPipeError:
             # A fixed tool may intentionally stop without consuming all input.
             pass
+        except MemoryError:
+            capture.memory_failed.set()
         except (OSError, ValueError):
             if not stopping.is_set():
                 capture.failed.set()
@@ -148,6 +153,8 @@ def run_bounded(cmd, home, env, timeout=40, input=None, output_limit=None):
         else:
             input_done.set()
         while True:
+            if capture.memory_failed.is_set():
+                raise Blocked('TOOL_MEMORY_LIMIT')
             if capture.overflow.is_set():
                 raise Blocked('TOOL_OUTPUT_LIMIT')
             if capture.failed.is_set():
@@ -161,6 +168,8 @@ def run_bounded(cmd, home, env, timeout=40, input=None, output_limit=None):
         # Readers are finished; recheck flags after the completion barrier.
         # Otherwise a flag set between the earlier checks and poll() could
         # return a truncated result as success.
+        if capture.memory_failed.is_set():
+            raise Blocked('TOOL_MEMORY_LIMIT')
         if capture.overflow.is_set():
             raise Blocked('TOOL_OUTPUT_LIMIT')
         if capture.failed.is_set():

@@ -5,7 +5,7 @@ This module does not possess a Drive credential, make network requests, execute
 source, alter existing Atlas observations, or turn old prose into test evidence.
 """
 from __future__ import annotations
-import collections,contextlib,gzip,html,os,re,sys,time
+import collections,contextlib,html,os,re,sys,time
 from pathlib import Path
 from .common import *
 from .engine import Analyzer,ROOT,run_fixed
@@ -15,6 +15,10 @@ from . import analysis_recovery
 from .corpus_checkpoint import validate_result,validate_segment
 
 SCHEMA=1
+# Bound accumulated source metadata before aggregate publication. Source/parser
+# limits are independent; reaching this budget preserves completed checkpoints
+# and publishes an explicitly incomplete report that can be split into runs.
+MAX_REPORT_SOURCE_BYTES=160_000_000
 
 def manifest(value):
     if not isinstance(value,dict) or type(value.get('schema')) is not int or value['schema']!=1 or not isinstance(value.get('files'),list):raise Blocked('CORPUS_MANIFEST')
@@ -182,9 +186,9 @@ def run(workbench,source_root,manifest_file,out,profile=None,max_containers=20,a
     if not out.exists():out.mkdir(parents=True,mode=0o700);write(out/'binding.json',canonical(binding),new=True)
     elif loads(read(out/'binding.json',2_000_000))!=binding:raise Blocked('CORPUS_BINDING_CHANGED_NEW_RUN_REQUIRED')
     analyzer=analyzer or Analyzer(workbench.home)
-    results=[];unread=[];blocked=[];used=0;cached=0;start=time.monotonic()
+    results=[];unread=[];blocked=[];used=0;cached=0;metadata_bytes=0;start=time.monotonic()
     with _lock(out/'.running.lock'):
-        for row in m['files']:
+        for position,row in enumerate(m['files']):
             local=safe_path(source_root/row['path'])
             if not local.is_relative_to(source_root):raise Blocked('SOURCE_ESCAPE')
             try:
@@ -231,6 +235,13 @@ def run(workbench,source_root,manifest_file,out,profile=None,max_containers=20,a
                         else:write(history,previous,new=True)
                     r=fresh
                     write(checkpoint,canonical({'binding':cb,'result_sha256':sha(canonical(r)),'result':r}),new=not checkpoint.exists())
+                source_metadata_bytes=len(canonical(r))
+                if metadata_bytes+source_metadata_bytes>MAX_REPORT_SOURCE_BYTES:
+                    blocked.append({'file_id':row['file_id'],'reason':'CORPUS_METADATA_BUDGET'})
+                    unread.extend({'file_id':remaining['file_id'],'reason':'CORPUS_METADATA_BUDGET'}
+                                  for remaining in m['files'][position+1:])
+                    break
+                metadata_bytes+=source_metadata_bytes
                 results.append(r)
             except (Blocked,OSError) as e:blocked.append({'file_id':row['file_id'],'reason':str(e) if isinstance(e,Blocked) else type(e).__name__})
         segments=[s for r in results for s in r['segments']]
@@ -270,13 +281,18 @@ def run(workbench,source_root,manifest_file,out,profile=None,max_containers=20,a
             'syntax_unvalidated_modules':sum(not p['syntax_validation_complete'] for p in partitions),
             'scope':'Complete top-level units of the same original module; not standalone programs'}
         report['summary']['source_roundtrips_verified']=sum(r.get('source_reconstruction',{}).get('verified_exact_bytes') is True for r in results)
+        report['coverage']['metadata_budget']={'source_bytes':metadata_bytes,'limit_bytes':MAX_REPORT_SOURCE_BYTES,
+            'basis':'Canonical JSON bytes of retained source records; not a process memory limit'}
         report['recovery']=analysis_recovery.summary(out/'analysis_attempts')
         report['summary']['source_scope_records']=sum(1 for _ in source_rows(report))
         workbench.guard()  # Reject publication if the qualified tools changed mid-run.
-        write(out/'corpus.json',canonical(report));cart=gzip.compress(b''.join(canonical(row)+b'\n' for row in all_rows(report)),mtime=0)
-        write(out/'capabilities.ndjson.gz',cart)
-        write(out/'receipt.json',canonical({'report_sha256':sha(canonical(report)),'cart_sha256':sha(cart),'cart_bytes':len(cart),'source_bodies_retained':False}))
-        write(out/'Review.html',render(report).encode())
+        from .streaming import canonical_chunks, gzip_chunks, write_chunks
+        report_file=write_chunks(out/'corpus.json',canonical_chunks(report),limit=REPORT_READ_LIMIT)
+        cart_file=write_chunks(out/'capabilities.ndjson.gz',gzip_chunks(
+            canonical(row)+b'\n' for row in all_rows(report)))
+        write_chunks(out/'Review.html',(part.encode() for part in render_parts(report)))
+        write(out/'receipt.json',canonical({'report_sha256':report_file['sha256'],
+            'cart_sha256':cart_file['sha256'],'cart_bytes':cart_file['bytes'],'source_bodies_retained':False}))
     return report
 
 def _class_context(meta,segment):
@@ -402,15 +418,27 @@ def inspect_definition(report,definition_id,source_root,max_bytes=250_000):
 
 
 def render(report):
+    return ''.join(render_parts(report))
+
+def render_parts(report):
     esc=lambda x:html.escape(str(x),quote=True)
     recovery=report.get('recovery',{})
     recovery_html=('<h2>Analysis recovery</h2><p>'+esc(recovery.get('recovered_segments',0))+' recovered; '+esc(recovery.get('retry_eligible_segments',0))+' eligible for a later bounded retry; '+esc(recovery.get('exhausted_segments',0))+' exhausted. The original failures remain in the attempt history. No source code was executed.</p>') if recovery else ''
-    items=list(all_rows(report));data=canonical(items).decode().replace('<','\\u003c').replace('>','\\u003e').replace('&','\\u0026')
-    return '''<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>FORGE mixed-source corpus</title>
+    yield '''<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>FORGE mixed-source corpus</title>
 <style>body{font:16px system-ui;margin:2rem auto;max-width:1120px;padding:0 1rem;background:#101820;color:#e5edf4}h1{font-size:2rem}input{width:95%;padding:1rem;margin:1rem 0}article{padding:1rem;border:1px solid #425366;margin:.7rem 0;overflow-wrap:anywhere}small{color:#aab9c8}pre{white-space:pre-wrap}button{padding:.6rem;cursor:pointer}</style>
 <h1>FORGE · Mixed-source evidence</h1><p>Read-only test corpus. Static observations, not verified implementations.</p><p>'''+esc(report['status'])+' · '+esc(report['summary']['segments'])+' code segments · '+esc(report['summary']['definitions'])+''' definitions</p>'''+recovery_html+'''
 <input id="q" aria-label="Search code metadata" placeholder="Search names, paths, and documented terms"><p id="count"></p><div id="results"></div>
-<details><summary>Coverage and limitations</summary><pre>'''+esc(json.dumps({'coverage':report['coverage'],'gaps':report['gaps']},indent=2))+'''</pre></details><script type="application/json" id="records">'''+data+'''</script><script>
+<details><summary>Coverage and limitations</summary><pre>'''
+    from .streaming import json_text_chunks
+    for chunk in json_text_chunks({'coverage':report['coverage'],'gaps':report['gaps']},indent=2):
+        yield html.escape(chunk,quote=True)
+    yield '''</pre></details><script type="application/json" id="records">'''
+    yield '['
+    for index,row in enumerate(all_rows(report)):
+        if index:yield ','
+        yield canonical(row).decode().replace('<','\\u003c').replace('>','\\u003e').replace('&','\\u0026')
+    yield ']'
+    yield '''</script><script>
 const rows=JSON.parse(document.getElementById('records').textContent),q=document.getElementById('q'),root=document.getElementById('results');
 function show(){let words=q.value.toLowerCase().trim().split(/\\s+/).filter(Boolean),found=rows.filter(r=>words.every(w=>[r.name,r.path,r.logical_path_hint||'',...r.search_terms].join(' ').toLowerCase().includes(w)));root.replaceChildren();document.getElementById('count').textContent=found.length+' matching occurrences; showing at most 100. Search is lexical, not a confidence score.';for(const r of found.slice(0,100)){const a=document.createElement('article'),h=document.createElement('h3'),p=document.createElement('p'),s=document.createElement('small');h.textContent=r.name;p.textContent=r.container+' → '+r.member_chain.map(x=>x.path).join(' → ')+' · '+(r.logical_path_hint||r.path)+' · lines '+r.start_line+'–'+r.end_line;s.textContent=r.format+' | '+r.runtime_status+' | '+r.source_id;a.append(h,p,s);root.append(a)}}q.addEventListener('input',show);show();</script>'''
 
@@ -423,6 +451,10 @@ REPORT_READ_LIMIT=256_000_000
 def _read_report_with_digest(folder):
     folder=safe_path(folder);data=read(folder/'corpus.json',REPORT_READ_LIMIT);receipt=loads(read(folder/'receipt.json',2000))
     if not isinstance(receipt,dict) or sha(data)!=receipt.get('report_sha256') or receipt.get('source_bodies_retained') is not False:raise Blocked('CORPUS_RECEIPT')
+    # Drop the raw byte allocation before the decoder builds its object graph.
+    # The immutable text still represents the exact bytes already hash-checked.
+    try:data=data.decode('utf-8')
+    except UnicodeError as e:raise Blocked('INVALID_JSON') from e
     report=loads(data)
     if not isinstance(report,dict) or report.get('upstream_code_executed') is not False or report.get('source_bodies_retained') is not False:raise Blocked('CORPUS_AUTHORITY')
     return report, receipt['report_sha256']
