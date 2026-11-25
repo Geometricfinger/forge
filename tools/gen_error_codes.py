@@ -14,6 +14,10 @@ SKIP={'third_party','dependencies','history','evidence','review','__pycache__'}
 
 # Hand-written meanings for the codes a newcomer is most likely to hit.
 KNOWN={
+ 'CORPUS_METADATA_BUDGET':'The accepted source records reached the aggregate metadata budget. The report is incomplete; split the manifest and use new run IDs. Completed checkpoints are preserved.',
+ 'CORPUS_REPORT_SIZE_LIMIT':'The complete report would exceed its publication/read ceiling. Preserve checkpoints and select a smaller manifest in a new run.',
+ 'TOOL_MEMORY_LIMIT':'The fixed tool I/O collector could not allocate memory. Its owned process group was stopped; preserve this run and use smaller inputs or more available memory.',
+ 'MEMORY_BUDGET_EXHAUSTED':'The command could not allocate memory. Preserve any existing checkpoints and rerun a smaller selection in a fresh run; no completion is claimed.',
  'CORPUS_CHECKPOINT_INVENTORY':'The retained parser inventory is malformed. Preserve this run and rebuild into a new run ID from the pinned original files.',
  'CORPUS_CHECKPOINT_GAPS':'The retained parser gap collection is malformed. Preserve this run and rebuild into a new run ID.',
  'CORPUS_CHECKPOINT_INTAKE_MISMATCH':'Retained intake status contradicts the parser inventory. Preserve the original checkpoint and rebuild into a new run ID.',
@@ -186,6 +190,10 @@ def collect():
                   'forge_core/reviewed_evaluator.py':'REVIEWED_TRIAL_'}
         if rel.as_posix() in prefixes:
             for c in BEHAVIOR_PAT.findall(body):found[prefixes[rel.as_posix()]+c].add(rel.as_posix())
+        # The CLI emits its last-resort allocation refusal directly, without
+        # allocating and raising a second exception during memory pressure.
+        if rel.as_posix()=='forge.py' and "'reason':'MEMORY_BUDGET_EXHAUSTED'" in body:
+            found['MEMORY_BUDGET_EXHAUSTED'].add(rel.as_posix())
         # The checkpoint validator passes complete literal codes through its
         # fixed assertion helper. Collect only that module and code namespace.
         if rel.as_posix()=='forge_core/corpus_checkpoint.py':

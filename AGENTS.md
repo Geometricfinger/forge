@@ -156,6 +156,11 @@ The command prints one JSON object. Check `status`:
 | `INCOMPLETE` | 2 | Some files were not read (`coverage.unread`) or were rejected (`coverage.blocked`). See Troubleshooting. |
 | `BLOCKED` | 2 | Nothing was produced; `reason` names the problem. See Troubleshooting. |
 
+A run also has an aggregate metadata budget. If it reaches that budget, Forge
+publishes an explicitly incomplete prefix and preserves completed checkpoints.
+Split the manifest into smaller runs; see [corpus capacity](docs/CORPUS_CAPACITY.md)
+for the exact byte limits and the distinction between structure and API coverage.
+
 Results are written to `$WORK/forge-home/corpora/$RUN/`:
 
 - `corpus.json`: the full report (sources, segments, definitions, Hound findings, gaps, coverage). Source bodies are not stored.

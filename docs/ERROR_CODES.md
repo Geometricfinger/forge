@@ -117,6 +117,7 @@ If `reason` is a Python exception name instead of a code:
 | <a id="corpus_query_bool"></a>`CORPUS_QUERY_BOOL` | Invalid query text or terms. | forge_core/server.py |
 | <a id="corpus_receipt"></a>`CORPUS_RECEIPT` | A receipt does not match its packet. | forge_core/corpus.py |
 | <a id="corpus_report"></a>`CORPUS_REPORT` | Corpus run input or stored state failed validation. | forge_core/corpus.py, forge_core/retrieval.py |
+| <a id="corpus_report_size_limit"></a>`CORPUS_REPORT_SIZE_LIMIT` | The complete report would exceed its publication/read ceiling. Preserve checkpoints and select a smaller manifest in a new run. | forge_core/streaming.py |
 | <a id="corpus_running"></a>`CORPUS_RUNNING` | Corpus run input or stored state failed validation. | forge_core/corpus.py |
 | <a id="corpus_run_id"></a>`CORPUS_RUN_ID` | `--run-id` must be 1-80 characters of A-Z a-z 0-9 _ -. | forge.py, forge_core/corpus.py |
 | <a id="corpus_selection"></a>`CORPUS_SELECTION` | Corpus run input or stored state failed validation. | forge_core/opportunities.py, forge_core/server.py |
@@ -216,7 +217,7 @@ If `reason` is a Python exception name instead of a code:
 | <a id="invalid_explicit_symbol_query"></a>`INVALID_EXPLICIT_SYMBOL_QUERY` | Invalid query text or terms. | forge_core/opportunities.py |
 | <a id="invalid_intake_limit"></a>`INVALID_INTAKE_LIMIT` | A safety size/count limit was exceeded. | forge_core/mixed_intake.py |
 | <a id="invalid_investigation_report"></a>`INVALID_INVESTIGATION_REPORT` | Input or stored state failed a validation check (see the raising module). | forge_core/opportunities.py |
-| <a id="invalid_json"></a>`INVALID_JSON` | The file is not valid UTF-8 JSON. Commands that take JSON (`--bundle`, `--contract`, `--filters`, `review-note --file`, ...) need a JSON object. `opportunity-draft --file` also accepts plain-text notes; a file whose first character is `{` is parsed as JSON. | forge_core/common.py, runner/research_runner/core.py |
+| <a id="invalid_json"></a>`INVALID_JSON` | The file is not valid UTF-8 JSON. Commands that take JSON (`--bundle`, `--contract`, `--filters`, `review-note --file`, ...) need a JSON object. `opportunity-draft --file` also accepts plain-text notes; a file whose first character is `{` is parsed as JSON. | forge_core/common.py, forge_core/corpus.py, runner/research_runner/core.py |
 | <a id="invalid_json_or_unicode"></a>`INVALID_JSON_OR_UNICODE` | Malformed or oversized JSON. | forge_core/interop.py |
 | <a id="invalid_number"></a>`INVALID_NUMBER` | Input or stored state failed a validation check (see the raising module). | forge_core/interop.py |
 | <a id="invalid_symbol_name"></a>`INVALID_SYMBOL_NAME` | Use a literal Python function or method name, for example process_item or Worker.process_item. | forge_core/symbol_lookup.py |
@@ -233,6 +234,7 @@ If `reason` is a Python exception name instead of a code:
 | <a id="local_folder_empty"></a>`LOCAL_FOLDER_EMPTY` | The plain folder has no supported files (.py .pyi .pyw .ipynb .zip .txt .md .markdown .rst; hidden files are skipped). | forge_core/corpus.py |
 | <a id="malformed_opportunity_input"></a>`MALFORMED_OPPORTUNITY_INPUT` | An opportunity bundle, run or packet failed validation. | forge_core/opportunities.py |
 | <a id="mechanism_scope"></a>`MECHANISM_SCOPE` | Input or stored state failed a validation check (see the raising module). | forge_core/opportunities.py |
+| <a id="memory_budget_exhausted"></a>`MEMORY_BUDGET_EXHAUSTED` | The command could not allocate memory. Preserve any existing checkpoints and rerun a smaller selection in a fresh run; no completion is claimed. | forge.py |
 | <a id="mission_cancelled"></a>`MISSION_CANCELLED` | The mission was cancelled; create a new one. | forge_core/store.py |
 | <a id="mission_changed"></a>`MISSION_CHANGED` | A pinned input changed after it was recorded (hash/identity no longer matches). Start a new run/home, or restore the original file. | forge_core/store.py |
 | <a id="mission_fields"></a>`MISSION_FIELDS` | A JSON object has missing or unexpected fields. | forge_core/server.py |
@@ -290,7 +292,7 @@ If `reason` is a Python exception name instead of a code:
 | <a id="opportunity_schema"></a>`OPPORTUNITY_SCHEMA` | Wrong or missing `schema` version. | forge_core/opportunities.py |
 | <a id="opportunity_source_kind"></a>`OPPORTUNITY_SOURCE_KIND` | Source `kind` must be one of firsthand, product_listing, product_docs, issue, research, source_review, synthetic, and `public` a boolean. | forge_core/opportunities.py |
 | <a id="origin_denied"></a>`ORIGIN_DENIED` | Input or stored state failed a validation check (see the raising module). | forge_core/server.py |
-| <a id="output_conflict"></a>`OUTPUT_CONFLICT` | The output path already exists. Forge never overwrites; pick a new path. | forge.py, forge_core/common.py, forge_core/creation_quest.py |
+| <a id="output_conflict"></a>`OUTPUT_CONFLICT` | The output path already exists. Forge never overwrites; pick a new path. | forge.py, forge_core/common.py, forge_core/creation_quest.py, forge_core/streaming.py |
 | <a id="packet_authority"></a>`PACKET_AUTHORITY` | The record claims an authority Forge never grants (e.g. release approval, execution). | forge_core/contract_trial.py, forge_core/reuse.py |
 | <a id="packet_binding"></a>`PACKET_BINDING` | A stored record is bound to different inputs/code than the current ones (integrity check). | forge_core/reuse.py |
 | <a id="packet_changed"></a>`PACKET_CHANGED` | A pinned input changed after it was recorded (hash/identity no longer matches). Start a new run/home, or restore the original file. | forge_core/reuse.py |
@@ -518,6 +520,7 @@ If `reason` is a Python exception name instead of a code:
 | <a id="tool_exit_"></a>`TOOL_EXIT_` | Raised as `TOOL_EXIT_<n>`: a bounded helper subprocess exited with status n. | forge_core/bounded_io.py |
 | <a id="tool_input_bounds"></a>`TOOL_INPUT_BOUNDS` | A value is outside its allowed size or range. | forge_core/bounded_io.py |
 | <a id="tool_io_failed"></a>`TOOL_IO_FAILED` | A bounded helper subprocess failed, timed out or exceeded output limits. | forge_core/bounded_io.py |
+| <a id="tool_memory_limit"></a>`TOOL_MEMORY_LIMIT` | The fixed tool I/O collector could not allocate memory. Its owned process group was stopped; preserve this run and use smaller inputs or more available memory. | forge_core/bounded_io.py |
 | <a id="tool_output_bounds"></a>`TOOL_OUTPUT_BOUNDS` | A value is outside its allowed size or range. | forge_core/bounded_io.py |
 | <a id="tool_output_limit"></a>`TOOL_OUTPUT_LIMIT` | A safety size/count limit was exceeded. | forge_core/bounded_io.py |
 | <a id="tool_timeout"></a>`TOOL_TIMEOUT` | A bounded helper subprocess failed, timed out or exceeded output limits. | forge_core/bounded_io.py, tests/test_reviewed_evaluator.py, tests/test_reviewed_evaluator_cli.py, tests/test_workbench.py, tools/run_self_recovery_trial.py |

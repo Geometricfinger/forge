@@ -33,6 +33,8 @@ class CompletionBoundary(unittest.TestCase):
         self.check_edge('overflow', 'TOOL_OUTPUT_LIMIT')
     def test_late_io_failure_cannot_become_success(self):
         self.check_edge('failed', 'TOOL_IO_FAILED')
+    def test_late_memory_failure_cannot_become_success(self):
+        self.check_edge('memory_failed', 'TOOL_MEMORY_LIMIT')
 
 if __name__ == '__main__':
     unittest.main()
