@@ -193,7 +193,7 @@ def collect():
             for c in BEHAVIOR_PAT.findall(body):found[prefixes[rel.as_posix()]+c].add(rel.as_posix())
         # The CLI emits its last-resort allocation refusal directly, without
         # allocating and raising a second exception during memory pressure.
-        if rel.as_posix()=='forge.py' and "'reason':'MEMORY_BUDGET_EXHAUSTED'" in body:
+        if rel.as_posix()=='forge.py' and '"reason": "MEMORY_BUDGET_EXHAUSTED"' in body:
             found['MEMORY_BUDGET_EXHAUSTED'].add(rel.as_posix())
         # The checkpoint validator passes complete literal codes through its
         # fixed assertion helper. Collect only that module and code namespace.

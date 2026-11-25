@@ -81,6 +81,18 @@ name and matched subject terms. No boolean behavior is inferred from the name.
 
 ## Boundaries
 
+Ranked search keeps a defensive metadata snapshot and computes counts over every
+matching occurrence. Canonical identity hashes are streamed. Temporary input rows
+are released before building the index features. Matching candidates retain
+compact scores; field and declaration evidence is assembled only for displayed
+rows, each with separate nested copies. A result limit bounds displayed rows; it
+does not reduce the corpus-wide statistics or the occurrences retained within a
+selected distinct group. Large reports and broad queries still require memory
+for the report, index and matching scores. When Python raises `MemoryError`, the
+CLI releases the failed command's traceback and writes a fixed
+`MEMORY_BUDGET_EXHAUSTED` response without invoking the JSON formatter. Resource
+refusals do not claim a complete search.
+
 These cues are shared with the research runner's fused code results. The runner
 checks declaration metadata against the retained corpus before using it. Older
 external Workbenches without the extension keep their existing behavior, and
