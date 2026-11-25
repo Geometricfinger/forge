@@ -145,7 +145,8 @@ def terms(s):
     s=re.sub(r'([a-z0-9])([A-Z])',r'\1 \2',s)
     return [x for x in re.findall('[a-z][a-z0-9]*',s.lower()) if x not in STOP]
 
-def rank_fusion(lexical,forge,limit=5,required_api=None,forge_observations=None,directional_matches=None):
+def rank_fusion(lexical,forge,limit=5,required_api=None,forge_observations=None,directional_matches=None,
+                directional_conflicts=None,predicate_matches=None,declared_outputs=None):
     check_int(limit,1,20);merged={}
     # A lexical assertion is not an observed API. Only FORGE contributes those.
     observed={r['id']:r.get('observed_apis',[]) for r in forge}
@@ -164,8 +165,20 @@ def rank_fusion(lexical,forge,limit=5,required_api=None,forge_observations=None,
     for rid, support in (directional_matches or {}).items():
         if rid in merged:
             merged[rid]['directional_match'] = support
-    return sorted(merged.values(),key=lambda r:(-int(len(r['matched_terms'])==r['term_count']),
-        -(len(r['matched_terms']) + int('directional_match' in r)), -int('directional_match' in r),
+    for field, evidence in [('directional_conflict',directional_conflicts),('predicate_match',predicate_matches),('declared_output',declared_outputs)]:
+        for rid, support in (evidence or {}).items():
+            if rid in merged:
+                merged[rid][field] = support
+    has_forward=any('directional_match' in r for r in merged.values())
+    has_output=any(r.get('declared_output',{}).get('name_match') for r in merged.values())
+    def intent_order(r):
+        output=r.get('declared_output')
+        conflict=(has_forward and 'directional_conflict' in r or has_output and output is not None and not output['name_match'])
+        preference=('directional_match' in r or 'predicate_match' in r or output is not None and output['name_match'])
+        return (-int(len(r['matched_terms'])==r['term_count'] and not conflict),
+                -(len(r['matched_terms']) + int(preference) - int(conflict)),
+                -int(preference),int(conflict))
+    return sorted(merged.values(),key=lambda r:(*intent_order(r),
         -int(r.get('exact_symbol',False)),-r['rrf'],r['id']))[:limit]
 
 def reference_hits(refs,query,limit):

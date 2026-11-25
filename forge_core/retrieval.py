@@ -7,10 +7,10 @@ from __future__ import annotations
 import collections, copy, math, re, threading
 from functools import lru_cache
 from .common import Blocked, canonical, integer, sha, text
-from .lexical import counts, words
-from . import direction
+from .lexical import counts, expand_query, words
+from . import direction, query_intent, return_types
 
-VERSION = 'field-bm25-rrf-3-direction'
+VERSION = 'field-bm25-rrf-5-declared-output'
 K1, B, RRF_K = 1.2, 0.75, 60
 WEIGHTS = {'symbol': 5.0, 'documentation': 1.0, 'parameters': 0.4,
            'path': 0.3, 'observed_api': 4.0, 'declared_call': 1.3,
@@ -141,7 +141,8 @@ class SearchIndex:
         # Do not silently rerank old observations as though fresh call context exists.
         self.legacy = any(r.get('context_status') == 'REINDEX_REQUIRED' for r in rows)
         self.features = []; self.postings = collections.defaultdict(set); self.groups = collections.defaultdict(list)
-        self.output_postings = collections.defaultdict(set)
+        self.output_postings = collections.defaultdict(set); self.symbol_tokens = set()
+        self.return_postings = collections.defaultdict(set)
         seen = set()
         for index, row in enumerate(self.rows):
             key = occurrence_id(row)
@@ -153,7 +154,14 @@ class SearchIndex:
                 for declaration in row.get('conversion_endpoints', ()):
                     for token in declaration['output']:
                         self.output_postings[token].add(index)
+                returned = row.get('return_type_declarations') or {}
+                if returned.get('status') == 'CAPTURED':
+                    for declaration in returned.get('declarations', ()):
+                        name = declaration['type'].casefold()
+                        self.return_postings[name].add(index)
+                        self.return_postings[name.rsplit('.', 1)[-1]].add(index)
             fields = _fields(row); self.features.append(fields)
+            self.symbol_tokens.update(fields['symbol'])
             self.groups[group_key(row)].append(index)
             for token in set().union(*(set(x) for x in fields.values())):
                 self.postings[token].add(index)
@@ -179,15 +187,24 @@ class SearchIndex:
         if not qt: raise Blocked('QUERY_TERMS_REQUIRED')
         if len(qt) > 32: raise Blocked('QUERY_TERM_LIMIT')
         synonyms = LEGACY_EXPAND if self.legacy else SYNONYMS
-        expansion = {t: sorted(synonyms.get(t, {t})) for t in qt}
+        expansion = ({t: sorted(synonyms.get(t, {t})) for t in qt} if self.legacy else
+                     expand_query(qt, (), synonyms))
+        symbol_expansion = expansion if self.legacy else expand_query(qt, self.symbol_tokens, synonyms)
         indexes = set()
-        for values in expansion.values():
+        for values in symbol_expansion.values():
             for token in values: indexes.update(self.postings.get(token, ()))
         if self.legacy: indexes = set(range(len(self.rows)))
         requested = direction.phrase(query) if not self.legacy else None
+        requested_output = return_types.request(query) if not self.legacy else None
+        if requested_output:
+            for token in expand_query([requested_output.casefold()], ())[requested_output.casefold()]:
+                indexes.update(self.return_postings.get(token, ()))
         if requested:
-            # A simple type annotation can supply a query term absent from the legacy postings.
-            indexes.update(set.intersection(*(self.output_postings.get(t, set()) for t in requested[1])))
+            # A simple return annotation can supply an endpoint absent from the
+            # ordinary postings; evaluate both endpoints before granting support.
+            for token in requested[1]:
+                for variant in expansion.get(token, (token,)):
+                    indexes.update(self.output_postings.get(variant, ()))
         scored = []; excluded = collections.Counter()
         for i in sorted(indexes):
             row = copy.deepcopy(self.rows[i]); fields = self.features[i]
@@ -198,18 +215,27 @@ class SearchIndex:
             if not set(filters.get('required_apis', ())) <= apis: excluded['required_api_not_observed'] += 1; continue
             if set(filters.get('exclude_apis', ())) & apis: excluded['excluded_api_observed'] += 1; continue
             all_terms = set(row['search_terms']) if self.legacy else set().union(*(set(v) for v in fields.values()))
-            matched = [t for t, variants in expansion.items() if set(variants) & all_terms]
+            matched = [t for t, variants in expansion.items() if set(variants) & all_terms or
+                       not self.legacy and set(symbol_expansion[t]) & set(fields['symbol'])]
             declarations = row.pop('conversion_endpoints', ())
-            support = (direction.match(requested, declarations)
-                       if requested and row.get('implementation_kind') != 'DECLARATION_OR_STUB' else None)
+            returned = return_types.compare(requested_output, row.pop('return_type_declarations', None), row.get('implementation_kind'))
+            support, reverse = (direction.evaluate(requested, declarations)
+                                if requested and row.get('implementation_kind') != 'DECLARATION_OR_STUB'
+                                else (None, None))
+            predicate = (query_intent.predicate_match(query, row['name'], row.get('implementation_kind'), symbol_expansion)
+                         if not self.legacy else None)
             if support:
-                endpoint_terms = sorted(set(qt) & set(support['input'] + support['output']))
+                declared_terms = set(support['input'] + support['output'])
+                endpoint_terms = sorted(t for t, variants in expansion.items() if set(variants) & declared_terms)
                 matched = sorted(set(matched).union(endpoint_terms))
+            if returned and returned['name_match']:
+                return_terms = sorted(set(qt) & set(words(requested_output)))
+                matched = sorted(set(matched).union(return_terms))
             if not matched: continue
             totals = {}; evidence = {}
             for field, weight in WEIGHTS.items():
                 terms = {}; score = 0.0
-                for qterm, variants in expansion.items():
+                for qterm, variants in (symbol_expansion if field == 'symbol' else expansion).items():
                     matches = [t for t in variants if t in fields[field]]
                     if not matches: continue
                     terms[qterm] = matches
@@ -220,14 +246,24 @@ class SearchIndex:
                 if terms: evidence[field] = terms
             row.update({'matched_query_terms': matched, 'match_count': len(matched),
                         'all_query_terms_matched': len(matched) == len(qt),
-                        'symbol_query_matches': len(set(qt) & set(words(row['name']))),
-                        'exact_symbol_match': sorted(set(words(row['name'].split('.')[-1]))) == qt,
+                        'symbol_query_matches': sum(bool(set(v) & set(words(row['name']))) for v in symbol_expansion.values()),
+                        'exact_symbol_match': (row['name'].split('.')[-1].casefold() == query.strip().casefold()
+                                               if re.fullmatch(r'[A-Za-z_]\w*', query.strip()) else
+                                               sorted(set(words(row['name'].split('.')[-1]))) == qt),
                         'text_group_id': group_key(row),
                         'rank_breakdown': {'field_bm25': totals, 'bm25_total': sum(totals.values())},
                         'matched_fields': evidence})
             if support:
                 row['rank_breakdown']['directional_match'] = support
                 row['matched_fields']['conversion_declaration'] = {t: [t] for t in endpoint_terms}
+            if reverse:
+                row['rank_breakdown']['directional_conflict'] = reverse
+            if predicate:
+                row['rank_breakdown']['predicate_match'] = predicate
+            if returned:
+                row['rank_breakdown']['declared_output'] = returned
+                if returned['name_match']:
+                    row['matched_fields']['return_type_declaration'] = {t: [t] for t in return_terms}
             scored.append(row)
         # Channel rankings contain a content group once, not once per archive copy.
         rankings = []; channel_names = ('lexical', 'symbol', 'call')
@@ -261,9 +297,19 @@ class SearchIndex:
                 preference = (1 if role == 'CONSTRUCTOR' else -1 if role == 'CALL_OPERATION' else 0) if construction else (1 if role == 'CALL_OPERATION' else -1 if role == 'CONSTRUCTOR' else 0)
                 row['rank_breakdown']['role_preference'] = preference if class_match and row.get('implementation_kind') != 'DECLARATION_OR_STUB' else 0
                 row['rank_breakdown']['role_policy'] = 'EXPLICIT_CONSTRUCTION' if construction else 'CLASS_BEHAVIOR_TIEBREAK'
-            scored.sort(key=lambda row: (-int(row['all_query_terms_matched']),
-                                        -(row['match_count'] + int('directional_match' in row['rank_breakdown'])),
-                                        -int('directional_match' in row['rank_breakdown']), -int(row['exact_symbol_match']),
+            has_forward = any('directional_match' in row['rank_breakdown'] for row in scored)
+            has_output = any(row['rank_breakdown'].get('declared_output', {}).get('name_match') for row in scored)
+            def intent_order(row):
+                breakdown = row['rank_breakdown']
+                output = breakdown.get('declared_output')
+                conflict = (has_forward and 'directional_conflict' in breakdown or
+                            has_output and output is not None and not output['name_match'])
+                preference = ('directional_match' in breakdown or 'predicate_match' in breakdown or
+                              output is not None and output['name_match'])
+                return (-int(row['all_query_terms_matched'] and not conflict),
+                        -(row['match_count'] + int(preference) - int(conflict)),
+                        -int(preference), int(conflict))
+            scored.sort(key=lambda row: (*intent_order(row), -int(row['exact_symbol_match']),
                                         -row['symbol_query_matches'], -row['rank_breakdown']['role_preference'], -row['rank_breakdown']['rrf'],
                                         -row['rank_breakdown']['bm25_total'], row['name'], occurrence_id(row)))
         grouped = collections.OrderedDict()
@@ -286,15 +332,24 @@ class SearchIndex:
         orientation = {}
         if requested:
             orientation['requested_direction'] = {'input': requested[0], 'output': requested[1],
-                'matching_occurrences': sum('directional_match' in row['rank_breakdown'] for row in scored)}
-        return {'query': query, 'query_terms': qt, 'query_expansion': expansion, **orientation,
+                'matching_occurrences': sum('directional_match' in row['rank_breakdown'] for row in scored),
+                'reverse_declared_occurrences': sum('directional_conflict' in row['rank_breakdown'] for row in scored)}
+        if not self.legacy and query_intent.predicate_request(query):
+            orientation['requested_predicate'] = {'matching_occurrences': sum('predicate_match' in row['rank_breakdown'] for row in scored),
+                'evidence': 'PREDICATE_DECLARATION_NOT_BEHAVIOR_PROOF'}
+        if requested_output:
+            orientation['requested_output'] = {'type': requested_output,
+                'matching_occurrences': sum(bool(row['rank_breakdown'].get('declared_output', {}).get('name_match')) for row in scored),
+                'evidence': 'DECLARED_RETURN_NAME_NOT_BEHAVIOR_PROOF', 'runtime_type_relationship': 'NOT_ESTABLISHED'}
+        return {'query': query, 'query_terms': qt, 'query_expansion': expansion,
+                **({'symbol_query_expansion': symbol_expansion} if symbol_expansion != expansion else {}), **orientation,
                 'query_evidence': query_evidence(qt, scored[0]['matched_query_terms'] if scored else [], 'TOP_METADATA_RESULT'),
                 'filters': filters, 'distinct': distinct, 'total_matching_occurrences': len(scored),
                 'distinct_matching_groups': len(grouped), 'full_match_count': sum(r['all_query_terms_matched'] for r in scored),
                 'results': (displayed if distinct else scored)[:limit],
                 'search_status': 'MATCHES_FOUND' if any(r['all_query_terms_matched'] for r in scored) else
                                  'PARTIAL_TERM_MATCHES_ONLY' if scored else 'NO_METADATA_MATCH',
-                'rank_meaning': ('legacy metadata coverage and exact symbols preserved; new call context requires reindexing; BM25 components diagnostic only' if self.legacy else 'complete term coverage first; an evidenced conversion direction can offset one missing term among partial matches; then exact symbols and field-weighted BM25 / reciprocal rank fusion') + '; NOT confidence, code quality, or verified behavior',
+                'rank_meaning': ('legacy metadata coverage and exact symbols preserved; new call context requires reindexing; BM25 components diagnostic only' if self.legacy else 'complete term coverage first except a reverse conversion or different declared return name when a matching declaration is available; a declared direction, return name, or subject-matching predicate can offset one missing term among partial matches; then exact symbols and field-weighted BM25 / reciprocal rank fusion') + '; NOT confidence, code quality, or verified behavior',
                 'ranker_version': 'legacy-coverage-compatible-1' if self.legacy else 'field-bm25-rrf-1',
                 'ranking_extension_version': None if self.legacy else VERSION, 'index_binding': self.binding,
                 'ranking_mode': 'LEGACY_COMPATIBILITY' if self.legacy else 'STRUCTURED_RETRIEVAL',

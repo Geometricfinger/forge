@@ -163,6 +163,18 @@ No raw class docstring is reconstructed. Nested functions and overriding methods
 do not inherit another class's description. Missing older metadata adds no new
 class terms. Added class words count toward the existing retained-search budget.
 
+Code search also shares the Workbench's bounded spelling expansions, explicit
+conversion direction, declared return names, and subject-matching predicate cues. A forward declaration
+can outrank an explicitly reverse declaration even when the latter contains more
+query words. The fused result exposes `directional_match`, `directional_conflict`,
+`predicate_match`, and `declared_output` when present; query evidence identifies the top declaration.
+These fields come from the bound corpus, not an API claim in source text.
+Ordinary complete term coverage retains priority except for a reverse direction
+or different declared return name when a matching declaration is available.
+Alias and subtype relationships are not established. Arbitrary requirements
+(including date-only parsing or absence of side effects) still require review and
+acceptance tests. See [search intent and limits](../docs/SEARCH_INTENT.md).
+
 The added result fields retain report schema 1. Runner code is part of mission
 identity, so existing completed missions must be recreated in a fresh external
 workspace after this update; do not rewrite their binding or checkpoint files.
