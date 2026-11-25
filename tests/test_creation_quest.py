@@ -74,6 +74,10 @@ class CreationQuestTests(unittest.TestCase):
         self.assertEqual(receipt['acceptance_file'], {'sha256': sha(check.read_bytes()), 'bytes': check.stat().st_size})
         self.assertEqual(receipt['runtime_validation'], 'NOT_RUN')
         self.assertIs(receipt['source_code_executed'], False)
+        packaging_review = (self.out/'preflight.json').read_bytes()
+        self.assertEqual(receipt['preflight']['report_sha256'], sha(packaging_review))
+        self.assertEqual(result['preflight_status'], 'NO_ISSUES_OBSERVED')
+        self.assertEqual(json.loads(packaging_review)['status'], 'NO_ISSUES_OBSERVED')
         with ZipFile(product) as artifact:
             self.assertEqual(artifact.read('helpers/measure.py'), self.unit.read_bytes())
             self.assertEqual(artifact.read('__main__.py'), self.entry.read_bytes())

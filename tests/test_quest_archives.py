@@ -47,6 +47,8 @@ class ArchiveQuestTests(unittest.TestCase):
                      'release-1.0/LICENSE': b'Synthetic fixture notice.\n',
                      'release-1.0/other/__init__.py': b'OTHER = True\n',
                      'release-1.0/unselected.py': b'raise RuntimeError("must never run")\ndef unused(): pass\n',
+                     'release-1.0/latin_key.py': b'KEY = 1\n',
+                     'release-1.0/unicode_key.py': b'KEY = 2\n',
                      'release-1.0/stub.pyi': b'def declared(): ...\n',
                      'release-1.0/guide.md': b'```python\ndef fenced(): pass\n```\n'}
         inner = BytesIO()
@@ -145,6 +147,25 @@ class ArchiveQuestTests(unittest.TestCase):
     def test_archived_component_requires_explicit_destination(self):
         self.recipe['module_files'] = self.recipe['module_files'][1:]
         self.blocked('QUEST_MODULE_MAPPING_REQUIRED')
+
+    def test_nfkc_collision_reaches_preflight_after_path_validation(self):
+        normal, distinct = 'K.py', '\U0001d542.py'
+        self.assertNotEqual(normal.casefold(), distinct.casefold())
+        self.recipe['module_files'] += [self.mapping('release-1.0/latin_key.py', normal),
+                                        self.mapping('release-1.0/unicode_key.py', distinct)]
+        code, result = self.build()
+        self.assertEqual(code, 0, result)
+        self.assertEqual(result['preflight_status'], 'REVIEW_REQUIRED')
+        report = json.loads((self.out/'preflight.json').read_bytes())
+        collision = next(row for row in report['issues'] if row['code'] == 'NORMALIZED_MODULE_COLLISION')
+        self.assertEqual(collision['module'], 'K')
+        self.assertEqual(collision['paths'], [normal, distinct])
+        with ZipFile(self.out/'product.pyz') as archive:
+            self.assertEqual(archive.read(normal), self.files['release-1.0/latin_key.py'])
+            self.assertEqual(archive.read(distinct), self.files['release-1.0/unicode_key.py'])
+        receipt = json.loads((self.out/'receipt.json').read_bytes())
+        self.assertEqual(receipt['preflight']['report_sha256'], sha((self.out/'preflight.json').read_bytes()))
+        self.assertEqual(receipt['runtime_validation'], 'NOT_RUN')
 
     def test_initializer_must_match_original_source_and_destination(self):
         for mappings in [self.recipe['module_files'][:1],

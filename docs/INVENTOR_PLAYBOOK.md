@@ -66,7 +66,63 @@ python3 forge.py --home "$WORK/home" quest-build --quest "$WORK/scout/quest.json
   --check-file "$WORK/check.py" --out "$WORK/product"
 ```
 
-The new output directory contains `product.pyz` and `receipt.json`. The receipt lists the exact module, entry-point and archive hashes. If supplied, `--check-file` records the acceptance file's hash. Run a reviewed product separately using `python3 "$WORK/product/product.pyz"` with its expected arguments. Execute the acceptance checks against those same archive bytes and keep the results. A build receipt alone establishes what was packaged.
+The new output directory contains `product.pyz`, `receipt.json` and `preflight.json`.
+The receipt lists the exact module, entry-point, archive and preflight hashes. If
+supplied, `--check-file` records the acceptance file's hash. Review the preflight
+issues, then run an authorized, reviewed product separately using
+`python3 "$WORK/product/product.pyz"` with its expected arguments. Execute the
+acceptance checks against those same archive bytes and keep the results. A build
+receipt establishes what was packaged; runtime validation remains `NOT_RUN`.
+
+### Review packaging before execution
+
+Every build checks the exact selected Python bytes in fixed compiler workers.
+The workers compile source without importing or executing it, then collect
+bounded import and literal package-resource syntax. They use the interpreter
+that runs Forge. Compilation can reveal an encoding problem that normalized
+corpus analysis did not expose, including preserved UTF-16 source bytes.
+
+`preflight.json` records each file's raw digest and compilation result, together
+with issues, source lines and suggested next steps. The CLI reports its status
+and issue count. `NO_ISSUES_OBSERVED` means these checks found no issues;
+`REVIEW_REQUIRED` means there are advisory findings; `INCOMPLETE` means a worker,
+capture or report limit prevented the complete bounded check. Packaging retains
+the original bytes and all warnings; a warning does not silently change imports,
+transcode modules or create package initializers.
+
+The receipt binds the exact `preflight.json` bytes by hash alongside the product
+hash. Assessment validates the optional summary and preserves the original
+receipt; it does not load that sidecar or rerun its checks. Compare the sidecar's
+hash with the receipt before using a separately supplied preflight report.
+
+| Preflight lead | Review action |
+|---|---|
+| Missing direct or relative import under a selected package | Select the needed module or review the conditional import. Imported attributes and dynamic imports remain unresolved. |
+| External import | Verify the dependency in the target environment. Forge does not import or install it. |
+| Literal package resource missing from the selected files | Select the exact resource at the expected destination. Aliased `importlib.resources` and `pkgutil` calls are recognized only when their module-level imports are unambiguous. |
+| Namespace package resource in a ZIP | Review the loader's ZIP support; select an original initializer explicitly when appropriate. Namespace imports alone do not trigger this warning. |
+| Eager import cycle | Review initialization order. Delayed function-body imports do not create eager edges; conditional imports may still produce a review lead. |
+| Top-level standard-library name | Review potential shadowing; nested modules and names built into the interpreter are distinguished. |
+| Raw Python compilation rejection | Review syntax and encoding for the intended Python version. Raw bytes remain unchanged. |
+| Non-NFKC module name or normalized-name collision | Review the destination mapping against Python's identifier normalization. Exact-string dynamic import behavior can differ. |
+
+The checks do not establish dependency closure, external package availability,
+successful initialization, compatibility with another interpreter or operating
+system, or runtime correctness. Dynamic resource paths and ambiguous/rebound
+aliases need manual review. Package resource anchors that name ordinary modules
+remain unresolved because interpreter versions differ. Resource checks do not
+read any files outside the selected bytes. Limits are 60,000 AST nodes per
+module, 256 import/resource references per kind per module, 512 retained issues
+and a 45-second worker wall budget for the product. Linux workers also have
+fixed address-space, CPU and file-descriptor limits. These are resource controls,
+not a hostile-code sandbox.
+
+Some unresolved expressions can appear in a `NO_ISSUES_OBSERVED` report: a
+`from . import name` member could be an attribute or submodule; even a literal
+`import_module("pkg.name")` call remains dynamic; and resource objects stored in
+variables or resource APIs imported inside functions are not followed. Review
+these cases separately rather than treating the absence of a warning as proof
+that their dependencies or resource files are present.
 
 ### Assemble directly from an indexed ZIP
 

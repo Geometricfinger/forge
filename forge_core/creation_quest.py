@@ -347,6 +347,9 @@ def build(workbench, quest_file, recipe_file, entry_file, source_root, out, chec
     modules, definitions, assets, source_files = _modules(report, root, recipe)
     if len(entry) + sum(map(len, modules.values())) + sum(map(len, assets.values())) > APP_BYTES:
         raise Blocked('QUEST_PRODUCT_SIZE')
+    from . import quest_preflight
+    packaging_review = quest_preflight.run(workbench.home, modules, assets, entry)
+    packaging_review_bytes = canonical(packaging_review)
     artifact = _archive({**modules, **assets}, entry)
     receipt = {'schema': 1, 'status': 'PROTOTYPE_PACKAGED', 'mode': quest['mode'],
                'run_id': quest['run_id'], 'corpus_sha256': digest, 'quest_sha256': sha(quest_bytes),
@@ -355,6 +358,7 @@ def build(workbench, quest_file, recipe_file, entry_file, source_root, out, chec
                'modules': [{'path': path, 'sha256': sha(data), 'bytes': len(data)} for path, data in modules.items()],
                'definitions': definitions, 'product_sha256': sha(artifact), 'product_bytes': len(artifact),
                'source_code_executed': False, 'runtime_validation': 'NOT_RUN', 'acceptance_file': None}
+    receipt['preflight'] = quest_preflight.summary(packaging_review, packaging_review_bytes)
     if 'module_files' in recipe or 'assets' in recipe:
         receipt['source_files'] = source_files
     if purpose is not None:
@@ -364,7 +368,10 @@ def build(workbench, quest_file, recipe_file, entry_file, source_root, out, chec
     if check_file is not None:
         check = read(check_file, 4_000_000)
         receipt['acceptance_file'] = {'sha256': sha(check), 'bytes': len(check)}
-    _publish(out, {'product.pyz': artifact, 'receipt.json': canonical(receipt)})
+    _publish(out, {'product.pyz': artifact, 'receipt.json': canonical(receipt),
+                   'preflight.json': packaging_review_bytes})
     return {'status': receipt['status'], 'product': str(out / 'product.pyz'),
             'receipt': str(out / 'receipt.json'), 'product_sha256': receipt['product_sha256'],
-            'runtime_validation': receipt['runtime_validation']}
+            'runtime_validation': receipt['runtime_validation'], 'preflight': str(out/'preflight.json'),
+            'preflight_status': packaging_review['status'],
+            'preflight_issues': len(packaging_review['issues'])}

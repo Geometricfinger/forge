@@ -187,7 +187,7 @@ def _receipt(raw, recipe_raw, recipe):
                 'modules', 'definitions', 'product_sha256', 'product_bytes',
                 'source_code_executed', 'runtime_validation', 'acceptance_file'}
     if (not isinstance(receipt, dict) or required - receipt.keys()
-            or receipt.keys() - (required | {'purpose_evidence', 'evaluation_plan', 'source_files'})
+            or receipt.keys() - (required | {'purpose_evidence', 'evaluation_plan', 'source_files', 'preflight'})
             or type(receipt['schema']) is not int or receipt['schema'] != 1
             or receipt['status'] != 'PROTOTYPE_PACKAGED'
             or receipt['mode'] not in ('idea', 'scout', 'opportunity')
@@ -215,6 +215,20 @@ def _receipt(raw, recipe_raw, recipe):
             or sorted(ids) != sorted(recipe['components'])):
         raise Blocked('QUEST_ASSESS_RECIPE_BINDING')
     _source_files(receipt, recipe)
+    if 'preflight' in receipt:
+        preflight = receipt['preflight']
+        _fields(preflight, {'status', 'report_sha256', 'files', 'issues', 'omitted_issues',
+                            'source_code_executed', 'runtime_validation'}, 'QUEST_ASSESS_RECEIPT')
+        _digest(preflight['report_sha256'], 'QUEST_ASSESS_RECEIPT')
+        if (not isinstance(preflight['status'], str)
+                or preflight['status'] not in {'NO_ISSUES_OBSERVED', 'REVIEW_REQUIRED', 'INCOMPLETE'}
+                or preflight['source_code_executed'] is not False or preflight['runtime_validation'] != 'NOT_RUN'
+                or type(preflight['files']) is not int or preflight['files'] != len(receipt['modules']) + 1
+                or type(preflight['issues']) is not int or not 0 <= preflight['issues'] <= 512
+                or type(preflight['omitted_issues']) is not int or preflight['omitted_issues'] < 0
+                or (preflight['status'] == 'NO_ISSUES_OBSERVED') != (preflight['issues'] == 0)
+                or (preflight['omitted_issues'] and preflight['status'] != 'INCOMPLETE')):
+            raise Blocked('QUEST_ASSESS_RECEIPT')
     addressed = _responses(recipe)
     if receipt['mode'] == 'opportunity':
         purpose = receipt.get('purpose_evidence')
