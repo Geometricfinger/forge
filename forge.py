@@ -451,9 +451,17 @@ def main():
     emit(value);return (0 if value.get('status')=='COMPLETED_FOR_SELECTED_CONTAINERS' else 2) if a.command in {'corpus-run','corpus-demo'} else (outcome_exit(value.get('status')) if a.command in {'run','demo'} else 0)
 if __name__=='__main__':
     try:raise SystemExit(main())
-    except MemoryError:
-        emit({'status':'BLOCKED','reason':'MEMORY_BUDGET_EXHAUSTED','release_approved':False})
-        raise SystemExit(2)
+    except MemoryError as error:
+        # Release failed-command locals before handling exhaustion. A fixed
+        # response avoids allocating a dict or invoking the JSON formatter.
+        error.__traceback__ = None
+        if OUTPUT_MODE=='human':
+            os.write(1,b'Status: BLOCKED\nreason: MEMORY_BUDGET_EXHAUSTED\nrelease_approved: no\n')
+        elif OUTPUT_MODE=='pretty':
+            os.write(1,b'{\n  "reason": "MEMORY_BUDGET_EXHAUSTED",\n  "release_approved": false,\n  "status": "BLOCKED"\n}\n')
+        else:
+            os.write(1,b'{"reason": "MEMORY_BUDGET_EXHAUSTED", "release_approved": false, "status": "BLOCKED"}\n')
+        raise SystemExit(2) from None
     except (Blocked,OSError,ValueError,KeyError) as e:
         out={'status':'BLOCKED','reason':str(e) if isinstance(e,Blocked) else type(e).__name__,'release_approved':False}
         if isinstance(e,PacketUnavailable):out['detail']=e.detail
