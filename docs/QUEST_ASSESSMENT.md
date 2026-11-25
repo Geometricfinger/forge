@@ -173,6 +173,13 @@ remaining work. It does not modify the
 build receipt's `runtime_validation: NOT_RUN`: packaging and assessment are
 different events.
 
+New build receipts also bind the exact `preflight.json` bytes by hash. Assessment
+validates the optional preflight summary's shape and consistency and retains it
+inside the original build receipt. It does not load the preflight sidecar,
+recompute its checks or attest to its findings. Review the matching sidecar and
+its unresolved cases separately; a reported pass on the selected observation
+cases does not clear packaging warnings.
+
 Matching hashes show consistency among the supplied records. They do not prove
 when expectations were written, authenticate an external execution, verify that
 an observation adapter interpreted the raw output correctly, or establish that

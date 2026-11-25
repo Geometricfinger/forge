@@ -348,6 +348,7 @@ If `reason` is a Python exception name instead of a code:
 | <a id="quest_opportunity_corpus"></a>`QUEST_OPPORTUNITY_CORPUS` | Use a corpus recorded in the saved opportunity. Its indexed bytes must still match. | forge_core/creation_quest.py |
 | <a id="quest_opportunity_recipe"></a>`QUEST_OPPORTUNITY_RECIPE` | Keep the original opportunity and workflow reference in the recipe for this quest. | forge_core/creation_quest.py |
 | <a id="quest_opportunity_workflow"></a>`QUEST_OPPORTUNITY_WORKFLOW` | Choose a workflow ID from the saved opportunity bundle. | forge_core/creation_quest.py |
+| <a id="quest_preflight_binding"></a>`QUEST_PREFLIGHT_BINDING` | The fixed packaging-check worker returned inconsistent file identity or result fields. Preflight remains incomplete; preserve the report and repeat or review the affected module separately. | forge_core/quest_preflight.py |
 | <a id="quest_product_path_collision"></a>`QUEST_PRODUCT_PATH_COLLISION` | Choose destinations without duplicate case-folded paths or a file occupying another file's directory. | forge_core/quest_sources.py |
 | <a id="quest_product_size"></a>`QUEST_PRODUCT_SIZE` | Keep the combined module, resource, notice and entry-point payload within the product byte limit. | forge_core/creation_quest.py |
 | <a id="quest_recipe"></a>`QUEST_RECIPE` | Fill the schema-1 recipe template with the audience, purpose, acceptance checks and components. | forge_core/creation_quest.py |
@@ -523,7 +524,7 @@ If `reason` is a Python exception name instead of a code:
 | <a id="tool_memory_limit"></a>`TOOL_MEMORY_LIMIT` | The fixed tool I/O collector could not allocate memory. Its owned process group was stopped; preserve this run and use smaller inputs or more available memory. | forge_core/bounded_io.py |
 | <a id="tool_output_bounds"></a>`TOOL_OUTPUT_BOUNDS` | A value is outside its allowed size or range. | forge_core/bounded_io.py |
 | <a id="tool_output_limit"></a>`TOOL_OUTPUT_LIMIT` | A safety size/count limit was exceeded. | forge_core/bounded_io.py |
-| <a id="tool_timeout"></a>`TOOL_TIMEOUT` | A bounded helper subprocess failed, timed out or exceeded output limits. | forge_core/bounded_io.py, tests/test_reviewed_evaluator.py, tests/test_reviewed_evaluator_cli.py, tests/test_workbench.py, tools/run_self_recovery_trial.py |
+| <a id="tool_timeout"></a>`TOOL_TIMEOUT` | A bounded helper subprocess failed, timed out or exceeded output limits. | forge_core/bounded_io.py, forge_core/quest_preflight.py, tests/test_quest_preflight.py, tests/test_reviewed_evaluator.py, tests/test_reviewed_evaluator_cli.py, tests/test_workbench.py, tools/run_self_recovery_trial.py |
 | <a id="tool_timeout_bounds"></a>`TOOL_TIMEOUT_BOUNDS` | A value is outside its allowed size or range. | forge_core/bounded_io.py |
 | <a id="tree_identity"></a>`TREE_IDENTITY` | Input or stored state failed a validation check (see the raising module). | forge_core/discovery.py |
 | <a id="tree_item"></a>`TREE_ITEM` | Input or stored state failed a validation check (see the raising module). | forge_core/discovery.py |

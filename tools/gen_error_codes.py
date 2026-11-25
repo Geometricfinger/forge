@@ -51,6 +51,7 @@ KNOWN={
  'QUEST_BINDING':'Use the original quest.json from this corpus run and workspace.',
  'QUEST_COMPONENT_SELECTION':'Choose one or more distinct definition IDs from this run. Use at most 32 selections including support paths.',
  'QUEST_ENTRY_SYNTAX':'Supply an entry point that the current Python interpreter can compile.',
+ 'QUEST_PREFLIGHT_BINDING':'The fixed packaging-check worker returned inconsistent file identity or result fields. Preflight remains incomplete; preserve the report and repeat or review the affected module separately.',
  'QUEST_EXISTING_CORPUS_REQUIRED':'Index your source with corpus-run and use its workspace for the quest.',
  'QUEST_IMPORT_PATH_COLLISION':'Choose a package layout with an unambiguous Python import path for each selected module.',
  'QUEST_PRODUCT_SIZE':'Keep the combined module, resource, notice and entry-point payload within the product byte limit.',

@@ -342,6 +342,23 @@ class QuestAssessmentTests(unittest.TestCase):
             self.assertEqual((code, result['reason']), (2, 'QUEST_ASSESS_RECEIPT'))
             self.assertFalse(self.out.exists())
 
+    def test_preflight_summary_is_validated_and_legacy_receipts_still_work(self):
+        from forge_core.quest_assessment import _receipt
+        self.build()
+        raw_recipe = self.recipe_file.read_bytes()
+        legacy = copy.deepcopy(self.receipt)
+        del legacy['preflight']
+        _receipt(canonical(legacy), raw_recipe, self.recipe)
+        for update in ({'status': []}, {'status': 'EXECUTED_PASS'}, {'files': True}, {'files': 0},
+                       {'issues': -1}, {'issues': 513}, {'issues': 1}, {'omitted_issues': 1},
+                       {'report_sha256': 'bad'}, {'source_code_executed': True},
+                       {'runtime_validation': 'PASSED'}):
+            with self.subTest(update=update):
+                changed = copy.deepcopy(self.receipt)
+                changed['preflight'].update(update)
+                with self.assertRaisesRegex(Blocked, '^QUEST_ASSESS_RECEIPT$'):
+                    _receipt(canonical(changed), raw_recipe, self.recipe)
+
     def test_no_assessment_written_into_artifacts_or_source(self):
         self.build()
         results = self.results()
