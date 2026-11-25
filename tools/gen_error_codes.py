@@ -14,6 +14,10 @@ SKIP={'third_party','dependencies','history','evidence','review','__pycache__'}
 
 # Hand-written meanings for the codes a newcomer is most likely to hit.
 KNOWN={
+ 'CORPUS_CHECKPOINT_INVENTORY':'The retained parser inventory is malformed. Preserve this run and rebuild into a new run ID from the pinned original files.',
+ 'CORPUS_CHECKPOINT_GAPS':'The retained parser gap collection is malformed. Preserve this run and rebuild into a new run ID.',
+ 'CORPUS_CHECKPOINT_INTAKE_MISMATCH':'Retained intake status contradicts the parser inventory. Preserve the original checkpoint and rebuild into a new run ID.',
+ 'CORPUS_CHECKPOINT_INVENTORY_MISMATCH':'Retained parser inventory and source segments disagree. Preserve the original checkpoint and rebuild into a new run ID.',
  'BRIDGE_CLASS_DOCUMENTATION':'Reinspect the source with the current engine to retain bounded class-description terms and source positions.',
  'BRIDGE_CLASS_DOCUMENTATION_BINDING':'Retained class-description terms or attribution differ from the checksum-verified corpus. Preserve the original evidence and create a fresh inspection.',
  'DOC_LINK_DOCUMENT_ENCODING':'Save the Markdown document as UTF-8.',
@@ -182,6 +186,10 @@ def collect():
                   'forge_core/reviewed_evaluator.py':'REVIEWED_TRIAL_'}
         if rel.as_posix() in prefixes:
             for c in BEHAVIOR_PAT.findall(body):found[prefixes[rel.as_posix()]+c].add(rel.as_posix())
+        # The checkpoint validator passes complete literal codes through its
+        # fixed assertion helper. Collect only that module and code namespace.
+        if rel.as_posix()=='forge_core/corpus_checkpoint.py':
+            for c in re.findall(r"'(CORPUS_CHECKPOINT_[A-Z0-9_]+)'",body):found[c].add(rel.as_posix())
     return found
 
 def render(found):

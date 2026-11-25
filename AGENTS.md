@@ -140,6 +140,13 @@ python3 "$FORGE/forge.py" --home "$WORK/forge-home" corpus-run --source-root "$T
 
 The workspace (`$WORK/forge-home`) is created on first use. Always pass `--max-containers 500`; the default of 20 files per invocation leaves the rest as `INVOCATION_BUDGET` (status `INCOMPLETE`). Re-running the same command resumes from checkpoints.
 
+Replay checks saved inventory, parser gaps, segment metadata and analyzer gaps
+for consistency before reusing them. A malformed or contradictory checkpoint is
+listed in `coverage.blocked` and makes the run `INCOMPLETE`. Preserve that run for
+inspection and use a new run id to rebuild from the pinned original files. These
+are trusted local consistency checks; they do not authenticate records against
+someone able to rewrite all cache contents.
+
 The command prints one JSON object. Check `status`:
 
 | `status` | Exit code | Meaning |

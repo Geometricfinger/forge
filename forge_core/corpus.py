@@ -12,6 +12,7 @@ from .engine import Analyzer,ROOT,run_fixed
 from .mixed_intake import DEFAULTS,tokens
 from .policy import validate_profile
 from . import analysis_recovery
+from .corpus_checkpoint import validate_result,validate_segment
 
 SCHEMA=1
 
@@ -96,7 +97,8 @@ def inspect_one(data,source,home,profile,analyzer,segment_dir=None,job_binding=N
     parsed=_parser(data,source['path'],home)
     if parsed.get('container_sha256')!=source['sha256'] or parsed.get('upstream_code_executed') is not False:raise Blocked('CORPUS_PARSE_BINDING')
     result={'source':source,'segments':[],'inventory':parsed['inventory'],'gaps':list(parsed['gaps']),
-            'upstream_code_executed':False,'analysis_status':'PARSED','hound_errors':[]}
+            'upstream_code_executed':False,'intake_status':'PARSED_WITH_GAPS' if parsed['gaps'] else 'PARSED',
+            'analysis_status':'PARSED','hound_errors':[]}
     from .source_blocks import deconstruct,reconstruct
     boundaries=[]
     if len(parsed['segments'])==1:
@@ -132,7 +134,7 @@ def inspect_one(data,source,home,profile,analyzer,segment_dir=None,job_binding=N
         journal=analysis_recovery.Journal(segment_dir.parent/'analysis_attempts'/sid,key) if segment_dir is not None else None
         if cache is not None and cache.exists():
             saved=_load_checkpoint(cache,key)
-            cached=saved['segment']
+            cached=validate_segment(saved.get('segment'),source,'SEGMENT_CHECKPOINT_BINDING')
             if cached['source_id']!=sid or cached['source_sha256']!=sha(payload) or canonical(cached.get('analysis_view'))!=canonical(segment.get('analysis_view')):raise Blocked('SEGMENT_CHECKPOINT_BINDING')
             if saved['segment'].get('hound_status')!='INSPECTED':raise Blocked('SEGMENT_CHECKPOINT_STATUS')
             if 'analysis_view' in segment and (cached.get('hound',{}).get('source_sha256')!=sha(analysis) or cached.get('hound',{}).get('source_id')!=sid):raise Blocked('SEGMENT_CHECKPOINT_BINDING')
@@ -193,21 +195,10 @@ def run(workbench,source_root,manifest_file,out,profile=None,max_containers=20,a
                 r=None;retry=False
                 if checkpoint.exists():
                     r=_load_checkpoint(checkpoint,cb)
-                    if r.get('source')!=row:raise Blocked('CORPUS_CHECKPOINT_SOURCE')
                     # Validate typed cache contents independently of checkpoint
                     # hashes. Rehashed missing failures are not successful analysis.
-                    cached_segments=r.get('segments')
-                    if not isinstance(cached_segments,list):raise Blocked('CORPUS_CHECKPOINT_SEGMENTS')
-                    errors=[];seen=set()
-                    for segment in cached_segments:
-                        if not isinstance(segment,dict) or segment.get('hound_status') not in ('BLOCKED','INSPECTED'):raise Blocked('CORPUS_CHECKPOINT_SEGMENTS')
-                        sid=segment.get('source_id')
-                        if not isinstance(sid,str) or not re.fullmatch('source_[0-9a-f]{64}',sid) or sid in seen:raise Blocked('CORPUS_CHECKPOINT_SEGMENTS')
-                        seen.add(sid)
-                        if segment['hound_status']=='BLOCKED':
-                            if not isinstance(segment.get('hound_reason'),str) or segment.get('hound')!={}:raise Blocked('CORPUS_CHECKPOINT_SEGMENTS')
-                            errors.append({'source_id':sid,'reason':segment['hound_reason']})
-                    if r.get('hound_errors')!=errors:raise Blocked('CORPUS_CHECKPOINT_GAP_MISMATCH')
+                    validate_result(r,row)
+                    cached_segments=r['segments']
                     for segment in cached_segments:
                         sid=segment['source_id']
                         key={'job':sha(canonical(binding)),'source':row['sha256'],'source_id':sid,'profile':sha(canonical(profile))}
@@ -221,7 +212,7 @@ def run(workbench,source_root,manifest_file,out,profile=None,max_containers=20,a
                             # Successful segment publication can precede aggregate
                             # publication. Recover its exact cached result, no rerun.
                             saved=_load_checkpoint(segment_cache,key)
-                            found=saved.get('segment',{})
+                            found=validate_segment(saved.get('segment'),row,'RECOVERY_CACHE_DISAGREEMENT')
                             if found.get('source_id')!=sid or found.get('source_sha256')!=segment['source_sha256'] or found.get('hound_status')!='INSPECTED' or canonical(found.get('analysis_view'))!=canonical(segment.get('analysis_view')):raise Blocked('RECOVERY_CACHE_DISAGREEMENT')
                             if 'analysis_view' in segment and found.get('hound',{}).get('source_sha256')!=segment['analysis_view']['analysis_sha256']:raise Blocked('RECOVERY_CACHE_DISAGREEMENT')
                             journal.cached_success(sha(canonical(saved)));retry=True
