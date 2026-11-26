@@ -120,6 +120,7 @@ class OpportunityQuestTests(unittest.TestCase):
         self.assertEqual(origin['workflow'], self.bundle['workflows'][0])
         self.assertEqual(len(origin['hypotheses']), 2)
         self.assertEqual(origin['sources'], self.bundle['sources'])
+        self.assertEqual(origin['mechanism_catalog'], self.bundle['mechanisms'])
         existing = next(h for h in origin['hypotheses'] if h['need']['id'] == 'label')
         self.assertEqual(existing['state'], 'EXISTING_OPTION_TO_VERIFY')
         self.assertTrue(existing['counter_searches'])

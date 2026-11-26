@@ -1,0 +1,492 @@
+{
+  "schema": 1,
+  "title": "Synthetic invention options and existing-solution control",
+  "as_of": "2026-11-25",
+  "max_age_days": 365,
+  "public_brief": "Compare declared mechanisms for a synthetic evidence-review job; no real demand claim.",
+  "sources": [
+    {
+      "id": "synthetic-contract",
+      "text": "Synthetic contract: the reviewer supplies a finite history model, available questions and declared effort. Proposed routes do not authenticate histories or execute code.",
+      "kind": "synthetic",
+      "public": false,
+      "origin_group": "owned-fixture",
+      "uri": "fixture://invention/contracts",
+      "observed_on": "2026-11-25",
+      "derived_from": [],
+      "capture_method": "synthetic_fixture"
+    }
+  ],
+  "workflows": [
+    {
+      "id": "recovery",
+      "title": "Ask only decision-relevant questions",
+      "actor": "Administrative handoff reviewer",
+      "domain": "Generic evidence review",
+      "purpose": "Compare alternative request mechanisms while retaining uncertainty.",
+      "initial_fields": [
+        "reviewed_histories",
+        "question_catalog",
+        "cost_model",
+        "reviewer_time"
+      ],
+      "required_conditions": [
+        "local_processing",
+        "no_automatic_contact"
+      ],
+      "steps": [
+        {
+          "id": "review",
+          "action": "Review which additional evidence to request",
+          "requires": [
+            "question_plan"
+          ],
+          "produces": [
+            "reviewed_plan"
+          ],
+          "evidence": [
+            {
+              "source": "synthetic-contract",
+              "start": 0,
+              "end": 169,
+              "quote": "Synthetic contract: the reviewer supplies a finite history model, available questions and declared effort. Proposed routes do not authenticate histories or execute code."
+            }
+          ]
+        }
+      ],
+      "needs": [
+        {
+          "id": "request-plan",
+          "step": "review",
+          "field": "question_plan",
+          "pattern": "information_gap",
+          "why": "The synthetic handoff has competing interpretations. A list of components does not supply a request plan.",
+          "basis": "inferred",
+          "evidence": [
+            {
+              "source": "synthetic-contract",
+              "start": 0,
+              "end": 169,
+              "quote": "Synthetic contract: the reviewer supplies a finite history model, available questions and declared effort. Proposed routes do not authenticate histories or execute code."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "copy",
+      "title": "Obtain a portable document copy",
+      "actor": "Document recipient",
+      "domain": "Generic evidence review",
+      "purpose": "Prefer a documented existing route when it satisfies the same job.",
+      "initial_fields": [
+        "saved_document"
+      ],
+      "steps": [
+        {
+          "id": "receive",
+          "action": "Receive a document copy",
+          "requires": [
+            "portable_copy"
+          ],
+          "produces": [],
+          "evidence": [
+            {
+              "source": "synthetic-contract",
+              "start": 0,
+              "end": 169,
+              "quote": "Synthetic contract: the reviewer supplies a finite history model, available questions and declared effort. Proposed routes do not authenticate histories or execute code."
+            }
+          ]
+        }
+      ],
+      "needs": [
+        {
+          "id": "copy-needed",
+          "step": "receive",
+          "field": "portable_copy",
+          "pattern": "format_gap",
+          "why": "The recipient needs a portable copy of the existing document.",
+          "basis": "inferred",
+          "evidence": [
+            {
+              "source": "synthetic-contract",
+              "start": 0,
+              "end": 169,
+              "quote": "Synthetic contract: the reviewer supplies a finite history model, available questions and declared effort. Proposed routes do not authenticate histories or execute code."
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "observations": [
+    {
+      "id": "existing-copy-supported",
+      "workflow": "copy",
+      "need": "copy-needed",
+      "kind": "supported",
+      "scope": "target",
+      "statement": "In this synthetic contract the existing export command provides the requested portable copy.",
+      "evidence": [
+        {
+          "source": "synthetic-contract",
+          "start": 0,
+          "end": 169,
+          "quote": "Synthetic contract: the reviewer supplies a finite history model, available questions and declared effort. Proposed routes do not authenticate histories or execute code."
+        }
+      ]
+    }
+  ],
+  "mechanisms": [
+    {
+      "id": "partition",
+      "title": "Group histories by required decision",
+      "domain": "Generic evidence review",
+      "purpose": "Produce a reviewable request plan from explicitly supplied data.",
+      "mechanism": "Group histories by required decision under the supplied finite-model contract.",
+      "addresses": [
+        "information_gap"
+      ],
+      "requires": [
+        "reviewed_histories"
+      ],
+      "provides": [
+        "decision_groups"
+      ],
+      "limits": [
+        "Synthetic declaration, not observed runtime capability.",
+        "A reviewer must supply correct inputs and judge semantic compatibility."
+      ],
+      "evidence": [
+        {
+          "source": "synthetic-contract",
+          "start": 0,
+          "end": 169,
+          "quote": "Synthetic contract: the reviewer supplies a finite history model, available questions and declared effort. Proposed routes do not authenticate histories or execute code."
+        }
+      ],
+      "code_queries": [
+        "symbol:bucketize"
+      ],
+      "role": "source_component",
+      "conditions": [
+        {
+          "condition": "local_processing",
+          "status": "supported",
+          "evidence": [
+            {
+              "source": "synthetic-contract",
+              "start": 0,
+              "end": 169,
+              "quote": "Synthetic contract: the reviewer supplies a finite history model, available questions and declared effort. Proposed routes do not authenticate histories or execute code."
+            }
+          ]
+        },
+        {
+          "condition": "no_automatic_contact",
+          "status": "supported",
+          "evidence": [
+            {
+              "source": "synthetic-contract",
+              "start": 0,
+              "end": 169,
+              "quote": "Synthetic contract: the reviewer supplies a finite history model, available questions and declared effort. Proposed routes do not authenticate histories or execute code."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "enumerate",
+      "title": "Enumerate available question subsets",
+      "domain": "Generic evidence review",
+      "purpose": "Produce a reviewable request plan from explicitly supplied data.",
+      "mechanism": "Enumerate available question subsets under the supplied finite-model contract.",
+      "addresses": [
+        "information_gap"
+      ],
+      "requires": [
+        "decision_groups",
+        "question_catalog"
+      ],
+      "provides": [
+        "candidate_question_sets"
+      ],
+      "limits": [
+        "Synthetic declaration, not observed runtime capability.",
+        "A reviewer must supply correct inputs and judge semantic compatibility."
+      ],
+      "evidence": [
+        {
+          "source": "synthetic-contract",
+          "start": 0,
+          "end": 169,
+          "quote": "Synthetic contract: the reviewer supplies a finite history model, available questions and declared effort. Proposed routes do not authenticate histories or execute code."
+        }
+      ],
+      "code_queries": [
+        "symbol:powerset"
+      ],
+      "role": "source_component",
+      "conditions": [
+        {
+          "condition": "local_processing",
+          "status": "supported",
+          "evidence": [
+            {
+              "source": "synthetic-contract",
+              "start": 0,
+              "end": 169,
+              "quote": "Synthetic contract: the reviewer supplies a finite history model, available questions and declared effort. Proposed routes do not authenticate histories or execute code."
+            }
+          ]
+        },
+        {
+          "condition": "no_automatic_contact",
+          "status": "supported",
+          "evidence": [
+            {
+              "source": "synthetic-contract",
+              "start": 0,
+              "end": 169,
+              "quote": "Synthetic contract: the reviewer supplies a finite history model, available questions and declared effort. Proposed routes do not authenticate histories or execute code."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "fixed-adapter",
+      "title": "Evaluate fixed question batches",
+      "domain": "Generic evidence review",
+      "purpose": "Produce a reviewable request plan from explicitly supplied data.",
+      "mechanism": "Evaluate fixed question batches under the supplied finite-model contract.",
+      "addresses": [
+        "information_gap"
+      ],
+      "requires": [
+        "candidate_question_sets",
+        "cost_model"
+      ],
+      "provides": [
+        "question_plan"
+      ],
+      "limits": [
+        "Synthetic declaration, not observed runtime capability.",
+        "A reviewer must supply correct inputs and judge semantic compatibility."
+      ],
+      "evidence": [
+        {
+          "source": "synthetic-contract",
+          "start": 0,
+          "end": 169,
+          "quote": "Synthetic contract: the reviewer supplies a finite history model, available questions and declared effort. Proposed routes do not authenticate histories or execute code."
+        }
+      ],
+      "code_queries": [],
+      "role": "new_work",
+      "conditions": [
+        {
+          "condition": "local_processing",
+          "status": "supported",
+          "evidence": [
+            {
+              "source": "synthetic-contract",
+              "start": 0,
+              "end": 169,
+              "quote": "Synthetic contract: the reviewer supplies a finite history model, available questions and declared effort. Proposed routes do not authenticate histories or execute code."
+            }
+          ]
+        },
+        {
+          "condition": "no_automatic_contact",
+          "status": "supported",
+          "evidence": [
+            {
+              "source": "synthetic-contract",
+              "start": 0,
+              "end": 169,
+              "quote": "Synthetic contract: the reviewer supplies a finite history model, available questions and declared effort. Proposed routes do not authenticate histories or execute code."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "adaptive-adapter",
+      "title": "Construct a conditional question tree",
+      "domain": "Generic evidence review",
+      "purpose": "Produce a reviewable request plan from explicitly supplied data.",
+      "mechanism": "Construct a conditional question tree under the supplied finite-model contract.",
+      "addresses": [
+        "information_gap"
+      ],
+      "requires": [
+        "decision_groups",
+        "question_catalog",
+        "cost_model"
+      ],
+      "provides": [
+        "question_plan"
+      ],
+      "limits": [
+        "Synthetic declaration, not observed runtime capability.",
+        "A reviewer must supply correct inputs and judge semantic compatibility."
+      ],
+      "evidence": [
+        {
+          "source": "synthetic-contract",
+          "start": 0,
+          "end": 169,
+          "quote": "Synthetic contract: the reviewer supplies a finite history model, available questions and declared effort. Proposed routes do not authenticate histories or execute code."
+        }
+      ],
+      "code_queries": [],
+      "role": "new_work",
+      "conditions": [
+        {
+          "condition": "local_processing",
+          "status": "supported",
+          "evidence": [
+            {
+              "source": "synthetic-contract",
+              "start": 0,
+              "end": 169,
+              "quote": "Synthetic contract: the reviewer supplies a finite history model, available questions and declared effort. Proposed routes do not authenticate histories or execute code."
+            }
+          ]
+        },
+        {
+          "condition": "no_automatic_contact",
+          "status": "supported",
+          "evidence": [
+            {
+              "source": "synthetic-contract",
+              "start": 0,
+              "end": 169,
+              "quote": "Synthetic contract: the reviewer supplies a finite history model, available questions and declared effort. Proposed routes do not authenticate histories or execute code."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "manual-review",
+      "title": "Review the declared histories manually",
+      "domain": "Generic evidence review",
+      "purpose": "Produce a reviewable request plan from explicitly supplied data.",
+      "mechanism": "Review the declared histories manually under the supplied finite-model contract.",
+      "addresses": [
+        "information_gap"
+      ],
+      "requires": [
+        "reviewed_histories",
+        "reviewer_time"
+      ],
+      "provides": [
+        "question_plan"
+      ],
+      "limits": [
+        "Synthetic declaration, not observed runtime capability.",
+        "A reviewer must supply correct inputs and judge semantic compatibility."
+      ],
+      "evidence": [
+        {
+          "source": "synthetic-contract",
+          "start": 0,
+          "end": 169,
+          "quote": "Synthetic contract: the reviewer supplies a finite history model, available questions and declared effort. Proposed routes do not authenticate histories or execute code."
+        }
+      ],
+      "code_queries": [],
+      "role": "manual_step",
+      "conditions": [
+        {
+          "condition": "local_processing",
+          "status": "supported",
+          "evidence": [
+            {
+              "source": "synthetic-contract",
+              "start": 0,
+              "end": 169,
+              "quote": "Synthetic contract: the reviewer supplies a finite history model, available questions and declared effort. Proposed routes do not authenticate histories or execute code."
+            }
+          ]
+        },
+        {
+          "condition": "no_automatic_contact",
+          "status": "supported",
+          "evidence": [
+            {
+              "source": "synthetic-contract",
+              "start": 0,
+              "end": 169,
+              "quote": "Synthetic contract: the reviewer supplies a finite history model, available questions and declared effort. Proposed routes do not authenticate histories or execute code."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "existing-export",
+      "title": "Use an existing copy-export command",
+      "domain": "Generic evidence review",
+      "purpose": "Produce a reviewable request plan from explicitly supplied data.",
+      "mechanism": "Use an existing copy-export command under the supplied finite-model contract.",
+      "addresses": [
+        "information_gap"
+      ],
+      "requires": [
+        "saved_document"
+      ],
+      "provides": [
+        "portable_copy"
+      ],
+      "limits": [
+        "Synthetic declaration, not observed runtime capability.",
+        "A reviewer must supply correct inputs and judge semantic compatibility."
+      ],
+      "evidence": [
+        {
+          "source": "synthetic-contract",
+          "start": 0,
+          "end": 169,
+          "quote": "Synthetic contract: the reviewer supplies a finite history model, available questions and declared effort. Proposed routes do not authenticate histories or execute code."
+        }
+      ],
+      "code_queries": [],
+      "role": "existing_option",
+      "conditions": [
+        {
+          "condition": "local_processing",
+          "status": "supported",
+          "evidence": [
+            {
+              "source": "synthetic-contract",
+              "start": 0,
+              "end": 169,
+              "quote": "Synthetic contract: the reviewer supplies a finite history model, available questions and declared effort. Proposed routes do not authenticate histories or execute code."
+            }
+          ]
+        },
+        {
+          "condition": "no_automatic_contact",
+          "status": "supported",
+          "evidence": [
+            {
+              "source": "synthetic-contract",
+              "start": 0,
+              "end": 169,
+              "quote": "Synthetic contract: the reviewer supplies a finite history model, available questions and declared effort. Proposed routes do not authenticate histories or execute code."
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "preferences": {
+    "information_gap": 4,
+    "format_gap": 2
+  }
+}

@@ -124,8 +124,94 @@ function appendReviewLeads(detail,group){
   }
   if(group.review_candidates_omitted)detail.append(el('p',group.review_candidates_omitted+' additional distinct partial leads omitted from this shortlist.','hint'));
 }
+function appendBuildOptions(parent,hypothesis){
+  const plan=hypothesis.build_options;
+  if(!plan)return; // Historical reports did not retain synthesized routes.
+  const section=el('section');
+  section.append(el('h3','Build options for review'),el('p',label(plan.status),'state'),
+    el('p','Required output: '+plan.target_field),
+    el('p','These routes combine reviewed declarations. Different mechanism sets do not establish different capabilities, tested behavior or novelty.','hint'));
+  if(plan.next_decision)section.append(el('p','Next decision: '+label(plan.next_decision)));
+  if(plan.required_conditions.length)section.append(el('p','Required conditions: '+plan.required_conditions.join(', ')));
+  const notices={
+    EXISTING_OPTION_REVIEW_REQUIRED:'Review the cited existing option for this exact task before proposing new work.',
+    EVIDENCE_REVIEW_REQUIRED:'Resolve the supporting, contrary or stale evidence before generating build routes.',
+    NO_NEW_WORK_DECLARED_OUTPUT_AVAILABLE:'The required output is already available in the declared workflow. No new build follows from this map.',
+    NO_DECLARED_ROUTE:'No complete route follows from these declarations. Review missing inputs and conditions; an absent route does not establish that no external solution exists.',
+    NO_PLAN_FOUND_WITHIN_BOUNDS:'No complete route was retained within the search bounds. Review the limits and unresolved inputs before drawing a conclusion.'
+  };
+  if(notices[plan.status])section.append(el('p',notices[plan.status]));
+  const list=values=>{const node=el('ul');for(const value of values)node.append(el('li',value));return node;};
+  const evidence=refs=>el('p',refs.length?'Evidence: '+refs.map(ref=>ref.source+' ['+ref.start+', '+ref.end+')').join('; '):'No condition declaration retained.','hint');
+  const conditions=rows=>{
+    const node=el('ul');
+    for(const row of rows){const item=el('li',row.condition+': '+label(row.status));item.append(evidence(row.evidence));node.append(item);}
+    return node;
+  };
+  if(plan.options.length)section.append(el('p','Review order considers unconfirmed conditions, new work and route length. It is not a usefulness, cost or success ranking.','hint'));
+  for(const [index,option] of plan.options.entries()){
+    const detail=el('details');
+    detail.append(el('summary','Option '+(index+1)+' · '+label(option.classification)+' · '+option.steps.length+' steps'+(option.unconfirmed_conditions.length?' · conditions unconfirmed':'')),
+      el('p',option.id,'hint'),el('p','Operating conditions: '+label(option.condition_status)));
+    if(option.unconfirmed_conditions.length)detail.append(el('h4','Conditions still unknown'),list(option.unconfirmed_conditions.map(row=>row.mechanism+': '+row.condition)));
+    if(option.unimplemented_mechanisms.length)detail.append(el('h4','New work requiring implementation and evidence'),list(option.unimplemented_mechanisms));
+    else detail.append(el('p','No step is declared as new work; the complete route still needs validation.','hint'));
+    const steps=el('ol');
+    for(const step of option.steps){
+      const item=el('li');
+      item.append(el('h4',step.title),el('p',label(step.role)+' · '+step.mechanism),el('p',step.description),
+        el('p','Requires: '+(step.requires.join(', ')||'No declared input')),el('p','Provides: '+(step.provides.join(', ')||'No declared output')));
+      if(step.input_bindings.length)item.append(el('h5','Input sources'),list(step.input_bindings.map(row=>row.field+' ← '+(row.origin==='workflow'?'workflow input':'step '+row.mechanism))));
+      if(step.condition_checks.length)item.append(el('h5','Condition declarations'),conditions(step.condition_checks));
+      item.append(el('h5','Limits'),list(step.limits),evidence(step.evidence));
+      if(step.code_queries.length)item.append(el('p','Source queries: '+step.code_queries.join('; ')));
+      steps.append(item);
+    }
+    detail.append(steps,el('p','Mechanisms were not executed by this plan. Review source rights, adapters and acceptance cases before a separate authorized experiment.','hint'));
+    section.append(detail);
+  }
+  const unresolved=plan.unresolved;
+  if(Object.values(unresolved).some(rows=>rows.length)){
+    const detail=el('details');
+    detail.append(el('summary','Unresolved inputs and excluded routes'),
+      el('p',"These catalog branches may be unused by the retained options. Check each option's own input bindings and conditions.",'hint'));
+    if(unresolved.missing_inputs_without_provider.length)detail.append(el('h4','Inputs with no declared provider'),list(unresolved.missing_inputs_without_provider));
+    if(unresolved.unreachable_mechanisms.length)detail.append(el('h4','Unreachable mechanisms'),list(unresolved.unreachable_mechanisms.map(row=>row.mechanism+': requires '+row.missing_inputs.join(', '))));
+    if(unresolved.cyclic_dependency_groups.length)detail.append(el('h4','Unseeded dependency cycles'),list(unresolved.cyclic_dependency_groups.map(group=>group.join(', '))));
+    if(unresolved.incompatible_mechanisms.length){
+      detail.append(el('h4','Excluded by a required condition'));
+      for(const row of unresolved.incompatible_mechanisms)detail.append(el('p',row.mechanism),conditions(row.conditions));
+    }
+    detail.append(el('p','These diagnostics concern the supplied map. They are not a minimal repair plan or proof that all alternatives were searched.','hint'));
+    section.append(detail);
+  }
+  const coverage=plan.coverage, detail=el('details');
+  detail.append(el('summary','Search coverage and limits'));
+  const fields=[
+    ['Search performed','search_performed'],['Mechanisms supplied','mechanisms_supplied'],['Relevant mechanisms','relevant_mechanisms'],
+    ['Eligible mechanisms','eligible_mechanisms'],['Maximum steps per route','max_steps'],['Maximum retained states','max_states'],
+    ['Maximum displayed options','max_options'],['States retained','states_retained'],['States expanded','states_expanded'],
+    ['Minimal complete sets found','minimal_plans_found'],['Options retained','options_retained'],['Options omitted','options_omitted'],
+    ['Transitions omitted by state limit','transitions_omitted_by_state_budget'],['Transitions omitted by depth limit','transitions_omitted_by_depth'],
+    ['Equivalent orders collapsed','equivalent_orders_collapsed'],['Redundant complete sets omitted','redundant_complete_sets_omitted'],
+    ['State budget exhausted','state_budget_exhausted'],['Depth limited','depth_limited'],
+    ['Search complete within depth bound','search_complete_within_depth'],['Declared reachable without depth limit','declared_reachable_without_depth_limit']
+  ];
+  const values=el('dl');
+  for(const [title,key] of fields){
+    if(!Object.hasOwn(coverage,key))continue;
+    const value=coverage[key]===null?'Not assessed':typeof coverage[key]==='boolean'?(coverage[key]?'Yes':'No'):String(coverage[key]);
+    values.append(el('dt',title),el('dd',value));
+  }
+  detail.append(values,el('p','Selection: '+label(coverage.selection_policy)),
+    el('p','Inclusion minimality concerns mechanism sets for one declared output. It does not establish minimum effort, cost, operator intervention or market value.','hint'));
+  section.append(detail);
+  if(plan.limitations.length){const limits=el('details');limits.append(el('summary','Interpretation limits'),list(plan.limitations));section.append(limits);}
+  parent.append(section);
+}
 async function show(id){const r=await api('/api/opportunity?run='+encodeURIComponent(id)),area=$('opp-detail');area.hidden=false;area.replaceChildren(el('h2',r.title),el('p',r.scope,'hint'));
 for(const h of r.hypotheses){const a=el('article',undefined,'finding');a.append(el('p',label(h.state),'state'),el('h3',h.concept.title),el('p',h.concept.problem_hypothesis),el('p','Next action: '+label(h.concept.recommended_action)),el('p','User: '+h.concept.user),el('p',h.concept.proposed_intervention));
+appendBuildOptions(a,h);
 const table=el('table'),head=el('tr');for(const x of ['Mechanism','Missing prerequisites','Output fit'])head.append(el('th',x));table.append(head);for(const m of h.mechanisms){const tr=el('tr');tr.append(el('td',m.title),el('td',m.missing_prerequisites.join(', ')||'None in the declared map; not verified'),el('td',label(m.output_fit)));table.append(tr);}a.append(table);
 a.append(el('h3','Challenge the opportunity'));for(const c of h.counter_searches)a.append(el('p',c.question));a.append(el('h3','Proposed experiment'),el('p',h.experiment.question),el('p','Experiment not executed. No business, rights or release approval.','hint'));
 const detail=el('details');detail.append(el('summary','Source evidence and actual code leads'));for(const o of h.evidence.observations){detail.append(el('p',label(o.kind)+': '+o.statement));for(const e of o.checked_evidence)detail.append(el('p',e.source_uri+' · '+e.citation.quote,'code'));}for(const m of h.code_leads){detail.append(el('h4',m.mechanism));for(const c of m.candidates)detail.append(el('p',c.name+' · '+c.corpus+' · '+(c.definition_id||c.source_id),'code'));if(m.partial_matches_held_for_review)detail.append(el('p',m.partial_matches_held_for_review+' partial query matches excluded from the main shortlist.','hint'));appendReviewLeads(detail,m);}a.append(detail);

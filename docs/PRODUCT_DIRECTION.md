@@ -17,8 +17,9 @@ investigation and creation task.
    gap. A limitation in one situation does not establish a broad market.
 3. Find candidate mechanisms in authorized source material. Inspect complete
    modules, dependencies, interfaces and reuse conditions.
-4. Choose a bounded intervention. Preserve the originating needs and define
-   observable acceptance cases, including incorrect and uncertain inputs.
+4. Compare routes that use existing configurations, explicit manual work or new
+   component combinations. Choose a bounded intervention, preserve its original
+   needs, and define observable cases, including incorrect and uncertain inputs.
 5. Build the smallest useful prototype with a reviewed adapter.
 6. Run the authorized experiment on the exact archive, assess the recorded
    observations, and retain failures, omissions and unresolved needs.
@@ -33,6 +34,7 @@ assessment commands do not start a model or execute inspected code.
 | Stage | Current implementation | Remaining limitation |
 | --- | --- | --- |
 | Observe a workflow | Opportunity Lab stores observations, needs, sources, alternatives and counterevidence | The operator or agent supplies and reviews the observations |
+| Form build options | Bounded composition joins reviewed inputs and outputs with ordered steps, roles, conditions, missing bridges and evidence gates | The agent supplies mechanism meaning; distinct routes do not establish semantic diversity, novelty or tested behavior |
 | Find mechanisms | Corpus intake, lexical search, source inspection and dependency context | Retrieval relevance is not demonstrated usefulness or complete dependency resolution |
 | Preserve the product's purpose | An opportunity-backed creation quest retains the whole selected workflow and proposed responses | The proposed response still needs an experiment |
 | Prepare selected source | `quest-prepare` adds original indexed package initializer mappings, verifies selected bytes and exposes source preflight and support review | Archive destinations, dependencies, notices, resources and reuse rights still need explicit review |
@@ -57,6 +59,19 @@ handling of missing information and integration effort. A passing software test
 establishes behavior for its cases; practical advantage requires this comparison.
 If an existing option already solves the task adequately, record that result and
 reuse it or redirect the investigation.
+
+### Produce alternatives when the first idea runs out
+
+Use a reviewed inventory of product capabilities, documented limitations,
+unknowns, manual alternatives and permitted source mechanisms. Compose routes
+to the same complete task, then compare the work and guarantees they actually
+declare. Existing settings and integration routes must compete with new code.
+
+The [build-option layer](INVENTION_OPTIONS.md) makes those compositions inspectable
+and retains evidence gates, missing bridges and bounded search omissions. It does
+not acquire a market census or infer useful inventions from app names. The next
+test is whether the selected route improves the task against the best available
+baseline, including the possibility that no new product is needed.
 
 ### 3. Resume investigations from their outcomes
 

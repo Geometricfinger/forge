@@ -4,11 +4,11 @@
 
 The goal is to investigate **why a workflow still requires avoidable work** before searching for code to build another application. This layer is a reproducible implementation of part of that process. It consumes reviewed structured inputs; it does not presently learn human preferences or infer complete workflows from arbitrary Internet pages.
 
-Implemented chain: attributed source → reviewed step/requirement map → missing-handoff inference → evidence state → purpose/mechanism candidates → prerequisites/output-fit check → existing FORGE search → counterevidence plan → experiment plan → retained owner feedback and export.
+Implemented chain: attributed source → reviewed step/requirement map → missing-handoff inference → evidence state → purpose/mechanism candidates → bounded mechanism composition → prerequisites/conditions/output-fit review → existing FORGE search → counterevidence plan → experiment plan → retained owner feedback and export.
 
 ## Modules
 
-`forge_core/opportunities.py` owns input validation, exact citations, source grouping, gap inference, state adjudication, mechanism selection, corpus linkage and persistent records. `opportunity_examples.py` holds synthetic examples and the explicitly attributed source case study. `opportunity_demo.py` connects the case study to two actual retained corpus reports. The command line and authenticated local HTTP endpoints use those same implementations. Presentation is in `assets/opportunities.html` and `assets/opportunities.js`.
+`forge_core/opportunities.py` owns input validation, exact citations, source grouping, gap inference, state adjudication, mechanism selection, corpus linkage and persistent records. `invention_options.py` composes bounded routes over reviewed mechanism contracts; `invention_view.py` renders their escaped static review. `opportunity_examples.py` holds synthetic examples and the explicitly attributed source case study. `opportunity_demo.py` connects the case study to two actual retained corpus reports. The command line and authenticated local HTTP endpoints use those same implementations. Presentation is in `assets/opportunities.html` and `assets/opportunities.js`.
 
 No domain-specific source function is imported to generate an opportunity. Code retrieval returns source-bound metadata using the existing ranker. No evidence-source URI is followed automatically. No model or general command tool is exposed to input content.
 
@@ -24,6 +24,15 @@ An observation ties a typed statement to one need and cites evidence. Kinds incl
 
 Mechanisms separate purpose from how it works. They declare addressed patterns, inputs, outputs, limitations, citations and code queries. Matching a pattern is not semantic proof. Missing prerequisites and a missing required output remain explicit. Exact terminology drives field comparison; automatic ontology alignment, hidden synonyms and arbitrary causal inference are not claimed.
 
+Workflows may additionally declare `required_conditions`, up to 16 unique IDs.
+Mechanisms may declare `role` (`existing_option`, `source_component`, `new_work`,
+`manual_step` or `unclassified`) and up to 16 `conditions`. Each condition has
+exactly `condition`, `status` and `evidence`; status is `supported`, `incompatible`
+or `unknown`, and evidence uses the ordinary one-to-eight exact citations. An
+omitted role remains unclassified. An omitted required-condition declaration
+remains unknown. These annotations do not verify capability or approve reuse.
+See [build options](INVENTION_OPTIONS.md) for the exact additions and examples.
+
 ## Evidence states
 
 `SINGLE_SOURCE_PROBLEM` and `CORROBORATED_WORKFLOW_PROBLEM` describe qualifying, fresh, scoped reported evidence. Corroboration counts supplied origin groups, exact normalized text and declared derivation; it is not authenticated person identity or statistical independence.
@@ -31,6 +40,36 @@ Mechanisms separate purpose from how it works. They declare addressed patterns, 
 `INFERRED_HANDOFF_GAP` describes a missing field in the supplied workflow map. `INFORMATION_GAP_ONLY` means descriptions do not establish coverage. `UNTESTED_GAP_HYPOTHESIS` is unresolved. `STALE_EVIDENCE_RECHECK` retains out-of-date sources for review without treating them as fresh support.
 
 `EXISTING_OPTION_TO_VERIFY` directs evaluation of the existing option instead of another new-code pitch. `CONFLICT_REQUIRES_REVIEW` and `COUNTEREVIDENCE_REVIEW` preserve contrary evidence and pause build recommendations. None grants runtime, rights, market, novelty or release approval.
+
+## Composed build options
+
+Each new hypothesis retains `build_options`. Starting with fields declared
+available before its target step, synthesis searches supporting mechanism
+contracts for the exact required output. A route has ordered steps, input
+origins, condition checks, role classification, source citations and new-work
+obligations. Supporting mechanisms may belong to other pattern families.
+
+Incompatible required conditions exclude a mechanism. Unknown conditions remain
+visible. Existing-option, contrary/conflicting-evidence and stale-only states
+gate synthesis. An already available target needs no new route. Missing
+providers, unreachable mechanisms and unseeded dependency cycles stay visible;
+these catalog-wide diagnostics can describe branches unused by retained options.
+
+The search is bounded to four steps, 4,096 retained states and eight displayed
+options. Coverage records search omissions and unassessed results. It retains
+distinct inclusion-minimal mechanism sets found within the bounds, with role
+class coverage in the shortlist. This is not a cost optimum, independently
+verified semantic diversity, or evidence of novelty. Field composition assumes
+information accumulates; destructive effects and probabilistic outcomes require
+separate modeling and testing.
+
+The complete reviewed mechanism catalog is retained for deterministic replay.
+Option citations use source/range/digest locators backed by that catalog; input
+quote correspondence is checked against the retained source text. Saved reports
+are checked against recomputed declarations at review/export boundaries.
+Historical reports without options remain readable without invented new results.
+The live UI and static export show the same declared routes, limits and next
+decision. All `implementation_tested` and approval claims remain false.
 
 ## Search and candidate context
 
@@ -64,5 +103,11 @@ The static Opportunity Lab is available at `/opportunities`; API operations requ
 ## Capacity and outstanding work
 
 Limits include 384 KB input, 80 sources, 20 workflows, 30 steps per workflow, 40 mechanisms, 80 total generated/explicit hypotheses, four corpus selections, and bounded text/citation arrays. Broad collections should be partitioned with separate records; no automatic global census or cross-batch market inference exists. Local list views are bounded and not a distributed index.
+
+The exact serialized saved record (input bundle, report and checksum) is limited
+to 10,000,000 bytes. A larger record fails with `OPPORTUNITY_RECORD_BOUNDS` before
+publication. Compact option citations retain source/range/quote-digest locators
+that resolve through the shared `mechanism_catalog`; they avoid copying full
+passages into every step while preserving the reviewed citation identity.
 
 Unfinished: learned purpose/mechanism extraction, independent opportunity assessment, authorized large-scale product-listing acquisition, cross-language semantics, reliable demand evidence, actual generated-application evaluation, independent judge permissions, native Mac/Windows and production hosting. Preserved resource/authentication boundaries must not be removed to make these labels disappear.

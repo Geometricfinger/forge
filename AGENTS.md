@@ -16,6 +16,15 @@ What Forge does **not** do:
 
 ## Driving a creation quest
 
+When the user needs possible builds rather than a fixed product idea, begin with
+reviewed workflow and alternative-product evidence in Opportunity Lab. Its
+`build_options` compose exact declared mechanism inputs and outputs while
+retaining unknown operating conditions, missing bridges and reasons to prefer an
+existing option. The agent supplies product research and semantic interpretation;
+the search does not infer an empty market from a listing's omissions. See
+[build options](docs/INVENTION_OPTIONS.md) for the schema, bounds and a synthetic
+example. Select a route for a bounded experiment before writing its adapter.
+
 When the user asks you to make something from a folder, start with a saved corpus. Use `quest-start --idea` for a stated job or `quest-start --scout` to explore the available modules. Use `quest-start --opportunity-run ID --workflow ID` to carry an observed complete workflow from Opportunity Lab into creation. Map proposed outcomes to the selected needs and source leads in the recipe. Inspect the candidates, select a user and an observable outcome, write the adapter, and run `quest-build`. When authorized to run the reviewed prototype, test the exact packaged archive and report what worked or failed. The [creation quest playbook](docs/INVENTOR_PLAYBOOK.md#run-a-creation-quest) gives the commands and recipe fields.
 
 Use `module_files` to map whole indexed module source IDs to product import paths,

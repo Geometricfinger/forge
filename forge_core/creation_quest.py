@@ -111,6 +111,7 @@ def _opportunity_quest(workbench, report, digest, run_id, opportunity_run, workf
             'bundle_sha256': saved['bundle_sha256'], 'report_sha256': sha(canonical(saved)),
             'workflow': workflow, 'hypotheses': hypotheses,
             'sources': record['bundle']['sources'], 'source_register': saved['source_register'],
+            'mechanism_catalog': saved.get('mechanism_catalog', []),
         },
         'next_step': 'Review the complete workflow and existing alternatives. Choose the needs to '
                      'address, map each need to selected source components and a useful outcome, '
