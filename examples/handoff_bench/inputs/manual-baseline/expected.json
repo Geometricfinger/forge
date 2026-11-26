@@ -1,0 +1,702 @@
+{
+  "baseline_kind": "independent_agent_manual_judgment",
+  "cases": [
+    {
+      "actionable_within_budget": false,
+      "ask_all_available_baseline": {
+        "declared_cost": 9,
+        "distinguishes_all_cross_decision_pairs": true,
+        "question_count": 1,
+        "question_ids": [
+          "noise"
+        ],
+        "within_budget": false
+      },
+      "case_id": "C01",
+      "indistinguishable_pairs": [],
+      "minimum_cost": 0,
+      "minimum_question_count": 0,
+      "omitted_optimal_plan_count": 0,
+      "optimal_plan_count": 1,
+      "optimal_question_sets": [
+        []
+      ],
+      "rationale": "Both histories require HOLD. There are no cross-decision pairs. The sole minimum-cardinality optimum is the empty set, regardless of differing noise answers.",
+      "status": "NO_QUESTION_NEEDED",
+      "title": "All declared histories have the same decision"
+    },
+    {
+      "actionable_within_budget": false,
+      "ask_all_available_baseline": {
+        "declared_cost": 0,
+        "distinguishes_all_cross_decision_pairs": true,
+        "question_count": 0,
+        "question_ids": [],
+        "within_budget": true
+      },
+      "case_id": "C02",
+      "indistinguishable_pairs": [],
+      "minimum_cost": 0,
+      "minimum_question_count": 0,
+      "omitted_optimal_plan_count": 0,
+      "optimal_plan_count": 1,
+      "optimal_question_sets": [
+        []
+      ],
+      "rationale": "One declared history creates no competing decision. No question can be necessary to distinguish decisions within this supplied world set.",
+      "status": "NO_QUESTION_NEEDED",
+      "title": "Single declared history and no questions"
+    },
+    {
+      "actionable_within_budget": true,
+      "ask_all_available_baseline": {
+        "declared_cost": 3,
+        "distinguishes_all_cross_decision_pairs": true,
+        "question_count": 1,
+        "question_ids": [
+          "receipt"
+        ],
+        "within_budget": true
+      },
+      "case_id": "C03",
+      "indistinguishable_pairs": [],
+      "minimum_cost": 3,
+      "minimum_question_count": 1,
+      "omitted_optimal_plan_count": 0,
+      "optimal_plan_count": 1,
+      "optimal_question_sets": [
+        [
+          "receipt"
+        ]
+      ],
+      "rationale": "The sole cross-decision pair has different known receipt answers. Its only available separator costs three units, exactly the budget.",
+      "status": "PLAN_FOUND",
+      "title": "One available separator"
+    },
+    {
+      "actionable_within_budget": true,
+      "ask_all_available_baseline": {
+        "declared_cost": 5,
+        "distinguishes_all_cross_decision_pairs": true,
+        "question_count": 2,
+        "question_ids": [
+          "left",
+          "right"
+        ],
+        "within_budget": true
+      },
+      "case_id": "C04",
+      "indistinguishable_pairs": [],
+      "minimum_cost": 5,
+      "minimum_question_count": 2,
+      "omitted_optimal_plan_count": 0,
+      "optimal_plan_count": 1,
+      "optimal_question_sets": [
+        [
+          "left",
+          "right"
+        ]
+      ],
+      "rationale": "left is required for w1/w2, and right is required for w1/w3. Each alone leaves a cross-decision pair indistinguishable. Together they also distinguish w2/w3, so the unique optimum costs five.",
+      "status": "PLAN_FOUND",
+      "title": "Two questions are jointly necessary"
+    },
+    {
+      "actionable_within_budget": true,
+      "ask_all_available_baseline": {
+        "declared_cost": 7,
+        "distinguishes_all_cross_decision_pairs": true,
+        "question_count": 2,
+        "question_ids": [
+          "cheap",
+          "expensive"
+        ],
+        "within_budget": true
+      },
+      "case_id": "C05",
+      "indistinguishable_pairs": [],
+      "minimum_cost": 2,
+      "minimum_question_count": 1,
+      "omitted_optimal_plan_count": 0,
+      "optimal_plan_count": 1,
+      "optimal_question_sets": [
+        [
+          "cheap"
+        ]
+      ],
+      "rationale": "Each question alone distinguishes the only pair. cheap costs two versus five. Adding expensive cannot improve coverage or the primary cost objective.",
+      "status": "PLAN_FOUND",
+      "title": "Cheaper duplicate separator dominates expensive one"
+    },
+    {
+      "actionable_within_budget": true,
+      "ask_all_available_baseline": {
+        "declared_cost": 4,
+        "distinguishes_all_cross_decision_pairs": true,
+        "question_count": 2,
+        "question_ids": [
+          "qa",
+          "qb"
+        ],
+        "within_budget": true
+      },
+      "case_id": "C06",
+      "indistinguishable_pairs": [],
+      "minimum_cost": 2,
+      "minimum_question_count": 1,
+      "omitted_optimal_plan_count": 0,
+      "optimal_plan_count": 2,
+      "optimal_question_sets": [
+        [
+          "qa"
+        ],
+        [
+          "qb"
+        ]
+      ],
+      "rationale": "Both individual questions distinguish the only pair and have the same cost and cardinality. Both one-question optima must be retained.",
+      "status": "PLAN_FOUND",
+      "title": "Two equal-cost alternative question sets"
+    },
+    {
+      "actionable_within_budget": true,
+      "ask_all_available_baseline": {
+        "declared_cost": 2,
+        "distinguishes_all_cross_decision_pairs": true,
+        "question_count": 2,
+        "question_ids": [
+          "detail",
+          "flag"
+        ],
+        "within_budget": true
+      },
+      "case_id": "C07",
+      "indistinguishable_pairs": [],
+      "minimum_cost": 2,
+      "minimum_question_count": 1,
+      "omitted_optimal_plan_count": 0,
+      "optimal_plan_count": 1,
+      "optimal_question_sets": [
+        [
+          "flag"
+        ]
+      ],
+      "rationale": "Only w1/w3 and w2/w3 need separation; flag separates both. detail is free but does not separate w1/w3. Adding it ties cost and loses the cardinality tie-break. Distinguishing w1 from w2 is unnecessary.",
+      "status": "PLAN_FOUND",
+      "title": "Histories with the same decision need not be separated"
+    },
+    {
+      "actionable_within_budget": false,
+      "ask_all_available_baseline": {
+        "declared_cost": 0,
+        "distinguishes_all_cross_decision_pairs": false,
+        "question_count": 1,
+        "question_ids": [
+          "noise"
+        ],
+        "within_budget": true
+      },
+      "case_id": "C08",
+      "indistinguishable_pairs": [
+        [
+          "w1",
+          "w2"
+        ]
+      ],
+      "minimum_cost": null,
+      "minimum_question_count": null,
+      "omitted_optimal_plan_count": 0,
+      "optimal_plan_count": 0,
+      "optimal_question_sets": [],
+      "rationale": "The available noise question has identical answers. The differing unavailable answer is not an admissible question, so w1/w2 cannot be guaranteed separated.",
+      "status": "INSUFFICIENT_EVIDENCE",
+      "title": "Only distinguishing question is unavailable"
+    },
+    {
+      "actionable_within_budget": false,
+      "ask_all_available_baseline": {
+        "declared_cost": 4,
+        "distinguishes_all_cross_decision_pairs": false,
+        "question_count": 1,
+        "question_ids": [
+          "record"
+        ],
+        "within_budget": true
+      },
+      "case_id": "C09",
+      "indistinguishable_pairs": [
+        [
+          "w1",
+          "w2"
+        ]
+      ],
+      "minimum_cost": null,
+      "minimum_question_count": null,
+      "omitted_optimal_plan_count": 0,
+      "optimal_plan_count": 0,
+      "optimal_question_sets": [],
+      "rationale": "The sole available known answer is identical in both histories even though decisions differ. More budget cannot create a separating question.",
+      "status": "INSUFFICIENT_EVIDENCE",
+      "title": "Identical known histories with different decisions"
+    },
+    {
+      "actionable_within_budget": false,
+      "ask_all_available_baseline": {
+        "declared_cost": 1,
+        "distinguishes_all_cross_decision_pairs": false,
+        "question_count": 1,
+        "question_ids": [
+          "receipt"
+        ],
+        "within_budget": true
+      },
+      "case_id": "C10",
+      "indistinguishable_pairs": [
+        [
+          "w1",
+          "w2"
+        ]
+      ],
+      "minimum_cost": null,
+      "minimum_question_count": null,
+      "omitted_optimal_plan_count": 0,
+      "optimal_plan_count": 0,
+      "optimal_question_sets": [],
+      "rationale": "w2 has no receipt key. Missing is an unknown answer, not a different known value. The pair has no guaranteed available separator.",
+      "status": "INSUFFICIENT_EVIDENCE",
+      "title": "Missing answer cannot guarantee a distinction"
+    },
+    {
+      "actionable_within_budget": true,
+      "ask_all_available_baseline": {
+        "declared_cost": 5,
+        "distinguishes_all_cross_decision_pairs": true,
+        "question_count": 2,
+        "question_ids": [
+          "evidence",
+          "incomplete"
+        ],
+        "within_budget": true
+      },
+      "case_id": "C11",
+      "indistinguishable_pairs": [],
+      "minimum_cost": 4,
+      "minimum_question_count": 1,
+      "omitted_optimal_plan_count": 0,
+      "optimal_plan_count": 1,
+      "optimal_question_sets": [
+        [
+          "evidence"
+        ]
+      ],
+      "rationale": "incomplete cannot guarantee separation because w2's answer is missing. evidence has different known answers in both worlds and is the only effective separator, costing four.",
+      "status": "PLAN_FOUND",
+      "title": "Complete alternative evidence rescues an unknown question"
+    },
+    {
+      "actionable_within_budget": true,
+      "ask_all_available_baseline": {
+        "declared_cost": 2,
+        "distinguishes_all_cross_decision_pairs": true,
+        "question_count": 2,
+        "question_ids": [
+          "free",
+          "paid"
+        ],
+        "within_budget": false
+      },
+      "case_id": "C12",
+      "indistinguishable_pairs": [],
+      "minimum_cost": 0,
+      "minimum_question_count": 1,
+      "omitted_optimal_plan_count": 0,
+      "optimal_plan_count": 1,
+      "optimal_question_sets": [
+        [
+          "free"
+        ]
+      ],
+      "rationale": "free alone distinguishes the pair at zero declared cost. Zero cost does not mean no question is needed: the minimum cardinality is one.",
+      "status": "PLAN_FOUND",
+      "title": "Zero-cost separating question still must be asked"
+    },
+    {
+      "actionable_within_budget": true,
+      "ask_all_available_baseline": {
+        "declared_cost": 2,
+        "distinguishes_all_cross_decision_pairs": true,
+        "question_count": 2,
+        "question_ids": [
+          "noise",
+          "separator"
+        ],
+        "within_budget": true
+      },
+      "case_id": "C13",
+      "indistinguishable_pairs": [],
+      "minimum_cost": 2,
+      "minimum_question_count": 1,
+      "omitted_optimal_plan_count": 0,
+      "optimal_plan_count": 1,
+      "optimal_question_sets": [
+        [
+          "separator"
+        ]
+      ],
+      "rationale": "separator is necessary. Adding the free noise question does not raise cost, but raises cardinality from one to two, so it must not appear in an optimal set.",
+      "status": "PLAN_FOUND",
+      "title": "Free irrelevant question loses cardinality tie-break"
+    },
+    {
+      "actionable_within_budget": true,
+      "ask_all_available_baseline": {
+        "declared_cost": 6,
+        "distinguishes_all_cross_decision_pairs": true,
+        "question_count": 2,
+        "question_ids": [
+          "qa",
+          "qb"
+        ],
+        "within_budget": true
+      },
+      "case_id": "C14",
+      "indistinguishable_pairs": [],
+      "minimum_cost": 6,
+      "minimum_question_count": 2,
+      "omitted_optimal_plan_count": 0,
+      "optimal_plan_count": 1,
+      "optimal_question_sets": [
+        [
+          "qa",
+          "qb"
+        ]
+      ],
+      "rationale": "qa is uniquely needed for w1/w2, qb for w1/w3. Their total six equals the budget and is permitted.",
+      "status": "PLAN_FOUND",
+      "title": "Minimum feasible cost equals the budget"
+    },
+    {
+      "actionable_within_budget": false,
+      "ask_all_available_baseline": {
+        "declared_cost": 6,
+        "distinguishes_all_cross_decision_pairs": true,
+        "question_count": 2,
+        "question_ids": [
+          "qa",
+          "qb"
+        ],
+        "within_budget": false
+      },
+      "case_id": "C15",
+      "indistinguishable_pairs": [],
+      "minimum_cost": 6,
+      "minimum_question_count": 2,
+      "omitted_optimal_plan_count": 0,
+      "optimal_plan_count": 1,
+      "optimal_question_sets": [
+        [
+          "qa",
+          "qb"
+        ]
+      ],
+      "rationale": "The same mandatory pair of questions as C14 costs six, while the budget is five. Separation is possible in the declared universe but not within budget. The oracle retains the mathematical optimum; it is not a permitted recommendation.",
+      "status": "BUDGET_BLOCKED",
+      "title": "Minimum feasible cost exceeds the budget by one"
+    },
+    {
+      "actionable_within_budget": true,
+      "ask_all_available_baseline": {
+        "declared_cost": 54,
+        "distinguishes_all_cross_decision_pairs": true,
+        "question_count": 4,
+        "question_ids": [
+          "noise",
+          "separator",
+          "unanswered",
+          "zero"
+        ],
+        "within_budget": false
+      },
+      "case_id": "C16",
+      "indistinguishable_pairs": [],
+      "minimum_cost": 3,
+      "minimum_question_count": 1,
+      "omitted_optimal_plan_count": 0,
+      "optimal_plan_count": 1,
+      "optimal_question_sets": [
+        [
+          "separator"
+        ]
+      ],
+      "rationale": "separator is the only effective question. zero and noise have equal answers; unanswered is missing in both worlds. The optimum is three versus fifty-four units for asking every available question.",
+      "status": "PLAN_FOUND",
+      "title": "Irrelevant and missing-answer questions do not help"
+    },
+    {
+      "actionable_within_budget": true,
+      "ask_all_available_baseline": {
+        "declared_cost": 3,
+        "distinguishes_all_cross_decision_pairs": true,
+        "question_count": 3,
+        "question_ids": [
+          "qa",
+          "qb",
+          "qc"
+        ],
+        "within_budget": false
+      },
+      "case_id": "C17",
+      "indistinguishable_pairs": [],
+      "minimum_cost": 2,
+      "minimum_question_count": 2,
+      "omitted_optimal_plan_count": 0,
+      "optimal_plan_count": 3,
+      "optimal_question_sets": [
+        [
+          "qa",
+          "qb"
+        ],
+        [
+          "qa",
+          "qc"
+        ],
+        [
+          "qb",
+          "qc"
+        ]
+      ],
+      "rationale": "Every single question leaves the other two worlds together. Any pair gives three distinct answer vectors. All three two-question sets have cost two and cardinality two.",
+      "status": "PLAN_FOUND",
+      "title": "Three pairwise alternative two-question optima"
+    },
+    {
+      "actionable_within_budget": false,
+      "ask_all_available_baseline": {
+        "declared_cost": 1,
+        "distinguishes_all_cross_decision_pairs": false,
+        "question_count": 1,
+        "question_ids": [
+          "qx"
+        ],
+        "within_budget": true
+      },
+      "case_id": "C18",
+      "indistinguishable_pairs": [
+        [
+          "w1",
+          "w3"
+        ],
+        [
+          "w2",
+          "w3"
+        ]
+      ],
+      "minimum_cost": null,
+      "minimum_question_count": null,
+      "omitted_optimal_plan_count": 0,
+      "optimal_plan_count": 0,
+      "optimal_question_sets": [],
+      "rationale": "qx separates w1/w2. It cannot guarantee either pair involving w3 because w3's answer is missing. The unresolved pair list is exactly w1/w3 and w2/w3.",
+      "status": "INSUFFICIENT_EVIDENCE",
+      "title": "Report only the genuinely indistinguishable pairs"
+    },
+    {
+      "actionable_within_budget": true,
+      "ask_all_available_baseline": {
+        "declared_cost": 5,
+        "distinguishes_all_cross_decision_pairs": true,
+        "question_count": 2,
+        "question_ids": [
+          "alpha",
+          "zeta"
+        ],
+        "within_budget": true
+      },
+      "case_id": "C19",
+      "indistinguishable_pairs": [],
+      "minimum_cost": 5,
+      "minimum_question_count": 2,
+      "omitted_optimal_plan_count": 0,
+      "optimal_plan_count": 1,
+      "optimal_question_sets": [
+        [
+          "alpha",
+          "zeta"
+        ]
+      ],
+      "rationale": "This is C04 with renamed world and question identifiers and reordered arrays. alpha is left and zeta is right. Both are required; cost and cardinality remain five and two. Names/order do not change feasibility.",
+      "status": "PLAN_FOUND",
+      "title": "Renamed and reordered copy of the synergistic case"
+    },
+    {
+      "actionable_within_budget": true,
+      "ask_all_available_baseline": {
+        "declared_cost": 4,
+        "distinguishes_all_cross_decision_pairs": true,
+        "question_count": 3,
+        "question_ids": [
+          "qa",
+          "qb",
+          "whole"
+        ],
+        "within_budget": false
+      },
+      "case_id": "C20",
+      "indistinguishable_pairs": [],
+      "minimum_cost": 2,
+      "minimum_question_count": 1,
+      "omitted_optimal_plan_count": 0,
+      "optimal_plan_count": 1,
+      "optimal_question_sets": [
+        [
+          "whole"
+        ]
+      ],
+      "rationale": "qa plus qb separates all decisions at total cost two. whole also separates all at cost two but asks only one question. The stated cardinality tie-break selects whole alone.",
+      "status": "PLAN_FOUND",
+      "title": "Cardinality breaks a primary-cost tie"
+    },
+    {
+      "actionable_within_budget": true,
+      "ask_all_available_baseline": {
+        "declared_cost": 10,
+        "distinguishes_all_cross_decision_pairs": true,
+        "question_count": 10,
+        "question_ids": [
+          "q00",
+          "q01",
+          "q02",
+          "q03",
+          "q04",
+          "q05",
+          "q06",
+          "q07",
+          "q08",
+          "q09"
+        ],
+        "within_budget": false
+      },
+      "case_id": "C21",
+      "indistinguishable_pairs": [],
+      "minimum_cost": 1,
+      "minimum_question_count": 1,
+      "omitted_optimal_plan_count": 2,
+      "optimal_plan_count": 10,
+      "optimal_question_sets": [
+        [
+          "q00"
+        ],
+        [
+          "q01"
+        ],
+        [
+          "q02"
+        ],
+        [
+          "q03"
+        ],
+        [
+          "q04"
+        ],
+        [
+          "q05"
+        ],
+        [
+          "q06"
+        ],
+        [
+          "q07"
+        ]
+      ],
+      "rationale": "All ten questions individually distinguish the only pair and cost one. There are exactly ten optimal singleton sets. Lexicographic retention keeps q00 through q07 and reports two omitted optima.",
+      "status": "PLAN_FOUND",
+      "title": "More than eight equally optimal plans"
+    },
+    {
+      "actionable_within_budget": true,
+      "ask_all_available_baseline": {
+        "declared_cost": 0,
+        "distinguishes_all_cross_decision_pairs": true,
+        "question_count": 2,
+        "question_ids": [
+          "qa",
+          "qb"
+        ],
+        "within_budget": true
+      },
+      "case_id": "C22",
+      "indistinguishable_pairs": [],
+      "minimum_cost": 0,
+      "minimum_question_count": 2,
+      "omitted_optimal_plan_count": 0,
+      "optimal_plan_count": 1,
+      "optimal_question_sets": [
+        [
+          "qa",
+          "qb"
+        ]
+      ],
+      "rationale": "Each question uniquely separates one pair from w1. Both must be asked even though the total declared cost is zero. An empty or singleton plan is insufficient.",
+      "status": "PLAN_FOUND",
+      "title": "Two zero-cost questions are jointly necessary"
+    },
+    {
+      "actionable_within_budget": true,
+      "ask_all_available_baseline": {
+        "declared_cost": 1,
+        "distinguishes_all_cross_decision_pairs": true,
+        "question_count": 1,
+        "question_ids": [
+          "observed"
+        ],
+        "within_budget": true
+      },
+      "case_id": "C23",
+      "indistinguishable_pairs": [],
+      "minimum_cost": 1,
+      "minimum_question_count": 1,
+      "omitted_optimal_plan_count": 0,
+      "optimal_plan_count": 1,
+      "optimal_question_sets": [
+        [
+          "observed"
+        ]
+      ],
+      "rationale": "Both worlds contain an observed key with a string answer. Empty string and the literal word unknown are different known values under the frozen schema; neither is a missing key. Unicode decision labels do not change that rule.",
+      "status": "PLAN_FOUND",
+      "title": "Empty and literal unknown strings are known answers"
+    },
+    {
+      "actionable_within_budget": true,
+      "ask_all_available_baseline": {
+        "declared_cost": 11,
+        "distinguishes_all_cross_decision_pairs": true,
+        "question_count": 3,
+        "question_ids": [
+          "qa",
+          "qb",
+          "whole"
+        ],
+        "within_budget": false
+      },
+      "case_id": "C24",
+      "indistinguishable_pairs": [],
+      "minimum_cost": 4,
+      "minimum_question_count": 2,
+      "omitted_optimal_plan_count": 0,
+      "optimal_plan_count": 1,
+      "optimal_question_sets": [
+        [
+          "qa",
+          "qb"
+        ]
+      ],
+      "rationale": "The two-question plan costs four and separates all pairs. whole alone costs seven. Cost is the primary objective, so fewer questions cannot displace the cheaper two-question optimum.",
+      "status": "PLAN_FOUND",
+      "title": "Lower cost wins over fewer questions"
+    }
+  ],
+  "generation": "Optima and rationales hand-authored; no optimization solver or product implementation used.",
+  "not_a_practitioner_study": true,
+  "schema": 1
+}

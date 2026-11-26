@@ -1,0 +1,792 @@
+{
+  "cases": [
+    {
+      "acceptance": 0,
+      "expected": {
+        "case_id": "C01",
+        "indistinguishable_pairs": [],
+        "minimum_cost": 0,
+        "minimum_question_count": 0,
+        "omitted_optimal_plan_count": 0,
+        "optimal_plan_count": 1,
+        "optimal_question_sets": [
+          []
+        ],
+        "status": "NO_QUESTION_NEEDED"
+      },
+      "id": "C01",
+      "inputs": [
+        {
+          "bytes": 20135,
+          "path": "inputs/input-batch.json",
+          "sha256": "1fa3e7910548f3711e3ba3a4695d5e55c095b0438a5785cd81af7e2fbab084ca"
+        },
+        {
+          "bytes": 3415,
+          "path": "inputs/SPEC.md",
+          "sha256": "8f6944ea0559e1cf2398dbb4a12b1066d0d6cbdc17d5ab53d4be13491d0fa338"
+        }
+      ],
+      "needs": []
+    },
+    {
+      "acceptance": 0,
+      "expected": {
+        "case_id": "C02",
+        "indistinguishable_pairs": [],
+        "minimum_cost": 0,
+        "minimum_question_count": 0,
+        "omitted_optimal_plan_count": 0,
+        "optimal_plan_count": 1,
+        "optimal_question_sets": [
+          []
+        ],
+        "status": "NO_QUESTION_NEEDED"
+      },
+      "id": "C02",
+      "inputs": [
+        {
+          "bytes": 20135,
+          "path": "inputs/input-batch.json",
+          "sha256": "1fa3e7910548f3711e3ba3a4695d5e55c095b0438a5785cd81af7e2fbab084ca"
+        },
+        {
+          "bytes": 3415,
+          "path": "inputs/SPEC.md",
+          "sha256": "8f6944ea0559e1cf2398dbb4a12b1066d0d6cbdc17d5ab53d4be13491d0fa338"
+        }
+      ],
+      "needs": []
+    },
+    {
+      "acceptance": 0,
+      "expected": {
+        "case_id": "C03",
+        "indistinguishable_pairs": [],
+        "minimum_cost": 3,
+        "minimum_question_count": 1,
+        "omitted_optimal_plan_count": 0,
+        "optimal_plan_count": 1,
+        "optimal_question_sets": [
+          [
+            "receipt"
+          ]
+        ],
+        "status": "QUESTIONS_FOR_REVIEW"
+      },
+      "id": "C03",
+      "inputs": [
+        {
+          "bytes": 20135,
+          "path": "inputs/input-batch.json",
+          "sha256": "1fa3e7910548f3711e3ba3a4695d5e55c095b0438a5785cd81af7e2fbab084ca"
+        },
+        {
+          "bytes": 3415,
+          "path": "inputs/SPEC.md",
+          "sha256": "8f6944ea0559e1cf2398dbb4a12b1066d0d6cbdc17d5ab53d4be13491d0fa338"
+        }
+      ],
+      "needs": []
+    },
+    {
+      "acceptance": 0,
+      "expected": {
+        "case_id": "C04",
+        "indistinguishable_pairs": [],
+        "minimum_cost": 5,
+        "minimum_question_count": 2,
+        "omitted_optimal_plan_count": 0,
+        "optimal_plan_count": 1,
+        "optimal_question_sets": [
+          [
+            "left",
+            "right"
+          ]
+        ],
+        "status": "QUESTIONS_FOR_REVIEW"
+      },
+      "id": "C04",
+      "inputs": [
+        {
+          "bytes": 20135,
+          "path": "inputs/input-batch.json",
+          "sha256": "1fa3e7910548f3711e3ba3a4695d5e55c095b0438a5785cd81af7e2fbab084ca"
+        },
+        {
+          "bytes": 3415,
+          "path": "inputs/SPEC.md",
+          "sha256": "8f6944ea0559e1cf2398dbb4a12b1066d0d6cbdc17d5ab53d4be13491d0fa338"
+        }
+      ],
+      "needs": []
+    },
+    {
+      "acceptance": 0,
+      "expected": {
+        "case_id": "C05",
+        "indistinguishable_pairs": [],
+        "minimum_cost": 2,
+        "minimum_question_count": 1,
+        "omitted_optimal_plan_count": 0,
+        "optimal_plan_count": 1,
+        "optimal_question_sets": [
+          [
+            "cheap"
+          ]
+        ],
+        "status": "QUESTIONS_FOR_REVIEW"
+      },
+      "id": "C05",
+      "inputs": [
+        {
+          "bytes": 20135,
+          "path": "inputs/input-batch.json",
+          "sha256": "1fa3e7910548f3711e3ba3a4695d5e55c095b0438a5785cd81af7e2fbab084ca"
+        },
+        {
+          "bytes": 3415,
+          "path": "inputs/SPEC.md",
+          "sha256": "8f6944ea0559e1cf2398dbb4a12b1066d0d6cbdc17d5ab53d4be13491d0fa338"
+        }
+      ],
+      "needs": []
+    },
+    {
+      "acceptance": 0,
+      "expected": {
+        "case_id": "C06",
+        "indistinguishable_pairs": [],
+        "minimum_cost": 2,
+        "minimum_question_count": 1,
+        "omitted_optimal_plan_count": 0,
+        "optimal_plan_count": 2,
+        "optimal_question_sets": [
+          [
+            "qa"
+          ],
+          [
+            "qb"
+          ]
+        ],
+        "status": "QUESTIONS_FOR_REVIEW"
+      },
+      "id": "C06",
+      "inputs": [
+        {
+          "bytes": 20135,
+          "path": "inputs/input-batch.json",
+          "sha256": "1fa3e7910548f3711e3ba3a4695d5e55c095b0438a5785cd81af7e2fbab084ca"
+        },
+        {
+          "bytes": 3415,
+          "path": "inputs/SPEC.md",
+          "sha256": "8f6944ea0559e1cf2398dbb4a12b1066d0d6cbdc17d5ab53d4be13491d0fa338"
+        }
+      ],
+      "needs": []
+    },
+    {
+      "acceptance": 0,
+      "expected": {
+        "case_id": "C07",
+        "indistinguishable_pairs": [],
+        "minimum_cost": 2,
+        "minimum_question_count": 1,
+        "omitted_optimal_plan_count": 0,
+        "optimal_plan_count": 1,
+        "optimal_question_sets": [
+          [
+            "flag"
+          ]
+        ],
+        "status": "QUESTIONS_FOR_REVIEW"
+      },
+      "id": "C07",
+      "inputs": [
+        {
+          "bytes": 20135,
+          "path": "inputs/input-batch.json",
+          "sha256": "1fa3e7910548f3711e3ba3a4695d5e55c095b0438a5785cd81af7e2fbab084ca"
+        },
+        {
+          "bytes": 3415,
+          "path": "inputs/SPEC.md",
+          "sha256": "8f6944ea0559e1cf2398dbb4a12b1066d0d6cbdc17d5ab53d4be13491d0fa338"
+        }
+      ],
+      "needs": []
+    },
+    {
+      "acceptance": 0,
+      "expected": {
+        "case_id": "C08",
+        "indistinguishable_pairs": [
+          [
+            "w1",
+            "w2"
+          ]
+        ],
+        "minimum_cost": null,
+        "minimum_question_count": null,
+        "omitted_optimal_plan_count": 0,
+        "optimal_plan_count": 0,
+        "optimal_question_sets": [],
+        "status": "INSUFFICIENT_EVIDENCE"
+      },
+      "id": "C08",
+      "inputs": [
+        {
+          "bytes": 20135,
+          "path": "inputs/input-batch.json",
+          "sha256": "1fa3e7910548f3711e3ba3a4695d5e55c095b0438a5785cd81af7e2fbab084ca"
+        },
+        {
+          "bytes": 3415,
+          "path": "inputs/SPEC.md",
+          "sha256": "8f6944ea0559e1cf2398dbb4a12b1066d0d6cbdc17d5ab53d4be13491d0fa338"
+        }
+      ],
+      "needs": []
+    },
+    {
+      "acceptance": 0,
+      "expected": {
+        "case_id": "C09",
+        "indistinguishable_pairs": [
+          [
+            "w1",
+            "w2"
+          ]
+        ],
+        "minimum_cost": null,
+        "minimum_question_count": null,
+        "omitted_optimal_plan_count": 0,
+        "optimal_plan_count": 0,
+        "optimal_question_sets": [],
+        "status": "INSUFFICIENT_EVIDENCE"
+      },
+      "id": "C09",
+      "inputs": [
+        {
+          "bytes": 20135,
+          "path": "inputs/input-batch.json",
+          "sha256": "1fa3e7910548f3711e3ba3a4695d5e55c095b0438a5785cd81af7e2fbab084ca"
+        },
+        {
+          "bytes": 3415,
+          "path": "inputs/SPEC.md",
+          "sha256": "8f6944ea0559e1cf2398dbb4a12b1066d0d6cbdc17d5ab53d4be13491d0fa338"
+        }
+      ],
+      "needs": []
+    },
+    {
+      "acceptance": 0,
+      "expected": {
+        "case_id": "C10",
+        "indistinguishable_pairs": [
+          [
+            "w1",
+            "w2"
+          ]
+        ],
+        "minimum_cost": null,
+        "minimum_question_count": null,
+        "omitted_optimal_plan_count": 0,
+        "optimal_plan_count": 0,
+        "optimal_question_sets": [],
+        "status": "INSUFFICIENT_EVIDENCE"
+      },
+      "id": "C10",
+      "inputs": [
+        {
+          "bytes": 20135,
+          "path": "inputs/input-batch.json",
+          "sha256": "1fa3e7910548f3711e3ba3a4695d5e55c095b0438a5785cd81af7e2fbab084ca"
+        },
+        {
+          "bytes": 3415,
+          "path": "inputs/SPEC.md",
+          "sha256": "8f6944ea0559e1cf2398dbb4a12b1066d0d6cbdc17d5ab53d4be13491d0fa338"
+        }
+      ],
+      "needs": []
+    },
+    {
+      "acceptance": 0,
+      "expected": {
+        "case_id": "C11",
+        "indistinguishable_pairs": [],
+        "minimum_cost": 4,
+        "minimum_question_count": 1,
+        "omitted_optimal_plan_count": 0,
+        "optimal_plan_count": 1,
+        "optimal_question_sets": [
+          [
+            "evidence"
+          ]
+        ],
+        "status": "QUESTIONS_FOR_REVIEW"
+      },
+      "id": "C11",
+      "inputs": [
+        {
+          "bytes": 20135,
+          "path": "inputs/input-batch.json",
+          "sha256": "1fa3e7910548f3711e3ba3a4695d5e55c095b0438a5785cd81af7e2fbab084ca"
+        },
+        {
+          "bytes": 3415,
+          "path": "inputs/SPEC.md",
+          "sha256": "8f6944ea0559e1cf2398dbb4a12b1066d0d6cbdc17d5ab53d4be13491d0fa338"
+        }
+      ],
+      "needs": []
+    },
+    {
+      "acceptance": 0,
+      "expected": {
+        "case_id": "C12",
+        "indistinguishable_pairs": [],
+        "minimum_cost": 0,
+        "minimum_question_count": 1,
+        "omitted_optimal_plan_count": 0,
+        "optimal_plan_count": 1,
+        "optimal_question_sets": [
+          [
+            "free"
+          ]
+        ],
+        "status": "QUESTIONS_FOR_REVIEW"
+      },
+      "id": "C12",
+      "inputs": [
+        {
+          "bytes": 20135,
+          "path": "inputs/input-batch.json",
+          "sha256": "1fa3e7910548f3711e3ba3a4695d5e55c095b0438a5785cd81af7e2fbab084ca"
+        },
+        {
+          "bytes": 3415,
+          "path": "inputs/SPEC.md",
+          "sha256": "8f6944ea0559e1cf2398dbb4a12b1066d0d6cbdc17d5ab53d4be13491d0fa338"
+        }
+      ],
+      "needs": []
+    },
+    {
+      "acceptance": 0,
+      "expected": {
+        "case_id": "C13",
+        "indistinguishable_pairs": [],
+        "minimum_cost": 2,
+        "minimum_question_count": 1,
+        "omitted_optimal_plan_count": 0,
+        "optimal_plan_count": 1,
+        "optimal_question_sets": [
+          [
+            "separator"
+          ]
+        ],
+        "status": "QUESTIONS_FOR_REVIEW"
+      },
+      "id": "C13",
+      "inputs": [
+        {
+          "bytes": 20135,
+          "path": "inputs/input-batch.json",
+          "sha256": "1fa3e7910548f3711e3ba3a4695d5e55c095b0438a5785cd81af7e2fbab084ca"
+        },
+        {
+          "bytes": 3415,
+          "path": "inputs/SPEC.md",
+          "sha256": "8f6944ea0559e1cf2398dbb4a12b1066d0d6cbdc17d5ab53d4be13491d0fa338"
+        }
+      ],
+      "needs": []
+    },
+    {
+      "acceptance": 0,
+      "expected": {
+        "case_id": "C14",
+        "indistinguishable_pairs": [],
+        "minimum_cost": 6,
+        "minimum_question_count": 2,
+        "omitted_optimal_plan_count": 0,
+        "optimal_plan_count": 1,
+        "optimal_question_sets": [
+          [
+            "qa",
+            "qb"
+          ]
+        ],
+        "status": "QUESTIONS_FOR_REVIEW"
+      },
+      "id": "C14",
+      "inputs": [
+        {
+          "bytes": 20135,
+          "path": "inputs/input-batch.json",
+          "sha256": "1fa3e7910548f3711e3ba3a4695d5e55c095b0438a5785cd81af7e2fbab084ca"
+        },
+        {
+          "bytes": 3415,
+          "path": "inputs/SPEC.md",
+          "sha256": "8f6944ea0559e1cf2398dbb4a12b1066d0d6cbdc17d5ab53d4be13491d0fa338"
+        }
+      ],
+      "needs": []
+    },
+    {
+      "acceptance": 0,
+      "expected": {
+        "case_id": "C15",
+        "indistinguishable_pairs": [],
+        "minimum_cost": 6,
+        "minimum_question_count": 2,
+        "omitted_optimal_plan_count": 0,
+        "optimal_plan_count": 1,
+        "optimal_question_sets": [
+          [
+            "qa",
+            "qb"
+          ]
+        ],
+        "status": "BUDGET_BLOCKED"
+      },
+      "id": "C15",
+      "inputs": [
+        {
+          "bytes": 20135,
+          "path": "inputs/input-batch.json",
+          "sha256": "1fa3e7910548f3711e3ba3a4695d5e55c095b0438a5785cd81af7e2fbab084ca"
+        },
+        {
+          "bytes": 3415,
+          "path": "inputs/SPEC.md",
+          "sha256": "8f6944ea0559e1cf2398dbb4a12b1066d0d6cbdc17d5ab53d4be13491d0fa338"
+        }
+      ],
+      "needs": []
+    },
+    {
+      "acceptance": 0,
+      "expected": {
+        "case_id": "C16",
+        "indistinguishable_pairs": [],
+        "minimum_cost": 3,
+        "minimum_question_count": 1,
+        "omitted_optimal_plan_count": 0,
+        "optimal_plan_count": 1,
+        "optimal_question_sets": [
+          [
+            "separator"
+          ]
+        ],
+        "status": "QUESTIONS_FOR_REVIEW"
+      },
+      "id": "C16",
+      "inputs": [
+        {
+          "bytes": 20135,
+          "path": "inputs/input-batch.json",
+          "sha256": "1fa3e7910548f3711e3ba3a4695d5e55c095b0438a5785cd81af7e2fbab084ca"
+        },
+        {
+          "bytes": 3415,
+          "path": "inputs/SPEC.md",
+          "sha256": "8f6944ea0559e1cf2398dbb4a12b1066d0d6cbdc17d5ab53d4be13491d0fa338"
+        }
+      ],
+      "needs": []
+    },
+    {
+      "acceptance": 0,
+      "expected": {
+        "case_id": "C17",
+        "indistinguishable_pairs": [],
+        "minimum_cost": 2,
+        "minimum_question_count": 2,
+        "omitted_optimal_plan_count": 0,
+        "optimal_plan_count": 3,
+        "optimal_question_sets": [
+          [
+            "qa",
+            "qb"
+          ],
+          [
+            "qa",
+            "qc"
+          ],
+          [
+            "qb",
+            "qc"
+          ]
+        ],
+        "status": "QUESTIONS_FOR_REVIEW"
+      },
+      "id": "C17",
+      "inputs": [
+        {
+          "bytes": 20135,
+          "path": "inputs/input-batch.json",
+          "sha256": "1fa3e7910548f3711e3ba3a4695d5e55c095b0438a5785cd81af7e2fbab084ca"
+        },
+        {
+          "bytes": 3415,
+          "path": "inputs/SPEC.md",
+          "sha256": "8f6944ea0559e1cf2398dbb4a12b1066d0d6cbdc17d5ab53d4be13491d0fa338"
+        }
+      ],
+      "needs": []
+    },
+    {
+      "acceptance": 0,
+      "expected": {
+        "case_id": "C18",
+        "indistinguishable_pairs": [
+          [
+            "w1",
+            "w3"
+          ],
+          [
+            "w2",
+            "w3"
+          ]
+        ],
+        "minimum_cost": null,
+        "minimum_question_count": null,
+        "omitted_optimal_plan_count": 0,
+        "optimal_plan_count": 0,
+        "optimal_question_sets": [],
+        "status": "INSUFFICIENT_EVIDENCE"
+      },
+      "id": "C18",
+      "inputs": [
+        {
+          "bytes": 20135,
+          "path": "inputs/input-batch.json",
+          "sha256": "1fa3e7910548f3711e3ba3a4695d5e55c095b0438a5785cd81af7e2fbab084ca"
+        },
+        {
+          "bytes": 3415,
+          "path": "inputs/SPEC.md",
+          "sha256": "8f6944ea0559e1cf2398dbb4a12b1066d0d6cbdc17d5ab53d4be13491d0fa338"
+        }
+      ],
+      "needs": []
+    },
+    {
+      "acceptance": 0,
+      "expected": {
+        "case_id": "C19",
+        "indistinguishable_pairs": [],
+        "minimum_cost": 5,
+        "minimum_question_count": 2,
+        "omitted_optimal_plan_count": 0,
+        "optimal_plan_count": 1,
+        "optimal_question_sets": [
+          [
+            "alpha",
+            "zeta"
+          ]
+        ],
+        "status": "QUESTIONS_FOR_REVIEW"
+      },
+      "id": "C19",
+      "inputs": [
+        {
+          "bytes": 20135,
+          "path": "inputs/input-batch.json",
+          "sha256": "1fa3e7910548f3711e3ba3a4695d5e55c095b0438a5785cd81af7e2fbab084ca"
+        },
+        {
+          "bytes": 3415,
+          "path": "inputs/SPEC.md",
+          "sha256": "8f6944ea0559e1cf2398dbb4a12b1066d0d6cbdc17d5ab53d4be13491d0fa338"
+        }
+      ],
+      "needs": []
+    },
+    {
+      "acceptance": 0,
+      "expected": {
+        "case_id": "C20",
+        "indistinguishable_pairs": [],
+        "minimum_cost": 2,
+        "minimum_question_count": 1,
+        "omitted_optimal_plan_count": 0,
+        "optimal_plan_count": 1,
+        "optimal_question_sets": [
+          [
+            "whole"
+          ]
+        ],
+        "status": "QUESTIONS_FOR_REVIEW"
+      },
+      "id": "C20",
+      "inputs": [
+        {
+          "bytes": 20135,
+          "path": "inputs/input-batch.json",
+          "sha256": "1fa3e7910548f3711e3ba3a4695d5e55c095b0438a5785cd81af7e2fbab084ca"
+        },
+        {
+          "bytes": 3415,
+          "path": "inputs/SPEC.md",
+          "sha256": "8f6944ea0559e1cf2398dbb4a12b1066d0d6cbdc17d5ab53d4be13491d0fa338"
+        }
+      ],
+      "needs": []
+    },
+    {
+      "acceptance": 0,
+      "expected": {
+        "case_id": "C21",
+        "indistinguishable_pairs": [],
+        "minimum_cost": 1,
+        "minimum_question_count": 1,
+        "omitted_optimal_plan_count": 2,
+        "optimal_plan_count": 10,
+        "optimal_question_sets": [
+          [
+            "q00"
+          ],
+          [
+            "q01"
+          ],
+          [
+            "q02"
+          ],
+          [
+            "q03"
+          ],
+          [
+            "q04"
+          ],
+          [
+            "q05"
+          ],
+          [
+            "q06"
+          ],
+          [
+            "q07"
+          ]
+        ],
+        "status": "QUESTIONS_FOR_REVIEW"
+      },
+      "id": "C21",
+      "inputs": [
+        {
+          "bytes": 20135,
+          "path": "inputs/input-batch.json",
+          "sha256": "1fa3e7910548f3711e3ba3a4695d5e55c095b0438a5785cd81af7e2fbab084ca"
+        },
+        {
+          "bytes": 3415,
+          "path": "inputs/SPEC.md",
+          "sha256": "8f6944ea0559e1cf2398dbb4a12b1066d0d6cbdc17d5ab53d4be13491d0fa338"
+        }
+      ],
+      "needs": []
+    },
+    {
+      "acceptance": 0,
+      "expected": {
+        "case_id": "C22",
+        "indistinguishable_pairs": [],
+        "minimum_cost": 0,
+        "minimum_question_count": 2,
+        "omitted_optimal_plan_count": 0,
+        "optimal_plan_count": 1,
+        "optimal_question_sets": [
+          [
+            "qa",
+            "qb"
+          ]
+        ],
+        "status": "QUESTIONS_FOR_REVIEW"
+      },
+      "id": "C22",
+      "inputs": [
+        {
+          "bytes": 20135,
+          "path": "inputs/input-batch.json",
+          "sha256": "1fa3e7910548f3711e3ba3a4695d5e55c095b0438a5785cd81af7e2fbab084ca"
+        },
+        {
+          "bytes": 3415,
+          "path": "inputs/SPEC.md",
+          "sha256": "8f6944ea0559e1cf2398dbb4a12b1066d0d6cbdc17d5ab53d4be13491d0fa338"
+        }
+      ],
+      "needs": []
+    },
+    {
+      "acceptance": 0,
+      "expected": {
+        "case_id": "C23",
+        "indistinguishable_pairs": [],
+        "minimum_cost": 1,
+        "minimum_question_count": 1,
+        "omitted_optimal_plan_count": 0,
+        "optimal_plan_count": 1,
+        "optimal_question_sets": [
+          [
+            "observed"
+          ]
+        ],
+        "status": "QUESTIONS_FOR_REVIEW"
+      },
+      "id": "C23",
+      "inputs": [
+        {
+          "bytes": 20135,
+          "path": "inputs/input-batch.json",
+          "sha256": "1fa3e7910548f3711e3ba3a4695d5e55c095b0438a5785cd81af7e2fbab084ca"
+        },
+        {
+          "bytes": 3415,
+          "path": "inputs/SPEC.md",
+          "sha256": "8f6944ea0559e1cf2398dbb4a12b1066d0d6cbdc17d5ab53d4be13491d0fa338"
+        }
+      ],
+      "needs": []
+    },
+    {
+      "acceptance": 0,
+      "expected": {
+        "case_id": "C24",
+        "indistinguishable_pairs": [],
+        "minimum_cost": 4,
+        "minimum_question_count": 2,
+        "omitted_optimal_plan_count": 0,
+        "optimal_plan_count": 1,
+        "optimal_question_sets": [
+          [
+            "qa",
+            "qb"
+          ]
+        ],
+        "status": "QUESTIONS_FOR_REVIEW"
+      },
+      "id": "C24",
+      "inputs": [
+        {
+          "bytes": 20135,
+          "path": "inputs/input-batch.json",
+          "sha256": "1fa3e7910548f3711e3ba3a4695d5e55c095b0438a5785cd81af7e2fbab084ca"
+        },
+        {
+          "bytes": 3415,
+          "path": "inputs/SPEC.md",
+          "sha256": "8f6944ea0559e1cf2398dbb4a12b1066d0d6cbdc17d5ab53d4be13491d0fa338"
+        }
+      ],
+      "needs": []
+    }
+  ],
+  "schema": 1
+}

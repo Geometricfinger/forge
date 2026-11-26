@@ -53,6 +53,14 @@ and [product direction](docs/PRODUCT_DIRECTION.md) for the complete creation goa
 
 ## Requirements
 
+The [handoff bench](docs/HANDOFF_BENCH.md) is a separately reviewed executable
+example for comparing documented export fields with the same frozen planner and
+a separate burden ledger. Its static builder does not execute product code.
+Explicit Linux qualification runs the original 24 cases and five synthetic
+handoffs through one archive and verifier. Unknown human work and unverified
+native-format decoding remain visible. This adds no product execution path to
+FORGE's analysis commands; see the example README before running it.
+
 - Python 3.11 or newer with SQLite FTS5 (included in standard CPython builds). Check with `python3 --version`.
 - Linux or macOS. Windows is not supported.
 - No third-party packages, no `pip install`, no build step. Node.js is optional and only used by `verify.py`.

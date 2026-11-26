@@ -1,0 +1,17 @@
+{
+  "case_id": "H04",
+  "declared_format": "stl",
+  "manifest_kind": "reviewed_native_case",
+  "observations": [
+    {
+      "artifact_id": "review_note",
+      "category": "order_or_case",
+      "end": 60,
+      "quote": "Synthetic untrusted claim: order_or_case content is present.",
+      "start": 0
+    }
+  ],
+  "package_artifact": "scan_fixture",
+  "provenance": "synthetic",
+  "schema": 1
+}

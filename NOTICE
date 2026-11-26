@@ -25,3 +25,13 @@ This product includes third-party software and example material:
 
 Public repositories referenced by URL and commit in contracts/ and hound/contracts/
 are identifiers only; their source code is not included in this repository.
+
+3. The separately reviewed handoff-bench example preserves selected complete
+   boltons 24.1.0 and more-itertools 10.6.0 modules for its explicit prototype.
+   These are not installed dependencies of the FORGE analysis runtime.
+   - boltons: BSD 3-Clause License; original notice retained at
+     examples/handoff_bench/vendor/licenses/boltons/LICENSE.
+   - more-itertools: MIT License; original notice retained at
+     examples/handoff_bench/vendor/licenses/more-itertools/LICENSE.
+   Exact upstream revisions and byte identities are recorded in
+   examples/handoff_bench/SOURCE_PROVENANCE.json and preservation_pins.json.

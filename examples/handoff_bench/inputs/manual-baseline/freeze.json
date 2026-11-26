@@ -1,0 +1,150 @@
+{
+  "case_count": 24,
+  "files": [
+    {
+      "bytes": 6222,
+      "path": "README.md",
+      "sha256": "16d932455212c87ec4f5dccc015eac42a303ae6fd475745c82506ebd9839832b"
+    },
+    {
+      "bytes": 13696,
+      "path": "build_manual_baseline.py",
+      "sha256": "6f7ddebfa893e9094a817686bc297a41ba0ca63963236b22551aaf10805882d2"
+    },
+    {
+      "bytes": 21804,
+      "path": "expected.json",
+      "sha256": "6211a4633eaff3914732069d4eff407142c8848cbe8dd8cb85c420243459bd6a"
+    },
+    {
+      "bytes": 20135,
+      "path": "input-batch.json",
+      "sha256": "1fa3e7910548f3711e3ba3a4695d5e55c095b0438a5785cd81af7e2fbab084ca"
+    },
+    {
+      "bytes": 434,
+      "path": "inputs/C01.json",
+      "sha256": "7834c304be24489977a8575e28885615c8dc07fbdda1f241c5b8d04255436e77"
+    },
+    {
+      "bytes": 180,
+      "path": "inputs/C02.json",
+      "sha256": "2cc48955877e87f90af5ea4f7d4af61bc03f3859c9ff2879b0f0a94d4ccaaf2e"
+    },
+    {
+      "bytes": 451,
+      "path": "inputs/C03.json",
+      "sha256": "283fe17f2839c0e1d6a2b0fbb89e25028d154675782411e6c2c42daf1746f926"
+    },
+    {
+      "bytes": 713,
+      "path": "inputs/C04.json",
+      "sha256": "19fcc8bc9579c1a847cf890edd02b793fdd68cb56d2580f1bbfb04fd23807497"
+    },
+    {
+      "bytes": 610,
+      "path": "inputs/C05.json",
+      "sha256": "a084153bcba5e47a964bdcb367595785a70e4d14c71257bb7c00f2027477015f"
+    },
+    {
+      "bytes": 574,
+      "path": "inputs/C06.json",
+      "sha256": "064f030c7ee3e6fdc956af9eb8f84731d114d2aedfaa7d3ff6786cddebc87199"
+    },
+    {
+      "bytes": 718,
+      "path": "inputs/C07.json",
+      "sha256": "b1a2c82b5a1602b27eb76930dbf556f2ec72794a0e6d4bf69c7d7961343f8bcf"
+    },
+    {
+      "bytes": 626,
+      "path": "inputs/C08.json",
+      "sha256": "591634dfbe5854cc27887555025f4e40d5db78d4ad623617865e7b990ccb6f98"
+    },
+    {
+      "bytes": 435,
+      "path": "inputs/C09.json",
+      "sha256": "75e4fa6c0c83630babbc6df6a0ff53b50b68b5dd1b85fc948f748bcbc9b021e0"
+    },
+    {
+      "bytes": 409,
+      "path": "inputs/C10.json",
+      "sha256": "d973725f6d50e43c330fed0566fdfbaae48c0bf4567be011fe5ef42ecf6804c4"
+    },
+    {
+      "bytes": 603,
+      "path": "inputs/C11.json",
+      "sha256": "561c12d1002b29568bb3f24d919904f1c5dced7358b6375e58ab7b99886bc3d5"
+    },
+    {
+      "bytes": 586,
+      "path": "inputs/C12.json",
+      "sha256": "1f959dae6ad62f5b8fdafe0afe3bf91a3388d5edc6e947d1331e20d5d4187234"
+    },
+    {
+      "bytes": 616,
+      "path": "inputs/C13.json",
+      "sha256": "a40bb0ac54518a73a8af9a0b699990b208773e955d281e59ac0a71be20b72768"
+    },
+    {
+      "bytes": 688,
+      "path": "inputs/C14.json",
+      "sha256": "7d20205d313bbe16e2b1ccf8ed9bf992bee7a6b7f564baa838c6789ab82b4146"
+    },
+    {
+      "bytes": 688,
+      "path": "inputs/C15.json",
+      "sha256": "abfa34613ddfc6aaf8e68cf1572c0f95be8cbae8372ec8f9520b660a735af050"
+    },
+    {
+      "bytes": 925,
+      "path": "inputs/C16.json",
+      "sha256": "8428f95beae7d1cd07528cf8292678e63c02bfbb57217e5c9df5777e49f2f592"
+    },
+    {
+      "bytes": 865,
+      "path": "inputs/C17.json",
+      "sha256": "36819a95b530ee3a1b0027616748831ef456fde472aadfe3398701f16dddc710"
+    },
+    {
+      "bytes": 487,
+      "path": "inputs/C18.json",
+      "sha256": "36d6fbe48ca7be05fe97efd371b70f3ffe403e45e00bd0312077d471596fdc18"
+    },
+    {
+      "bytes": 713,
+      "path": "inputs/C19.json",
+      "sha256": "30feb1cceb0beef652a99caadd6c7ec658242858bd00620a60e480dabbbe2e08"
+    },
+    {
+      "bytes": 880,
+      "path": "inputs/C20.json",
+      "sha256": "e70c83173bdf3e5f568e42cd99e8d4ba90f54f302c36c9e9f5720eb9d0e8635e"
+    },
+    {
+      "bytes": 1874,
+      "path": "inputs/C21.json",
+      "sha256": "9058e5f5ecdbc7a1095c7524d480461662504ad1eee0e2243ce16957c12a64d1"
+    },
+    {
+      "bytes": 688,
+      "path": "inputs/C22.json",
+      "sha256": "f120fdd815ddfabbefab0d261ae8a6db5a8c4a9db4334f3ef130594b7afd0a15"
+    },
+    {
+      "bytes": 453,
+      "path": "inputs/C23.json",
+      "sha256": "97e6d346fc438219eba0a2bd7cb7201410ffdaccbc7ab076e2229b1de085c82b"
+    },
+    {
+      "bytes": 880,
+      "path": "inputs/C24.json",
+      "sha256": "4e9788d6c2201accfa375dcb4a829a07efeb4494252d9e53f54cb0962b44bf5a"
+    }
+  ],
+  "frozen_at_utc": "2026-11-26T02:57:08.348453+00:00",
+  "implementation_access_by_baseline_author": false,
+  "labels_visible_to_implementation_agent_before_first_run": false,
+  "optimization_solver_used_for_labels": false,
+  "schema": 1
+}

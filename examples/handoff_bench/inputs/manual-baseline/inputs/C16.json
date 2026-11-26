@@ -1,0 +1,51 @@
+{
+  "case_id": "C16",
+  "max_cost": 3,
+  "questions": [
+    {
+      "available": true,
+      "cost": 0,
+      "id": "zero",
+      "label": "Synthetic evidence request zero"
+    },
+    {
+      "available": true,
+      "cost": 1,
+      "id": "noise",
+      "label": "Synthetic evidence request noise"
+    },
+    {
+      "available": true,
+      "cost": 50,
+      "id": "unanswered",
+      "label": "Synthetic evidence request unanswered"
+    },
+    {
+      "available": true,
+      "cost": 3,
+      "id": "separator",
+      "label": "Synthetic evidence request separator"
+    }
+  ],
+  "schema": 1,
+  "worlds": [
+    {
+      "answers": {
+        "noise": "same",
+        "separator": "0",
+        "zero": "same"
+      },
+      "decision": "A",
+      "id": "w1"
+    },
+    {
+      "answers": {
+        "noise": "same",
+        "separator": "1",
+        "zero": "same"
+      },
+      "decision": "B",
+      "id": "w2"
+    }
+  ]
+}

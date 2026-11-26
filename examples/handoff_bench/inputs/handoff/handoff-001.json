@@ -1,0 +1,80 @@
+{
+  "budget": 4,
+  "burden_events": [
+    {
+      "actor": "human",
+      "id": "acq_human",
+      "measurement": "unknown",
+      "source": "Synthetic fixture: one declared required task; human actions and elapsed time were not observed.",
+      "stage": "acquisition",
+      "step_count": 1,
+      "wall_time_ns": null
+    },
+    {
+      "actor": "human",
+      "id": "interpret_human",
+      "measurement": "unknown",
+      "source": "Synthetic fixture: one declared required task; human actions and elapsed time were not observed.",
+      "stage": "interpretation",
+      "step_count": 1,
+      "wall_time_ns": null
+    },
+    {
+      "actor": "human",
+      "id": "model_human",
+      "measurement": "unknown",
+      "source": "Synthetic fixture: one declared required task; human actions and elapsed time were not observed.",
+      "stage": "model_preparation",
+      "step_count": 1,
+      "wall_time_ns": null
+    }
+  ],
+  "case_id": "H01",
+  "follow_up": [],
+  "questions": [
+    {
+      "available": true,
+      "cost": 4,
+      "id": "receipt",
+      "label": "Request the declared administrative evidence",
+      "source": "Synthetic reviewer-supplied question catalog; no question has been sent."
+    }
+  ],
+  "raw_artifacts": [
+    {
+      "bytes": 41,
+      "id": "case_csv",
+      "kind": "medit_csv",
+      "path": "artifacts/h01-cases.csv",
+      "provenance": "synthetic",
+      "selection": {
+        "case_name": "SYNTHETIC-H01"
+      },
+      "sha256": "f8fbcf1f216b1472d998a50db69e821dbd9398595b719b19becc592911d1f0cd"
+    }
+  ],
+  "reviewer_decisions": [
+    {
+      "answers": {
+        "receipt": "Completed"
+      },
+      "conditions": {
+        "status": "Completed"
+      },
+      "decision": "REVIEW_EXPORT",
+      "id": "positive"
+    },
+    {
+      "answers": {
+        "receipt": "Pending"
+      },
+      "conditions": {
+        "status": "Pending"
+      },
+      "decision": "REQUEST_REVIEW",
+      "id": "negative"
+    }
+  ],
+  "schema": 1,
+  "source": "medit_export"
+}

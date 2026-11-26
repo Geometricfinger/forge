@@ -1,0 +1,29 @@
+{
+  "case_id": "C01",
+  "max_cost": 0,
+  "questions": [
+    {
+      "available": true,
+      "cost": 9,
+      "id": "noise",
+      "label": "Synthetic evidence request noise"
+    }
+  ],
+  "schema": 1,
+  "worlds": [
+    {
+      "answers": {
+        "noise": "old"
+      },
+      "decision": "HOLD",
+      "id": "w1"
+    },
+    {
+      "answers": {
+        "noise": "new"
+      },
+      "decision": "HOLD",
+      "id": "w2"
+    }
+  ]
+}

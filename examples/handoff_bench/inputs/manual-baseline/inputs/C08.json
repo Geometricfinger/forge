@@ -1,0 +1,37 @@
+{
+  "case_id": "C08",
+  "max_cost": 10,
+  "questions": [
+    {
+      "available": false,
+      "cost": 1,
+      "id": "unavailable",
+      "label": "Synthetic evidence request unavailable"
+    },
+    {
+      "available": true,
+      "cost": 0,
+      "id": "noise",
+      "label": "Synthetic evidence request noise"
+    }
+  ],
+  "schema": 1,
+  "worlds": [
+    {
+      "answers": {
+        "noise": "same",
+        "unavailable": "0"
+      },
+      "decision": "A",
+      "id": "w1"
+    },
+    {
+      "answers": {
+        "noise": "same",
+        "unavailable": "1"
+      },
+      "decision": "B",
+      "id": "w2"
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "case_id": "C23",
+  "max_cost": 1,
+  "questions": [
+    {
+      "available": true,
+      "cost": 1,
+      "id": "observed",
+      "label": "Synthetic evidence request observed"
+    }
+  ],
+  "schema": 1,
+  "worlds": [
+    {
+      "answers": {
+        "observed": ""
+      },
+      "decision": "RÉVISER",
+      "id": "w1"
+    },
+    {
+      "answers": {
+        "observed": "unknown"
+      },
+      "decision": "保持",
+      "id": "w2"
+    }
+  ]
+}

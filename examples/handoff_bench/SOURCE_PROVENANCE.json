@@ -1,0 +1,66 @@
+{
+  "schema": 1,
+  "scope": "Unchanged reviewed prototype dependencies, isolated from the FORGE analysis runtime.",
+  "planner_core": {
+    "bytes": 10167,
+    "sha256": "555a3fd37e87912d164550a8e915f4fd5052d1e0e2da32b7c4402da4e381d1d5"
+  },
+  "repositories": [
+    {
+      "name": "boltons",
+      "url": "https://github.com/mahmoud/boltons",
+      "tag": "24.1.0",
+      "commit": "5aed99eb066f563fbad2231498492df8403a643d",
+      "license": "BSD-3-Clause"
+    },
+    {
+      "name": "more-itertools",
+      "url": "https://github.com/more-itertools/more-itertools",
+      "tag": "v10.6.0",
+      "commit": "1681cea3cd8fd1bfce41ac5db3987ae919d51b84",
+      "license": "MIT"
+    }
+  ],
+  "vendor_files": [
+    {
+      "path": "vendor/boltons/__init__.py",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "vendor/boltons/iterutils.py",
+      "bytes": 57562,
+      "sha256": "229f0f767aa3ca9fbc0b057dd7191170815bffb43599d3a293a246bd5a75afb6"
+    },
+    {
+      "path": "vendor/boltons/typeutils.py",
+      "bytes": 5814,
+      "sha256": "4da2b26d71386ee9010dfb52104e461ecba486ba5544a8cf50d9e26cd34e9c09"
+    },
+    {
+      "path": "vendor/licenses/boltons/LICENSE",
+      "bytes": 1497,
+      "sha256": "c301912653a8d8c99eab6212aa3aea8d164ea249d8ad53c941e0558a0a5ac1e3"
+    },
+    {
+      "path": "vendor/licenses/more-itertools/LICENSE",
+      "bytes": 1053,
+      "sha256": "09f1c8c9e941af3e584d59641ea9b87d83c0cb0fd007eb5ef391a7e2643c1a46"
+    },
+    {
+      "path": "vendor/more_itertools/__init__.py",
+      "bytes": 149,
+      "sha256": "f87d6eaba8b64b58ef35f6aa971c7c0fc25a62e8c96e1b4a48f57076a623e126"
+    },
+    {
+      "path": "vendor/more_itertools/more.py",
+      "bytes": 153652,
+      "sha256": "1569ad80189810a23f1bc849ffb52565e89df586d2c7aa6b167a3ee0fac447e6"
+    },
+    {
+      "path": "vendor/more_itertools/recipes.py",
+      "bytes": 32410,
+      "sha256": "d253dc3aebeba9ecb13c77d36ed207e8172713832d073469f13ca1e6a7478aa7"
+    }
+  ]
+}

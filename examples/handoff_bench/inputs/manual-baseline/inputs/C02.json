@@ -1,0 +1,13 @@
+{
+  "case_id": "C02",
+  "max_cost": 0,
+  "questions": [],
+  "schema": 1,
+  "worlds": [
+    {
+      "answers": {},
+      "decision": "REQUEST_RECEIPT",
+      "id": "w1"
+    }
+  ]
+}

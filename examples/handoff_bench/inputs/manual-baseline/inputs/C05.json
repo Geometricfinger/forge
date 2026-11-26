@@ -1,0 +1,37 @@
+{
+  "case_id": "C05",
+  "max_cost": 7,
+  "questions": [
+    {
+      "available": true,
+      "cost": 2,
+      "id": "cheap",
+      "label": "Synthetic evidence request cheap"
+    },
+    {
+      "available": true,
+      "cost": 5,
+      "id": "expensive",
+      "label": "Synthetic evidence request expensive"
+    }
+  ],
+  "schema": 1,
+  "worlds": [
+    {
+      "answers": {
+        "cheap": "0",
+        "expensive": "0"
+      },
+      "decision": "A",
+      "id": "w1"
+    },
+    {
+      "answers": {
+        "cheap": "1",
+        "expensive": "1"
+      },
+      "decision": "B",
+      "id": "w2"
+    }
+  ]
+}

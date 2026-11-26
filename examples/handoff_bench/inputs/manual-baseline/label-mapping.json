@@ -1,0 +1,22 @@
+{
+  "adapter_seen_by_baseline_author": false,
+  "created_at_utc": "2026-11-26T02:59:37.249121+00:00",
+  "mapping": {
+    "PLAN_FOUND": "QUESTIONS_FOR_REVIEW"
+  },
+  "original_frozen_files_verified_unchanged": 28,
+  "phase": "PRE_PRODUCT_EXECUTION",
+  "product_spec": {
+    "bytes": 3415,
+    "path": "inputs/SPEC.md",
+    "sha256": "8f6944ea0559e1cf2398dbb4a12b1066d0d6cbdc17d5ab53d4be13491d0fa338"
+  },
+  "reason": "Align the independently frozen feasible-within-budget status label with the product SPEC wording. This does not change mathematical expectations, original files, or case semantics.",
+  "schema": 1,
+  "source_baseline_freeze_sha256": "99a3cb6fe718ee06d9fe4f9b187d07a2a78f495cb8351fbb0ab5a89537112187",
+  "source_expected": {
+    "bytes": 21804,
+    "path": "expected.json",
+    "sha256": "6211a4633eaff3914732069d4eff407142c8848cbe8dd8cb85c420243459bd6a"
+  }
+}

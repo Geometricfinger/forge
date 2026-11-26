@@ -1,0 +1,89 @@
+{
+  "basis": "Hand supplied labels and fixtures authored before first handoff product execution; no optimization solver.",
+  "case_count": 5,
+  "created_utc": "2026-11-26T04:09:51.241927+00:00",
+  "files": [
+    {
+      "bytes": 2194,
+      "path": "README.md",
+      "sha256": "8e4479d15be8c32154f82d2f00c08204bea5ca4e9e543cb5293c69239b3ccd36"
+    },
+    {
+      "bytes": 41,
+      "path": "artifacts/h01-cases.csv",
+      "sha256": "f8fbcf1f216b1472d998a50db69e821dbd9398595b719b19becc592911d1f0cd"
+    },
+    {
+      "bytes": 61,
+      "path": "artifacts/h02-cases.csv",
+      "sha256": "7c4850c24c3848f181a35c05a6d8fb09d2d5343d19e5026823ba52362fa000b5"
+    },
+    {
+      "bytes": 405,
+      "path": "artifacts/h03-manifest.json",
+      "sha256": "b2544e57294515ff927afb4f296ce34b886ff9293b3bd5394f261cd4007a63d7"
+    },
+    {
+      "bytes": 49,
+      "path": "artifacts/h03-native.fixture",
+      "sha256": "7cdd0387756545f5dce81de34cbb71c4631224c0b9d376afebebf497d7a732fb"
+    },
+    {
+      "bytes": 66,
+      "path": "artifacts/h03-review.txt",
+      "sha256": "f9996a03dea6a050b2a3602b87b8286f8aa8acb7df0b19daef5d641392cea23c"
+    },
+    {
+      "bytes": 129,
+      "path": "artifacts/h04-Completed.stl",
+      "sha256": "38cc943bfac1811ee2c540b57a8372fa3ad5c3fbf56b89b5e33e103a3d612d44"
+    },
+    {
+      "bytes": 397,
+      "path": "artifacts/h04-manifest.json",
+      "sha256": "5426ea916e32cd348a7fce3c4f48f0925906e33ce5c9193c9fd42ea4b4d1a08e"
+    },
+    {
+      "bytes": 61,
+      "path": "artifacts/h04-review.txt",
+      "sha256": "a28d93f9cb8b3760d18218d9299758f7b314d58c4043cd413eee4ac578d087e2"
+    },
+    {
+      "bytes": 63,
+      "path": "artifacts/h05-cases.csv",
+      "sha256": "11c4f78636787e5e2d7e82405b35186111c8f01426c61e7c681021cd24991a6a"
+    },
+    {
+      "bytes": 22660,
+      "path": "expected.json",
+      "sha256": "873ed26536c014100a92f31f718621f665452cefc4c4506885a335607c0f27bc"
+    },
+    {
+      "bytes": 2006,
+      "path": "handoff-001.json",
+      "sha256": "78d40fd278cb871d55def5394cadf8a7ccbc7ee68a6afffffc2f75c224408fbf"
+    },
+    {
+      "bytes": 2111,
+      "path": "handoff-002.json",
+      "sha256": "aea044fb9965e6443329074e9153c33331a1918c7b69f384ada3961737563d85"
+    },
+    {
+      "bytes": 2546,
+      "path": "handoff-003.json",
+      "sha256": "85731fe0855f09a00c93101e1d10cd103736b92fb101892518cd014d0b4d0b83"
+    },
+    {
+      "bytes": 2539,
+      "path": "handoff-004.json",
+      "sha256": "c937cff5e95bc644fce325e2d4dbd4205a44f0dd8d3c4f041649184b426754ec"
+    },
+    {
+      "bytes": 2006,
+      "path": "handoff-005.json",
+      "sha256": "877594b95e79816e3f0f673d95fc7f59ce7ebbd4d7b75fa1748ceec548213365"
+    }
+  ],
+  "planner_sha256": "555a3fd37e87912d164550a8e915f4fd5052d1e0e2da32b7c4402da4e381d1d5",
+  "schema": 1
+}

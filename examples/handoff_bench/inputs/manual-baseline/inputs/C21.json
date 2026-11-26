@@ -1,0 +1,101 @@
+{
+  "case_id": "C21",
+  "max_cost": 1,
+  "questions": [
+    {
+      "available": true,
+      "cost": 1,
+      "id": "q00",
+      "label": "Synthetic evidence request q00"
+    },
+    {
+      "available": true,
+      "cost": 1,
+      "id": "q01",
+      "label": "Synthetic evidence request q01"
+    },
+    {
+      "available": true,
+      "cost": 1,
+      "id": "q02",
+      "label": "Synthetic evidence request q02"
+    },
+    {
+      "available": true,
+      "cost": 1,
+      "id": "q03",
+      "label": "Synthetic evidence request q03"
+    },
+    {
+      "available": true,
+      "cost": 1,
+      "id": "q04",
+      "label": "Synthetic evidence request q04"
+    },
+    {
+      "available": true,
+      "cost": 1,
+      "id": "q05",
+      "label": "Synthetic evidence request q05"
+    },
+    {
+      "available": true,
+      "cost": 1,
+      "id": "q06",
+      "label": "Synthetic evidence request q06"
+    },
+    {
+      "available": true,
+      "cost": 1,
+      "id": "q07",
+      "label": "Synthetic evidence request q07"
+    },
+    {
+      "available": true,
+      "cost": 1,
+      "id": "q08",
+      "label": "Synthetic evidence request q08"
+    },
+    {
+      "available": true,
+      "cost": 1,
+      "id": "q09",
+      "label": "Synthetic evidence request q09"
+    }
+  ],
+  "schema": 1,
+  "worlds": [
+    {
+      "answers": {
+        "q00": "0",
+        "q01": "0",
+        "q02": "0",
+        "q03": "0",
+        "q04": "0",
+        "q05": "0",
+        "q06": "0",
+        "q07": "0",
+        "q08": "0",
+        "q09": "0"
+      },
+      "decision": "A",
+      "id": "w1"
+    },
+    {
+      "answers": {
+        "q00": "1",
+        "q01": "1",
+        "q02": "1",
+        "q03": "1",
+        "q04": "1",
+        "q05": "1",
+        "q06": "1",
+        "q07": "1",
+        "q08": "1",
+        "q09": "1"
+      },
+      "decision": "B",
+      "id": "w2"
+    }
+  ]
+}

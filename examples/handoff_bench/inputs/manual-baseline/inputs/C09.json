@@ -1,0 +1,29 @@
+{
+  "case_id": "C09",
+  "max_cost": 10,
+  "questions": [
+    {
+      "available": true,
+      "cost": 4,
+      "id": "record",
+      "label": "Synthetic evidence request record"
+    }
+  ],
+  "schema": 1,
+  "worlds": [
+    {
+      "answers": {
+        "record": "same"
+      },
+      "decision": "A",
+      "id": "w1"
+    },
+    {
+      "answers": {
+        "record": "same"
+      },
+      "decision": "B",
+      "id": "w2"
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "created_at_utc": "2026-11-26T02:59:37.249121+00:00",
+  "files": [
+    {
+      "bytes": 877,
+      "path": "label-mapping.json",
+      "sha256": "5251d43d66cf53eb878bb6bb7237c6fec51835384d5f12533e9d6bfaa7f286e1"
+    },
+    {
+      "bytes": 20139,
+      "path": "evaluation-plan.json",
+      "sha256": "c0d2e978880778461901638b5930725e292a02ba482b37d98be5d380ee93fd0d"
+    }
+  ],
+  "input_refs": [
+    {
+      "bytes": 20135,
+      "path": "inputs/input-batch.json",
+      "sha256": "1fa3e7910548f3711e3ba3a4695d5e55c095b0438a5785cd81af7e2fbab084ca"
+    },
+    {
+      "bytes": 3415,
+      "path": "inputs/SPEC.md",
+      "sha256": "8f6944ea0559e1cf2398dbb4a12b1066d0d6cbdc17d5ab53d4be13491d0fa338"
+    }
+  ],
+  "original_freeze_sha256": "99a3cb6fe718ee06d9fe4f9b187d07a2a78f495cb8351fbb0ab5a89537112187",
+  "phase": "PRE_PRODUCT_EXECUTION",
+  "schema": 1
+}
