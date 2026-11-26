@@ -200,3 +200,19 @@ class QuestPreflightTests(unittest.TestCase):
     def test_facts_and_warnings_are_deterministic(self):
         modules = {'alpha/__init__.py': '', 'alpha/service.py': 'from .missing import something\n'}
         self.assertEqual(canonical(self.review(modules)), canonical(self.review(dict(reversed(list(modules.items()))))))
+
+    def test_module_only_review_does_not_fabricate_an_entry_point(self):
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory).resolve()
+            report = preflight.run(home, {'part.py': b'import missing_external\n'}, {}, None)
+        self.assertEqual(report['scope'], 'SELECTED_MODULES_ONLY')
+        self.assertFalse(report['entry_point_reviewed'])
+        self.assertEqual([row['path'] for row in report['files']], ['part.py'])
+        self.assertEqual(self.codes(report), ['EXTERNAL_IMPORT_UNVERIFIED'])
+        self.assertFalse(report['source_code_executed'])
+
+    def test_empty_supplied_entry_still_has_product_scope(self):
+        with tempfile.TemporaryDirectory() as directory:
+            report = preflight.run(Path(directory).resolve(), {}, {}, b'')
+        self.assertEqual([row['path'] for row in report['files']], ['__main__.py'])
+        self.assertNotIn('scope', report)

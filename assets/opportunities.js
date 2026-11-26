@@ -107,11 +107,28 @@ $('opp-compare-form').onsubmit=async event=>{
 };
 
 async function refresh(){const d=await api('/api/opportunities'),area=$('opp-runs');updateRunChoices(d.runs);area.replaceChildren();if(!d.runs.length)area.append(el('p','No investigations yet. Run the case study or import a reviewed brief.'));for(const r of d.runs){const a=el('article',undefined,'mission');a.append(el('h3',r.title),el('p',r.summary.hypotheses+' hypotheses · '+r.summary.sources+' sources'),button('Inspect evidence',()=>show(r.id)),button('Export private packet',async()=>{const p=await api('/api/opportunity/export',{run:r.id});say('Saved locally: '+p.path);}));area.append(a);}return d;}
+function appendReviewLeads(detail,group){
+  // Old saved reports retained only a count, not inspectable partial records.
+  if(!Object.hasOwn(group,'review_candidates'))return;
+  detail.append(el('h5','Partial matches to inspect'));
+  if(!group.review_candidates.length){
+    detail.append(el('p','No partial review leads retained for this mechanism.','hint'));
+    return;
+  }
+  detail.append(el('p','Review only. Inspect complete sources and refine the reviewed query before selecting a lead.','hint'));
+  for(const row of group.review_candidates){
+    detail.append(el('p',row.name+' · '+row.corpus+' · '+(row.definition_id||row.source_id),'code'),
+      el('p','Query: '+row.query+' · Rank: '+row.rank),
+      el('p','Matched terms: '+((row.matched_query_terms||[]).join(', ')||'Not recorded')),
+      el('p','Missing terms: '+((row.missing_query_terms||[]).join(', ')||'Not recorded')));
+  }
+  if(group.review_candidates_omitted)detail.append(el('p',group.review_candidates_omitted+' additional distinct partial leads omitted from this shortlist.','hint'));
+}
 async function show(id){const r=await api('/api/opportunity?run='+encodeURIComponent(id)),area=$('opp-detail');area.hidden=false;area.replaceChildren(el('h2',r.title),el('p',r.scope,'hint'));
 for(const h of r.hypotheses){const a=el('article',undefined,'finding');a.append(el('p',label(h.state),'state'),el('h3',h.concept.title),el('p',h.concept.problem_hypothesis),el('p','Next action: '+label(h.concept.recommended_action)),el('p','User: '+h.concept.user),el('p',h.concept.proposed_intervention));
 const table=el('table'),head=el('tr');for(const x of ['Mechanism','Missing prerequisites','Output fit'])head.append(el('th',x));table.append(head);for(const m of h.mechanisms){const tr=el('tr');tr.append(el('td',m.title),el('td',m.missing_prerequisites.join(', ')||'None in the declared map; not verified'),el('td',label(m.output_fit)));table.append(tr);}a.append(table);
 a.append(el('h3','Challenge the opportunity'));for(const c of h.counter_searches)a.append(el('p',c.question));a.append(el('h3','Proposed experiment'),el('p',h.experiment.question),el('p','Experiment not executed. No business, rights or release approval.','hint'));
-const detail=el('details');detail.append(el('summary','Source evidence and actual code leads'));for(const o of h.evidence.observations){detail.append(el('p',label(o.kind)+': '+o.statement));for(const e of o.checked_evidence)detail.append(el('p',e.source_uri+' · '+e.citation.quote,'code'));}for(const m of h.code_leads){detail.append(el('h4',m.mechanism));for(const c of m.candidates)detail.append(el('p',c.name+' · '+c.corpus+' · '+(c.definition_id||c.source_id),'code'));if(m.partial_matches_held_for_review)detail.append(el('p',m.partial_matches_held_for_review+' partial query matches excluded from the main shortlist.','hint'));}a.append(detail);
+const detail=el('details');detail.append(el('summary','Source evidence and actual code leads'));for(const o of h.evidence.observations){detail.append(el('p',label(o.kind)+': '+o.statement));for(const e of o.checked_evidence)detail.append(el('p',e.source_uri+' · '+e.citation.quote,'code'));}for(const m of h.code_leads){detail.append(el('h4',m.mechanism));for(const c of m.candidates)detail.append(el('p',c.name+' · '+c.corpus+' · '+(c.definition_id||c.source_id),'code'));if(m.partial_matches_held_for_review)detail.append(el('p',m.partial_matches_held_for_review+' partial query matches excluded from the main shortlist.','hint'));appendReviewLeads(detail,m);}a.append(detail);
 for(const decision of ['INVESTIGATE','REVISE','REJECT'])a.append(button(label(decision),async()=>{const reason=prompt('Explain your decision. This is feedback, not proof of validation.');if(!reason)return;await api('/api/opportunity/feedback',{run:id,note:{hypothesis:h.id,decision,reason,actor:'Local owner'}});say('Judgment retained without changing evidence or approval.');}));area.append(a);}return r;}
 $('opp-demo').onclick=async()=>{try{await api('/api/opportunity/demo',{});say('Running the bounded, source-linked case study.');}catch(e){say(e.message);}};
 $('opp-refresh').onclick=()=>refresh().catch(e=>say(e.message));

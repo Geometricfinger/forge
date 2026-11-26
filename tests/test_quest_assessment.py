@@ -334,6 +334,16 @@ class QuestAssessmentTests(unittest.TestCase):
             self.assertEqual((code, result['reason']), (2, 'QUEST_EVALUATION_PLAN'))
             self.assertFalse(self.build_dir.exists())
 
+    def test_cli_reports_invalid_case_location_without_echoing_its_label(self):
+        self.recipe['evaluation_plan']['cases'][0]['id'] = 'private-case-label '
+        self.recipe_file.write_bytes(canonical(self.recipe))
+        code, result = self.cli('quest-build', '--quest', self.quest, '--recipe', self.recipe_file,
+                                '--entry', self.entry, '--source-root', self.pool, '--out', self.build_dir)
+        self.assertEqual((code, result['reason']), (2, 'QUEST_EVALUATION_PLAN'))
+        self.assertEqual(result['detail']['field'], 'evaluation_plan.cases[0].id')
+        self.assertNotIn('private-case-label', canonical(result).decode())
+        self.assertFalse(self.build_dir.exists())
+
     def test_malformed_receipt_has_a_structured_refusal(self):
         self.build()
         for mode in ([], {}, None):

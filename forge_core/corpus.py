@@ -482,10 +482,10 @@ def list_runs(workbench):
         except (Blocked,OSError,ValueError):items.append({'id':p.name,'status':'BLOCKED_INVALID_REPORT'})
     return items
 
-def export_search(report,query,out,*,distinct=False,filters=None,include_tests=False):
+def export_search(report,query,out,*,distinct=False,filters=None,include_tests=False,limit=50):
     out=safe_path(out)
     if out.exists() or out.is_relative_to(ROOT):raise Blocked('NEW_PACKET_DIRECTORY_REQUIRED')
-    obj=search(report,query,limit=50,distinct=distinct,filters=filters,include_tests=include_tests);out.mkdir(parents=True,mode=0o700)
+    obj=search(report,query,limit=limit,distinct=distinct,filters=filters,include_tests=include_tests);out.mkdir(parents=True,mode=0o700)
     packet={'schema':1,**obj,'corpus_manifest_sha256':report['corpus_manifest_sha256'],'source_bodies_included':False,
             'next_step':'Review the exact referenced source and dependencies. Reacquire matching original container bytes; do not reconstruct implementation from metadata. No execution or adoption is approved.',
             'observed_vs_claimed':'Structure, documented terms and lexical call leads. Not runtime guarantees.',

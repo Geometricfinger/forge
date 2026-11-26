@@ -31,6 +31,29 @@ class CorpusIntegration(unittest.TestCase):
     def test_new_process_cli(self):
         p=subprocess.run([sys.executable,str(ROOT/'forge.py'),'--home',str(self.w.home),'corpus-search','--run-id',self.demo['run_id'],'--query','digest'],capture_output=True,timeout=20)
         self.assertEqual(p.returncode,0,p.stderr);self.assertEqual(loads(p.stdout)['full_match_count'],2)
+
+    def test_cli_result_limit_and_packet_share_the_same_bound(self):
+        command=[sys.executable,'-B',str(ROOT/'forge.py'),'--home',str(self.w.home),
+                 'corpus-search','--run-id',self.demo['run_id'],'--query','digest','--limit','1']
+        result=subprocess.run(command,capture_output=True,timeout=20)
+        self.assertEqual(result.returncode,0,result.stderr)
+        self.assertEqual(len(loads(result.stdout)['results']),1)
+        self.assertEqual(loads(result.stdout)['full_match_count'],2)
+        packet=Path(self.temp.name)/'limited-packet'
+        result=subprocess.run(command+['--out',str(packet)],capture_output=True,timeout=20)
+        self.assertEqual(result.returncode,0,result.stderr)
+        self.assertEqual(loads(result.stdout)['records'],1)
+        self.assertEqual(len(loads((packet/'reuse_candidates.json').read_bytes())['results']),1)
+
+    def test_cli_rejects_out_of_range_limit_without_a_packet(self):
+        for limit in ('0','101'):
+            packet=Path(self.temp.name)/('invalid-limit-'+limit)
+            result=subprocess.run([sys.executable,'-B',str(ROOT/'forge.py'),'--home',str(self.w.home),
+                                   'corpus-search','--run-id',self.demo['run_id'],'--query','digest',
+                                   '--limit',limit,'--out',str(packet)],capture_output=True,timeout=20)
+            self.assertEqual(result.returncode,2,result.stderr)
+            self.assertEqual(loads(result.stdout)['reason'],'INTEGER_BOUNDS')
+            self.assertFalse(packet.exists())
     def test_report_and_cart_no_implementation(self):
         s=json.dumps(self.r);self.assertNotIn('source_hex',s);self.assertNotIn('def digest(',s);self.assertFalse(self.r['release_approved'])
 

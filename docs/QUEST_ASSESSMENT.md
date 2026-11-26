@@ -44,6 +44,21 @@ expected values independently of the product's result. A file containing a
 single claimed `passed: true` value provides little evidence about the user's
 task; retain the actual relevant output instead.
 
+Include transport and export failures in the external experiment: malformed
+encoding, valid supplementary Unicode, nonzero exits, truncated output and
+refused exports that must preserve existing files. Freeze expected behavior and
+inputs first. Keep the original stdout/stderr and exported bytes, then record
+the relevant observations as JSON for comparison. Hashes of external artifacts
+bind those artifacts; they do not authenticate the process that produced them.
+Packaging preflight alone cannot establish these runtime behaviors.
+
+Validation retains existing refusal codes and can add `detail.field` and
+`detail.hint` for text and evaluation-plan errors. Locations use zero-based array
+indices and never echo supplied values. Case IDs must be distinct, start with an
+ASCII letter or digit, and contain at most 80 ASCII letters, digits, underscores
+or hyphens. Keep business record IDs inside the fixture unchanged when choosing
+separate evaluation IDs.
+
 ### Bind the case's input files
 
 When a case uses input files, prepare them before building and add an optional

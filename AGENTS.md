@@ -26,6 +26,13 @@ the original files or bounded ZIP members without extracting or executing them.
 It preserves raw bytes and records their source-to-product mapping. Dependency
 completion, package-data selection and reuse-rights review remain builder work.
 
+After explicit component and archive destination selection, `quest-prepare`
+can add required original indexed package initializer mappings and write a
+source-only preflight and support review. Keep the original recipe and inspect
+the added mappings; dependencies, resources, notices and reuse rights still need
+review. Build with `recipe.prepared.json` after reviewing the adapter. See
+[recipe preparation](docs/QUEST_PREPARATION.md).
+
 Before building, add an `evaluation_plan` to map fixed expected observations to
 the recipe's acceptance checks and promised needs. Declare each case's input
 file paths, byte counts and hashes when available; assessment verifies and retains
@@ -224,6 +231,10 @@ python3 "$FORGE/forge.py" --home "$WORK/forge-home" corpus-list
 ```
 
 Search options: `--include-tests` adds test code, `--distinct` groups byte-identical duplicates, and `--filters` accepts `required_apis`, `exclude_apis`, `record_kind` (`function` or `source_scope`) and `container_ids` (manifest `file_id`s). Each result has `path`, `name`, `start_line`, `end_line`, `observed_apis` and `definition_id`. Ranking is lexical relevance, not confidence. `search_status: NO_METADATA_MATCH` does not mean the capability is absent.
+
+`--limit` selects 1 to 100 displayed search results, including exported packets.
+Without it, search displays 20 and a packet retains 50. Total match counts still
+describe the full indexed search, not only the displayed rows.
 
 For a known Python function or method name, use the literal lookup. It distinguishes a definition with an inspectable ID from code that only calls it.
 

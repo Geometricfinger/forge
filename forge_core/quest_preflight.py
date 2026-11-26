@@ -337,7 +337,10 @@ def review(facts, assets, *, stdlib=None, builtin=None):
 
 
 def run(home, modules, assets, entry):
-    files = {**modules, '__main__.py': entry}
+    """Inspect selected raw modules, optionally with a supplied entry point."""
+    files = dict(modules)
+    if entry is not None:
+        files['__main__.py'] = entry
     facts = []
     deadline = time.monotonic() + MAX_SECONDS
     for path, data in sorted(files.items()):
@@ -358,7 +361,10 @@ def run(home, modules, assets, entry):
                     'raw_compilation': 'NOT_CHECKED', 'source_code_executed': False,
                     'gaps': [{'code': 'PREFLIGHT_WORKER_UNAVAILABLE', 'reason': str(error)}]}
         facts.append(fact)
-    return review(facts, assets)
+    report = review(facts, assets)
+    if entry is None:
+        report.update(scope='SELECTED_MODULES_ONLY', entry_point_reviewed=False)
+    return report
 
 
 def summary(report, raw):

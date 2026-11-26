@@ -10,6 +10,7 @@ from zipfile import ZipFile, ZipInfo
 from . import corpus, opportunities
 from .common import Blocked, canonical, loads, path_in_repo, read, safe_path, sha, text, write
 from .mixed_intake import DEFAULTS
+from .quest_diagnostics import require_text
 from .reviewed_evaluator import preflight
 
 
@@ -53,6 +54,7 @@ def _quest(report, digest, run_id, idea):
                 break
         basis = 'Round-robin sample from whole Python modules in path order.'
     else:
+        require_text(idea, 'idea', 200)
         search = corpus.search(report, idea, limit=100, filters={'record_kind': 'function'})
         selected = [row for row in search['results'] if _eligible(row)][:LEAD_LIMIT]
         basis = 'Ranked corpus search; up to the first 100 hits are considered for whole-module reuse.'
@@ -200,13 +202,13 @@ def _recipe(raw):
                                            'opportunity', 'need_responses', 'evaluation_plan'})
             or type(recipe['schema']) is not int or recipe['schema'] != 1):
         raise Blocked('QUEST_RECIPE')
-    text(recipe['audience'])
-    text(recipe['purpose'])
+    require_text(recipe['audience'], 'audience')
+    require_text(recipe['purpose'], 'purpose')
     checks = recipe['acceptance']
     if not isinstance(checks, list) or not 1 <= len(checks) <= 32:
         raise Blocked('QUEST_ACCEPTANCE')
-    for check in checks:
-        text(check)
+    for index, check in enumerate(checks):
+        require_text(check, f'acceptance[{index}]')
     components = recipe['components']
     if (not isinstance(components, list) or not 1 <= len(components) <= COMPONENT_LIMIT
             or not all(isinstance(key, str) and re.fullmatch(r'definition_[0-9a-f]{64}', key)
@@ -222,8 +224,9 @@ def _recipe(raw):
     return recipe
 
 
-def _modules(report, root, recipe):
-    from .quest_sources import Sources, check_paths
+def _selected_modules(report, root, recipe):
+    """Resolve only the caller's module selections, before initializer checks."""
+    from .quest_sources import Sources
     sources = Sources(report, root)
     selected = set(recipe['components'])
     mappings = {row['source_id']: row['path'] for row in recipe.get('module_files', [])}
@@ -255,6 +258,12 @@ def _modules(report, root, recipe):
         raise Blocked('QUEST_UNKNOWN_DEFINITION')
     if len(mappings) > COMPONENT_LIMIT:
         raise Blocked('QUEST_COMPONENT_SELECTION')
+    return sources, mappings, definitions
+
+
+def _modules(report, root, recipe):
+    from .quest_sources import check_paths
+    sources, mappings, definitions = _selected_modules(report, root, recipe)
     paths = list(mappings.values()) + [row['path'] for row in recipe.get('assets', [])] + ['__main__.py']
     check_paths(paths, [*mappings.values(), '__main__.py'])
     modules, assets, source_files = {}, {}, []
@@ -304,12 +313,8 @@ def _archive(modules, entry):
     return buffer.getvalue()
 
 
-def build(workbench, quest_file, recipe_file, entry_file, source_root, out, check_file=None):
-    out = preflight(workbench.home, out)['out']
-    root = safe_path(source_root)
-    if (not root.is_dir() or out.is_relative_to(root) or root.is_relative_to(out)
-            or root.is_relative_to(workbench.home) or workbench.home.is_relative_to(root)):
-        raise Blocked('QUEST_SEPARATE_SOURCE_ROOT')
+def load_quest_binding(workbench, quest_file):
+    """Recompute the retained quest against the currently bound corpus."""
     quest_bytes = read(quest_file, 4_000_000)
     quest = loads(quest_bytes)
     if not isinstance(quest, dict) or not {'run_id', 'idea'} <= quest.keys():
@@ -330,6 +335,16 @@ def build(workbench, quest_file, recipe_file, entry_file, source_root, out, chec
         expected = _quest(report, digest, quest['run_id'], quest['idea'])
     if canonical(quest) != canonical(expected):
         raise Blocked('QUEST_BINDING')
+    return quest, quest_bytes, report, digest
+
+
+def build(workbench, quest_file, recipe_file, entry_file, source_root, out, check_file=None):
+    out = preflight(workbench.home, out)['out']
+    root = safe_path(source_root)
+    if (not root.is_dir() or out.is_relative_to(root) or root.is_relative_to(out)
+            or root.is_relative_to(workbench.home) or workbench.home.is_relative_to(root)):
+        raise Blocked('QUEST_SEPARATE_SOURCE_ROOT')
+    quest, quest_bytes, report, digest = load_quest_binding(workbench, quest_file)
     raw_recipe = read(recipe_file, 256_000)
     recipe = _recipe(raw_recipe)
     purpose = None

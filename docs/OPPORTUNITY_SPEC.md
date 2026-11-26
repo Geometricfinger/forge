@@ -34,7 +34,13 @@ Mechanisms separate purpose from how it works. They declare addressed patterns, 
 
 ## Search and candidate context
 
-Real corpus search runs against selected immutable metadata snapshots. Corpus digests must match before and after analysis. Repeated corpus/query combinations are reused within the evaluation. Primary candidates require full query-term coverage. An identifier-shaped query further requires the exact or qualified symbol suffix. Partial matches are counted separately, not represented as complete candidates. This is a precision-oriented shortlist; it can omit useful weaker matches and is not a full-recall promise.
+Real corpus search runs against selected immutable metadata snapshots. Corpus digests must match before and after analysis. Repeated corpus/query combinations are reused within the evaluation. Primary candidates require full query-term coverage. An identifier-shaped query further requires the exact or qualified symbol suffix. Each search now considers up to 12 ranked results. Bounded `review_candidates` retain partial concept matches with source identities, rank and matched/missing terms so a reviewer can inspect them and refine the declared query. They never enter the primary `candidates` list automatically, and an exact-symbol request does not admit an unrelated partial symbol. Each mechanism retains at most 12 primary and 12 review candidates, with per-search coverage and omitted counts. Unknown retrieval totals remain unknown. This remains a bounded shortlist, not a full-recall promise or proof of useful behavior.
+
+Opportunity quests continue to use the primary candidates. To use a partial
+review lead, inspect the complete source and revise the reviewed mechanism query
+in a new bundle, for example with an explicit `symbol:` query once the intended
+function is known. Preserve the earlier report and the reason for that change.
+Retrieval does not supply the missing business interpretation or authorize reuse.
 
 Source ID, source hash, real definition ID when present, container, path, original range and index identity travel with a code candidate. A script record does not receive a fabricated function ID. A match does not authorize raw-code reacquisition, modification or execution. The safe no-match outcome is retained.
 

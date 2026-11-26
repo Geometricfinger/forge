@@ -7,6 +7,7 @@ import re
 
 from .common import Blocked, canonical, loads, path_in_repo, read, safe_path, sha, text
 from .reviewed_evaluator import preflight
+from .quest_diagnostics import DiagnosticBlocked
 
 
 MAX_CASES = 128
@@ -64,41 +65,63 @@ def validate_plan(recipe):
     if 'evaluation_plan' not in recipe:
         return None
     plan = recipe['evaluation_plan']
-    _fields(plan, {'schema', 'cases'}, 'QUEST_EVALUATION_PLAN')
-    if (type(plan['schema']) is not int or plan['schema'] != 1
-            or not isinstance(plan['cases'], list) or not 1 <= len(plan['cases']) <= MAX_CASES):
-        raise Blocked('QUEST_EVALUATION_PLAN')
+    def invalid(field, hint, code='QUEST_EVALUATION_PLAN'):
+        raise DiagnosticBlocked(code, 'evaluation_plan' + field, hint)
+
+    if not isinstance(plan, dict) or set(plan) != {'schema', 'cases'}:
+        invalid('', 'Use an object with exactly schema and cases.')
+    if type(plan['schema']) is not int or plan['schema'] != 1:
+        invalid('.schema', 'Use integer schema 1.')
+    if not isinstance(plan['cases'], list) or not 1 <= len(plan['cases']) <= MAX_CASES:
+        invalid('.cases', f'Provide 1 to {MAX_CASES} fixed evaluation cases.')
     addressed = set(_responses(recipe))
     seen = set()
     input_files = {}
-    for case in plan['cases']:
+    for index, case in enumerate(plan['cases']):
+        location = f'.cases[{index}]'
         required = {'id', 'acceptance', 'needs', 'expected'}
         if (not isinstance(case, dict) or required - case.keys()
                 or case.keys() - (required | {'inputs'})):
-            raise Blocked('QUEST_EVALUATION_PLAN')
-        if (not _identifier(case['id']) or case['id'] in seen
-                or type(case['acceptance']) is not int
-                or not 0 <= case['acceptance'] < len(recipe['acceptance'])
-                or not isinstance(case['needs'], list) or len(case['needs']) > 80
+            invalid(location, 'Use id, acceptance, needs and expected; inputs is optional.')
+        if not _identifier(case['id']):
+            invalid(location + '.id',
+                    'Use a stable case ID: 1 to 80 ASCII letters, digits, underscores or hyphens, '
+                    'starting with a letter or digit. Keep record identifiers in the fixture unchanged.')
+        if case['id'] in seen:
+            invalid(location + '.id', 'Use a distinct evaluation case ID for each case.')
+        if (type(case['acceptance']) is not int
+                or not 0 <= case['acceptance'] < len(recipe['acceptance'])):
+            invalid(location + '.acceptance', 'Use the zero-based integer index of an existing acceptance check.')
+        if (not isinstance(case['needs'], list) or len(case['needs']) > 80
                 or not all(isinstance(need, str) for need in case['needs'])
                 or len(set(case['needs'])) != len(case['needs'])
                 or not set(case['needs']) <= addressed):
-            raise Blocked('QUEST_EVALUATION_PLAN')
+            invalid(location + '.needs', 'List distinct need IDs from need_responses; use [] when none apply.')
         if len(canonical(case['expected'])) > 64_000:
-            raise Blocked('QUEST_EVALUATION_PLAN')
+            invalid(location + '.expected', 'Keep the canonical JSON expectation at or below 64000 bytes.')
         if 'inputs' in case:
             inputs = case['inputs']
             if not isinstance(inputs, list) or not 1 <= len(inputs) <= MAX_INPUTS_PER_CASE:
-                raise Blocked('QUEST_EVALUATION_INPUTS')
+                invalid(location + '.inputs', f'Provide 1 to {MAX_INPUTS_PER_CASE} input artifact references.',
+                        'QUEST_EVALUATION_INPUTS')
             paths = set()
-            for record in inputs:
-                path = _artifact_reference(record, 'QUEST_EVALUATION_INPUTS')
+            for input_index, record in enumerate(inputs):
+                field = location + f'.inputs[{input_index}]'
+                try:
+                    path = _artifact_reference(record, 'QUEST_EVALUATION_INPUTS')
+                except Blocked as exc:
+                    invalid(field,
+                            f'Use a relative normalized path, integer bytes from 0 to {MAX_ARTIFACT_BYTES}, '
+                            'and a lowercase SHA-256 digest. Each input must fit the assessment size limit.', str(exc))
                 if path in paths or (path in input_files and input_files[path] != record):
-                    raise Blocked('QUEST_EVALUATION_INPUTS')
+                    invalid(field, 'Use each input path once per case and the same binding wherever it is reused.',
+                            'QUEST_EVALUATION_INPUTS')
                 paths.add(path)
                 input_files[path] = record
             if sum(record['bytes'] for record in input_files.values()) > MAX_TOTAL_ARTIFACT_BYTES:
-                raise Blocked('QUEST_EVALUATION_INPUTS')
+                invalid(location + '.inputs',
+                        f'Keep unique declared input artifacts within {MAX_TOTAL_ARTIFACT_BYTES} total bytes.',
+                        'QUEST_EVALUATION_INPUTS')
         seen.add(case['id'])
     return plan
 
