@@ -462,9 +462,13 @@ def evaluate_handoff(path):
         model["cases"][0]["worlds"] = [{key: copy.deepcopy(history[key]) for key in ("id", "decision", "answers")}
                                        for history in mapped["histories"]]
         core.validate(model)
-        result = core.solve(model["cases"][0])
     events.append(ledger.runtime_event("export_model", "model_preparation", time.perf_counter_ns() - start,
-                                      "Filter only supplied histories and run the unchanged planner when consistent.", EXPORT_ROUTES))
+                                      "Filter only supplied histories and validate the resulting model.", EXPORT_ROUTES))
+    if model is not None:
+        start = time.perf_counter_ns()
+        result = core.solve(model["cases"][0])
+        events.append(ledger.runtime_event("export_plan", "model_preparation", time.perf_counter_ns() - start,
+                                          "Run the unchanged planner on the export-filtered model.", ("export_plus_planner",)))
     start = time.perf_counter_ns()
     conflict = mapped["status"] != "CONSISTENT"
     remaining, recorded, synthetic = apply_follow_up(case, mapped["histories"], raw, refs)

@@ -146,6 +146,34 @@ class HandoffVerifierTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.verify()
 
+    def test_coherent_planner_work_reallocation_or_omission_refused(self):
+        for mode in ('reallocate_to_export_only', 'omit_and_merge_time'):
+            with self.subTest(mode=mode):
+                self.copy = self.root / (self._testMethodName + '_' + mode)
+                shutil.copytree(self.original, self.copy)
+
+                def mutate(value):
+                    ledger = value['burden']
+                    events = ledger['events']
+                    planner = next(event for event in events if event['id'] == 'runtime_export_plan')
+                    if mode == 'reallocate_to_export_only':
+                        planner['routes'].append('export_reconciliation')
+                    else:
+                        model = next(event for event in events if event['id'] == 'runtime_export_model')
+                        model['wall_time_ns'] += planner['wall_time_ns']
+                        events.remove(planner)
+                    ledger['totals'] = verify_run.aggregate(events)
+                    for stage in verify_run.STAGES:
+                        ledger['phases'][stage] = verify_run.aggregate([event for event in events
+                            if event['stage'] == stage])
+                    for route in verify_run.ROUTES:
+                        ledger['routes'][route] = verify_run.aggregate([event for event in events
+                            if route in event.get('routes', verify_run.ROUTES)])
+
+                self.rewrite_handoff_payload(mutate)
+                with self.assertRaises(ValueError):
+                    self.verify()
+
     def test_coherent_plan_core_identity_change_refused(self):
         self.rewrite_handoff_payload(lambda value: value['plan'].__setitem__('planner_core_sha256', '0' * 64))
         with self.assertRaises(ValueError):
@@ -180,15 +208,23 @@ class HandoffVerifierTests(unittest.TestCase):
              'wall_time_ns': None, 'step_count': 1, 'source': 'Unmeasured declared work',
              'routes': ['manual_model']}
             for stage in ['acquisition', 'interpretation', 'model_preparation']], 'follow_up': []}
-        plan = {'case_id': 'coverage', 'planner_result': None, 'comparison': {
+        plan = {'case_id': 'coverage', 'model_input': None, 'planner_result': None, 'comparison': {
             route: {'unresolved_count': 1, 'recorded_questions_asked': 0, 'synthetic_questions_asked': 0}
             for route in verify_run.ROUTES}}
-        ledger = burden.make_ledger(supplied['burden_events'], [], plan['comparison'], None)
+        exports = ('export_reconciliation', 'export_plus_planner')
+        runtime = [burden.runtime_event(name, stage, 0, 'Synthetic accounting audit only.', routes)
+                   for name, stage, routes in [
+                       ('validate', 'model_preparation', verify_run.ROUTES),
+                       ('read_artifacts', 'acquisition', exports),
+                       ('extract', 'interpretation', exports),
+                       ('manual_plan', 'model_preparation', ('manual_model',)),
+                       ('export_model', 'model_preparation', exports)]]
+        ledger = burden.make_ledger(supplied['burden_events'], runtime, plan['comparison'], None)
         ledger['case_id'] = 'coverage'
         # Remove only the placeholders for the unmeasured export routes, then
         # keep arithmetic internally coherent. Global human-stage presence is
         # insufficient because these events apply only to manual_model.
-        ledger['events'] = supplied['burden_events']
+        ledger['events'] = supplied['burden_events'] + runtime
         ledger['totals'] = verify_run.aggregate(ledger['events'])
         for stage in verify_run.STAGES:
             ledger['phases'][stage] = verify_run.aggregate([e for e in ledger['events'] if e['stage'] == stage])

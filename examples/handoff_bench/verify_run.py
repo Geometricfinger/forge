@@ -173,6 +173,19 @@ def verify_burden(ledger, plan, supplied, elapsed_seconds):
     require(type(events) is list and len(events) <= 100, 'Burden event bound')
     ids = set()
     original = {event['id']: event for event in supplied['burden_events']}
+    export_routes = ('export_reconciliation', 'export_plus_planner')
+    runtime_contract = {
+        'runtime_validate': ('model_preparation', ROUTES),
+        'runtime_read_artifacts': ('acquisition', export_routes),
+        'runtime_extract': ('interpretation', export_routes),
+        'runtime_manual_plan': ('model_preparation', ('manual_model',)),
+        'runtime_export_model': ('model_preparation', export_routes),
+    }
+    if plan['model_input'] is not None:
+        runtime_contract['runtime_export_plan'] = ('model_preparation', ('export_plus_planner',))
+    if supplied['follow_up']:
+        runtime_contract['runtime_apply_followup'] = ('follow_up', ('export_plus_planner',))
+    runtime_seen = set()
     runtime_ns = 0
     for event in events:
         require(type(event) is dict and type(event.get('id')) is str
@@ -196,11 +209,18 @@ def verify_burden(ledger, plan, supplied, elapsed_seconds):
         elif event['actor'] == 'adapter':
             require(event['measurement'] == 'observed' and duration is not None,
                     'Runtime adapter event origin')
+            require(event['id'] in runtime_contract, 'Unexpected runtime adapter event')
+            stage, routes = runtime_contract[event['id']]
+            require(event['stage'] == stage and event['step_count'] == 1,
+                    'Runtime adapter event stage or step count changed')
+            equal(event.get('routes'), list(routes), 'Runtime adapter route allocation changed')
+            runtime_seen.add(event['id'])
             runtime_ns += duration
         else:
             require(event['measurement'] == 'unknown' and duration is None
                     and event['step_count'] == 0, 'Invented human event')
     require(set(original) <= ids, 'Missing supplied burden event')
+    require(runtime_seen == set(runtime_contract), 'Missing required runtime adapter event')
     require(runtime_ns <= int(elapsed_seconds * 1_000_000_000),
             'Adapter phase time exceeds supervised execution')
     require(all(any(event['actor'] == 'human' and event['stage'] == stage for event in events)

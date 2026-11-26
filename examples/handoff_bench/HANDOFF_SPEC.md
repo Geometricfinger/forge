@@ -118,6 +118,13 @@ charge. Each route sum includes an applicable shared event once; the global sum
 includes every actual recorded event once. Allocation does not constitute an
 independently observed counterfactual workflow.
 
+`runtime_export_model` measures filtering, model construction and validation
+shared by both export routes. For a consistent model, `runtime_export_plan`
+separately measures the unchanged planner computation and is charged only to
+`export_plus_planner`; no such event is emitted for a conflicting model.
+Planner-compute duration is ledger wall time, separate from the unchanged
+declared question-cost objective.
+
 The three human stages acquisition, interpretation and model preparation are
 always accounted for. Reading files locally measures local adapter I/O only;
 it does not measure creating a vendor export or authoring a model. A missing
@@ -140,6 +147,7 @@ timing, synthetic timing, or a proposed unanswered plan.
 Stdout is `{plan: ..., burden: ...}`. A new output directory contains exact
 `plan.json` and `burden.json` sidecars and a byte-bound receipt. All output sizes
 are checked before publication; existing output directories are refused.
+Without `--out`, handoff mode uses `handoff-results` in the current directory.
 Malformed inputs fail with a controlled code and do not publish partial plans.
 
 Bounds: 262144 input bytes; 12 artifacts, at most 1048576 bytes each and

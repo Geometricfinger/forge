@@ -34,9 +34,10 @@ python3 /absolute/path/to/new-handoff-build/product.pyz \
 
 The input references actual adjacent fixture/export files using relative paths,
 exact sizes and SHA-256 hashes. No artifact is downloaded. Stdout contains both
-`plan` and `burden`. With `--out`, the new directory receives `plan.json`,
-`burden.json` and an integrity receipt. Existing output is refused and output
-bounds are checked before publication.
+`plan` and `burden`. Handoff mode also writes `plan.json`, `burden.json` and an
+integrity receipt. Without `--out`, it creates `handoff-results` in the current
+directory; `--out` selects another new directory. Existing output is refused
+and output bounds are checked before publication.
 
 The same binary accepts the original planner input without handoff mode:
 
@@ -124,6 +125,12 @@ remain separate. Missing necessary human timing keeps the complete total
 unknown. Known subtotals do not establish total savings. Per-route ledgers
 allocate shared work once per applicable alternative; this accounting does not
 turn one run into independently timed executions of all alternatives.
+
+Shared export filtering and model preparation have their own measured event.
+For a consistent model, a separate `runtime_export_plan` event measures planner
+computation and is charged only to export plus planner. A conflict emits no
+planner-compute event. This duration remains separate from the planner's
+declared synthetic question cost.
 
 A follow-up record must name an existing available question, cite a pinned
 response and reference its burden event. Recorded and simulated follow-ups stay

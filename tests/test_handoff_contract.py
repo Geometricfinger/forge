@@ -405,6 +405,42 @@ class HandoffContract(unittest.TestCase):
             self.assertEqual(plan["planner_result"], plan["manual_planner_result"])
             self.assertEqual(plan["comparison"]["export_reconciliation"]["status"], "UNRESOLVED")
 
+    def test_export_only_burden_excludes_planner_runtime(self):
+        # Only solver calls advance this clock. The test therefore attributes a
+        # known cost to unchanged solver execution without depending on machine
+        # speed or interpreting unmeasured human work as zero.
+        original_solve = self.handoff.core.solve
+        solver_ns = 7_000_000
+        for index in range(1, 6):
+            with self.subTest(case=index):
+                now = [0]
+
+                def timed_solve(case):
+                    result = original_solve(case)
+                    now[0] += solver_ns
+                    return result
+
+                with mock.patch.object(self.handoff.time, "perf_counter_ns", side_effect=lambda: now[0]):
+                    with mock.patch.object(self.handoff.core, "solve", side_effect=timed_solve) as solve:
+                        burden = self.evaluate_case(index)["burden"]
+                events = {event["id"]: event for event in burden["events"]}
+                routes = burden["routes"]
+                self.assertEqual(routes["export_reconciliation"]["adapter_measured_wall_time_ns"], 0)
+                self.assertEqual(events["runtime_export_model"]["wall_time_ns"], 0)
+                self.assertEqual(set(events["runtime_export_model"]["routes"]),
+                                 {"export_reconciliation", "export_plus_planner"})
+                self.assertEqual(routes["manual_model"]["adapter_measured_wall_time_ns"], solver_ns)
+                if index == 5:
+                    self.assertEqual(solve.call_count, 1)
+                    self.assertNotIn("runtime_export_plan", events)
+                    self.assertEqual(routes["export_plus_planner"]["adapter_measured_wall_time_ns"], 0)
+                else:
+                    self.assertEqual(solve.call_count, 2)
+                    self.assertEqual(events["runtime_export_plan"]["wall_time_ns"], solver_ns)
+                    self.assertEqual(events["runtime_export_plan"]["routes"], ["export_plus_planner"])
+                    self.assertEqual(routes["export_plus_planner"]["adapter_measured_wall_time_ns"], solver_ns)
+                self.assertEqual(burden["totals"]["adapter_measured_wall_time_ns"], solver_ns * solve.call_count)
+
 
 if __name__ == "__main__":
     unittest.main()
