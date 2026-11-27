@@ -163,7 +163,27 @@ No raw class docstring is reconstructed. Nested functions and overriding methods
 do not inherit another class's description. Missing older metadata adds no new
 class terms. Added class words count toward the existing retained-search budget.
 
-Code search also shares the Workbench's bounded spelling expansions, explicit
+Code search also shares the Workbench's bounded spelling expansions, including
+regular English plural, past and `-ing` forms actually present in the selected
+source vocabulary. Both channels use the same `query_expansion` evidence after
+source/class bindings are checked. These are lexical alternatives, not equivalent
+meanings or type names. The existing SQLite vocabulary supplies membership checks;
+the runner does not copy another complete vocabulary into memory. Older external
+engines without this helper and legacy records keep their earlier spelling rules.
+For a question spanning current and legacy snapshots, each record keeps its own
+policy; a legacy source does not erase a current source's justified spelling match.
+Metadata hits with no overlap in their projected retained evidence are omitted
+before fusion.
+
+When every retained record's text and location match its bound corpus, equal
+coverage/intent leads prefer more `direct_matched_terms` from their own name and
+retained source over enclosing class documentation. Class-only leads remain
+discoverable. A literal one-identifier query prefers its `literal_symbol_match`
+before declaration cues; natural-language conversion requests retain their direction
+policy. Missing older text bindings add neither new preference. Direct source words
+can be comments or examples and do not prove that the behavior is implemented.
+
+Code search retains the Workbench's explicit
 conversion direction, declared return names, and subject-matching predicate cues. A forward declaration
 can outrank an explicitly reverse declaration even when the latter contains more
 query words. The fused result exposes `directional_match`, `directional_conflict`,

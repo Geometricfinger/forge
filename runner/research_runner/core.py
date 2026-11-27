@@ -178,8 +178,9 @@ def rank_fusion(lexical,forge,limit=5,required_api=None,forge_observations=None,
         return (-int(len(r['matched_terms'])==r['term_count'] and not conflict),
                 -(len(r['matched_terms']) + int(preference) - int(conflict)),
                 -int(preference),int(conflict))
-    return sorted(merged.values(),key=lambda r:(*intent_order(r),
-        -int(r.get('exact_symbol',False)),-r['rrf'],r['id']))[:limit]
+    return sorted(merged.values(),key=lambda r:(-int(r.get('literal_symbol_match',False)),*intent_order(r),
+        -int(r.get('exact_symbol',False)),-len(r.get('direct_matched_terms',())),
+        -r['rrf'],r['id']))[:limit]
 
 def reference_hits(refs,query,limit):
     qt=set(terms(query));hits=[]

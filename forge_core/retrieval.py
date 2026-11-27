@@ -7,11 +7,11 @@ from __future__ import annotations
 import collections, copy, hashlib, math, re, threading
 from functools import lru_cache
 from .common import Blocked, canonical, integer, sha, text
-from .lexical import counts, expand_query, words
+from .lexical import counts, expand_inflections, expand_query, words
 from .streaming import canonical_chunks
 from . import direction, query_intent, return_types
 
-VERSION = 'field-bm25-rrf-5-declared-output'
+VERSION = 'field-bm25-rrf-6-inflections-direct-fields'
 K1, B, RRF_K = 1.2, 0.75, 60
 WEIGHTS = {'symbol': 5.0, 'documentation': 1.0, 'parameters': 0.4,
            'path': 0.3, 'observed_api': 4.0, 'declared_call': 1.3,
@@ -143,7 +143,7 @@ def query_evidence(terms, matched, basis):
 
 
 _Score = collections.namedtuple('_Score',
-    'index group matched exact symbols lexical symbol call role forward reverse predicate output')
+    'index group matched exact symbols lexical symbol call role forward reverse predicate output direct')
 
 
 class SearchIndex:
@@ -213,6 +213,9 @@ class SearchIndex:
         expansion = ({t: sorted(synonyms.get(t, {t})) for t in qt} if self.legacy else
                      expand_query(qt, (), synonyms))
         symbol_expansion = expansion if self.legacy else expand_query(qt, self.symbol_tokens, synonyms)
+        if not self.legacy:
+            expansion = expand_inflections(expansion, self.postings)
+            symbol_expansion = {t: sorted(set(expansion[t]) | set(symbol_expansion[t])) for t in qt}
         indexes = set()
         for values in symbol_expansion.values():
             for token in values: indexes.update(self.postings.get(token, ()))
@@ -229,6 +232,7 @@ class SearchIndex:
                 for variant in expansion.get(token, (token,)):
                     indexes.update(self.output_postings.get(variant, ()))
         construction = bool(set(qt) & {'constructor','init','initialize','initialization','configuration','configure','instantiate','new'})
+        literal_identifier = bool(re.fullmatch(r'[A-Za-z_]\w*', query.strip()))
 
         def evaluate(i, detailed=False):
             # Keep only scalar scores for every match. Detailed evidence and
@@ -264,11 +268,15 @@ class SearchIndex:
                                  * (1 if t == qterm else .8) for t in matches)
                 totals[field] = score * weight
                 if terms: evidence[field] = terms
+            direct = set().union(*(set(terms) for field, terms in evidence.items()
+                                  if field not in ('class_documentation', 'path', 'method_role')))
+            if support: direct.update(endpoint_terms)
+            if returned and returned['name_match']: direct.update(return_terms)
             symbols = (len(set(qt) & set(legacy_tokens(row['name']))) if self.legacy else
                        sum(bool(set(v) & set(words(row['name']))) for v in symbol_expansion.values()))
             exact = (legacy_tokens(row['name'].split('.')[-1]) == qt if self.legacy else
                      row['name'].split('.')[-1].casefold() == query.strip().casefold()
-                     if re.fullmatch(r'[A-Za-z_]\w*', query.strip()) else
+                     if literal_identifier else
                      sorted(set(words(row['name'].split('.')[-1]))) == qt)
             role_preference = 0
             if not self.legacy:
@@ -282,7 +290,7 @@ class SearchIndex:
                 return _Score(i, group, len(matched), exact, symbols, total,
                               totals['symbol'], totals['observed_api'] + totals['declared_call'],
                               role_preference, bool(support), bool(reverse), bool(predicate),
-                              0 if returned is None else 1 if returned['name_match'] else -1)
+                              0 if returned is None else 1 if returned['name_match'] else -1, len(direct))
             annotated = {k: v for k, v in row.items() if k not in ('conversion_endpoints', 'return_type_declarations')}
             annotated.update({'matched_query_terms': matched, 'match_count': len(matched),
                         'all_query_terms_matched': len(matched) == len(qt),
@@ -305,6 +313,7 @@ class SearchIndex:
             breakdown['rrf'] = fusion.get(group, 0)
             breakdown['channel_ranks'] = {name: ranks[group] for name, ranks in channel_ranks.items() if group in ranks}
             if not self.legacy:
+                breakdown['direct_matched_terms'] = sorted(direct)
                 breakdown['role_preference'] = role_preference
                 breakdown['role_policy'] = 'EXPLICIT_CONSTRUCTION' if construction else 'CLASS_BEHAVIOR_TIEBREAK'
             return copy.deepcopy(annotated)
@@ -344,7 +353,8 @@ class SearchIndex:
                 return (-int(score.matched == len(qt) and not conflict),
                         -(score.matched + int(preference) - int(conflict)),
                         -int(preference), int(conflict))
-            scored.sort(key=lambda score: (*intent_order(score), -int(score.exact), -score.symbols,
+            scored.sort(key=lambda score: (-int(literal_identifier and score.exact),
+                                          *intent_order(score), -int(score.exact), -score.direct, -score.symbols,
                                           -score.role, -fusion.get(score.group, 0), -score.lexical,
                                           self.rows[score.index]['name'], occurrence_id(self.rows[score.index])))
         distinct_count = len({score.group for score in scored})
@@ -397,7 +407,7 @@ class SearchIndex:
                 'results': displayed,
                 'search_status': 'MATCHES_FOUND' if any(score.matched == len(qt) for score in scored) else
                                  'PARTIAL_TERM_MATCHES_ONLY' if scored else 'NO_METADATA_MATCH',
-                'rank_meaning': ('legacy metadata coverage and exact symbols preserved; new call context requires reindexing; BM25 components diagnostic only' if self.legacy else 'complete term coverage first except a reverse conversion or different declared return name when a matching declaration is available; a declared direction, return name, or subject-matching predicate can offset one missing term among partial matches; then exact symbols and field-weighted BM25 / reciprocal rank fusion') + '; NOT confidence, code quality, or verified behavior',
+                'rank_meaning': ('legacy metadata coverage and exact symbols preserved; new call context requires reindexing; BM25 components diagnostic only' if self.legacy else 'literal identifier matches first; otherwise complete term coverage first except a reverse conversion or different declared return name when a matching declaration is available; a declared direction, return name, or subject-matching predicate can offset one missing term among partial matches; then exact symbols, coverage from direct rather than inherited/path/role fields, symbol matches and field-weighted BM25 / reciprocal rank fusion') + '; NOT confidence, code quality, or verified behavior',
                 'ranker_version': 'legacy-coverage-compatible-1' if self.legacy else 'field-bm25-rrf-1',
                 'ranking_extension_version': None if self.legacy else VERSION, 'index_binding': self.binding,
                 'ranking_mode': 'LEGACY_COMPATIBILITY' if self.legacy else 'STRUCTURED_RETRIEVAL',

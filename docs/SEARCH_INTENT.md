@@ -46,6 +46,31 @@ identifies these extra variants. They apply only to symbol names, not arbitrary
 source-body mentions, called identifiers, paths, or documentation. These are lexical
 matches and can still be misleading in unfamiliar code.
 
+Fresh structured searches also match bounded regular English word forms, such as
+`item/items`, `retry/retries`, `plan/planned/planning`, and `alternate/alternating`.
+Only alternatives present in the index vocabulary are added to `query_expansion`;
+`matched_fields` shows the actual captured spelling. Each original query word
+still contributes at most one coverage vote. A literal identifier query puts the
+matching symbol before conceptual declaration cues, including contradictory
+documentation attached to that symbol. No additional vocabulary index or
+source-body copy is built.
+
+This is deliberately limited to regular plurals, past tense, and `-ing` forms.
+Derivational neighbors such as `alternate/alternative`,
+`multiple/multiplication`, and `iterable/iterator` remain different words.
+Irregular morphology and paraphrases can still be missed, and ambiguous regular
+forms can still produce irrelevant leads. Declared type names and conversion
+endpoint equivalence keep their existing explicit spelling rules. API filters
+still require the recorded API spelling and observation. Legacy reports retain
+their previous ranking and expansion behavior.
+
+When coverage, declaration preferences, and exact-symbol priority tie, terms
+captured in the definition's own fields take priority over terms found only in
+enclosing-class documentation, paths, or generated role labels. The result's
+`rank_breakdown.direct_matched_terms` explains this tie-break. Context-only
+matches remain searchable and still contribute to reported total coverage.
+This does not make direct documentation a verified behavior contract.
+
 ## Directed conversions
 
 A positive, unambiguous conversion question can use the declared order in a
