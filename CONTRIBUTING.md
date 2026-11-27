@@ -27,6 +27,7 @@ Thank you for your interest in improving Forge. This guide explains how to propo
 
    python3 run_tests.py --out "$CHECKS/workbench"
    python3 hound/run_tests.py --out "$CHECKS/hound"
+   python3 runner/tools/check_package.py
    python3 runner/run_tests.py
    python3 examples/demo/run_demo.py --out "$CHECKS/demo"
    python3 verify.py --out "$CHECKS/qualification"
@@ -42,6 +43,18 @@ Thank you for your interest in improving Forge. This guide explains how to propo
    ```sh
    python3 tools/update_analyzer_manifests.py
    ```
+
+   If you change the research runner, stage any intended new files first, then
+   refresh its package inventory and include `runner/FILE_HASHES.json` in the
+   pull request:
+
+   ```sh
+   python3 runner/tools/check_package.py --refresh
+   python3 runner/tools/check_package.py
+   ```
+
+   The refresh checks tracked runner files and refuses changes to previously
+   recorded historical contracts. CI checks this inventory before qualification.
 
 5. Open a pull request using the template. CI (`.github/workflows/qualification.yml`) re-runs the pre-publish check, `verify.py`, the runner tests and both demos on Python 3.11 and 3.13 against your pull request's head commit. Generated evidence must pass a separate publication check before its exact staged bytes are uploaded as `forge-verification-<commit-sha>-py<version>`. Failed or skipped publication checks prevent uploads. Every commit on `main` is verified the same way. The `qualify (Python 3.11)` and `qualify (Python 3.13)` checks must pass before a change can be merged. Follow [docs/PUBLICATION_SAFETY.md](docs/PUBLICATION_SAFETY.md) for public proof of work and private reports.
 
