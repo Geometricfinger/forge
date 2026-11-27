@@ -11,7 +11,7 @@ from .common import Blocked
 from .lexical import counts
 from . import direction, return_types
 
-VERSION = 'lexical-context-8-return-declarations'
+VERSION = 'lexical-context-9-conversion-example-boundary'
 MAX_CALLS = 128
 MAX_DECLARATIONS = 64
 MAX_BINDING_CANDIDATES = 8

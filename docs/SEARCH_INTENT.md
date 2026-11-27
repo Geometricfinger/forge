@@ -85,12 +85,44 @@ all of them are satisfied. Results expose a `directional_match` or a
 `directional_conflict` in `rank_breakdown`. Conflicting forward and reverse
 declarations receive neither preference nor penalty. Stubs receive no preference.
 
+Call/result examples such as `render(value) -> b'example'` are not captured as
+source-to-destination declarations. Removing the example arguments could invent
+an input relation and interpret literal contents as destination words. Genuine
+conversion prose and plain `source -> destination` summaries remain supported.
+A fresh scan is required to apply this capture correction to older observations.
+
 Complete term coverage normally comes first. When a forward declaration is
 available, an explicitly reverse declaration loses that priority and one lexical
 ranking point. A forward declaration can offset one missing term among partial
 matches. Other complete-coverage leads retain priority. Reverse leads remain
 visible, including when no forward lead exists. This is ranking evidence, not an
 automatic dependency choice or a verified conversion contract.
+
+### Destination-only evidence
+
+An explicit positive request for one destination can also use a weaker cue when
+the input cannot be matched. For example, a captured `peel_to_bytes` name can
+supply the destination spelling for `decode percent escapes into bytes`, while
+the requested input remains unestablished. `conversion_target_match` identifies
+the original declaration and records `input_match: NOT_ESTABLISHED`; it is not
+a declared return type or proof that the function decodes percent escapes.
+
+Every captured conversion declaration must agree on that single destination,
+and it must differ from the declared input. A full forward/reverse match,
+contradictory or ambiguous captured return metadata, a stub, or missing current
+structural context prevents this separate cue. Multiple-word or qualified
+destinations such as `models.Bytes` do not receive it; a namespace fragment
+cannot stand in for the complete destination spelling. Existing qualified
+declared-return matching is separate. Exact identifier and complete-coverage
+priority remain intact.
+
+The cue shares the existing one-point allowance for partial matches with
+direction, declared return name and predicate evidence; allowances never stack.
+It adds no matched input terms. `matched_query_terms`, `full_match_count` and
+partial-search status still describe the actual captured overlap. Results can
+therefore place a useful destination lead earlier while keeping its missing
+requirements visible. The runner recomputes this cue from current corpus
+metadata and requires the retained source/body/location binding before using it.
 
 ## Declared return names
 

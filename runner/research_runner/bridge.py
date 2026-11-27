@@ -328,7 +328,7 @@ def investigate(q,source_results,forge_root):
     records=[r for source in selected for r in source.get('records',[]) if not r.get('test_path')]
     refs=[r for source in selected for r in source.get('references',[])]
     gaps=[{'source':r['source']['id'],'state':r['status'],'gaps':r.get('gaps',[])} for r in selected if r['status'] in ('BLOCKED','UNSUPPORTED_BINARY','CODE_INDEXED_WITH_GAPS','TEXT_ONLY_UNSUPPORTED_LANGUAGE')]
-    lexical=[];forgerows=[];reference=[];observations={};directions={};conflicts={};predicates={};outputs={};class_contexts={}
+    lexical=[];forgerows=[];reference=[];observations={};directions={};conflicts={};predicates={};outputs={};conversion_targets={};class_contexts={}
     evidence = {}
     if q['intent'] in ('code','mixed'):
         corpus=validate_questions([q],forge_root)
@@ -339,6 +339,7 @@ def investigate(q,source_results,forge_root):
         intention = getattr(retrieval, 'query_intent', None)
         returning = getattr(retrieval, 'return_types', None)
         requested_output = returning.request(q['query']) if returning else None
+        target_matcher = getattr(retrieval, 'conversion_target_match', None)
         expander = getattr(retrieval, 'expand_query', None)
         expansion = (expander(set(terms(q['query'])), (), retrieval.SYNONYMS)
                      if expander else {t:[t] for t in terms(q['query'])})
@@ -369,6 +370,10 @@ def investigate(q,source_results,forge_root):
                         observations[rid]=metadata.get('observed_apis',[])
                         if not legacy:modern_ids.add(rid)
                         if not legacy and _bound_direct_text(original,metadata):direct_bound.add(rid)
+                        if (target_matcher and not legacy and rid in direct_bound
+                                and metadata.get('context_status') == 'CAPTURED'):
+                            target=target_matcher(requested,requested_output,metadata)
+                            if target:conversion_targets[rid]=target
                         if requested and not legacy and metadata.get('implementation_kind') != 'DECLARATION_OR_STUB':
                             if hasattr(directional,'evaluate'):
                                 support,reverse = directional.evaluate(requested, metadata.get('conversion_endpoints', ()))
@@ -433,7 +438,8 @@ def investigate(q,source_results,forge_root):
     if q['intent'] in ('reference','mixed') or not records:
         reference=reference_hits(refs,q['query'],5)
     fused=rank_fusion(lexical,forgerows,5,required_api=q.get('required_api'),forge_observations=observations,directional_matches=directions,
-                      directional_conflicts=conflicts,predicate_matches=predicates,declared_outputs=outputs)
+                      directional_conflicts=conflicts,predicate_matches=predicates,declared_outputs=outputs,
+                      conversion_targets=conversion_targets)
     if q['intent']=='reference':fused=[]
     else:
         # Older external workbenches keep their existing result format.
@@ -446,6 +452,9 @@ def investigate(q,source_results,forge_root):
                     'input': requested[0], 'output': requested[1],
                     'top_result_declaration': fused[0].get('directional_match') if fused else None,
                     'top_result_reverse_declaration': fused[0].get('directional_conflict') if fused else None}
+                if target_matcher:
+                    evidence['query_evidence']['requested_direction']['top_result_destination_only_declaration'] = (
+                        fused[0].get('conversion_target_match') if fused else None)
             if intention and intention.predicate_request(q['query']):
                 evidence['query_evidence']['requested_predicate'] = {
                     'top_result_declaration': fused[0].get('predicate_match') if fused else None,

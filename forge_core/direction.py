@@ -15,14 +15,37 @@ TO = re.compile(r'\b(?:into|to)\b|->|→', re.I)
 FROM = re.compile(r'\bfrom\b', re.I)
 FILLER = {'it', 'its', 'back', 'how', 'where', 'what', 'which', 'does', 'do', 'can',
           'function', 'routine', 'takes', 'representation', 'form', 'format', 'value', 'values'}
+CALL_EXAMPLE = re.compile(r'^(?:>>>\s*)?~?[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*\s*\(')
+CODE_EXAMPLE = re.compile(r'^(?:>>>|```|~~~|\.\.\s+(?:code(?:-block)?|testcode|doctest)::)')
 
 
-def plain(text):
+def _unformat(text):
     # Preserve the declared type in reStructuredText roles before punctuation
     # ends a clause. Formatting such as :class:`int` is not an endpoint boundary.
     text = re.sub(r':(?:[\w]+:)?[\w]+:`([^`]+)`', r'\1', text)
-    text = text.replace('`', '')
-    return re.sub(r'\([^()]*\)', ' ', text)
+    return text.replace('`', '')
+
+
+def plain(text):
+    return re.sub(r'\([^()]*\)', ' ', _unformat(text))
+
+
+def _call_example(text):
+    text = _unformat(text).lstrip('~')
+    if not CALL_EXAMPLE.match(text):
+        return False
+    # A leading word followed by a parenthesis can also be ordinary prose.
+    # Require an actual call expression before a result arrow. Try every arrow
+    # because a quoted call argument can itself contain an arrow spelling.
+    prefixes = [text[:mark.start()] for mark in re.finditer(r'->|→', text)] + [text]
+    for prefix in prefixes:
+        try:
+            expression = ast.parse(prefix.strip(), mode='eval').body
+        except (SyntaxError, ValueError, RecursionError):
+            continue
+        if isinstance(expression, ast.Call):
+            return True
+    return False
 
 
 def normalized(tokens):
@@ -101,7 +124,11 @@ def declarations(node):
     doc = ast.get_docstring(node, clean=False) or ''
     summary = doc[:384].strip().split('\n\n', 1)[0]
     summary = re.split(r'[.!?](?:\s|$)', summary, 1)[0]
-    relation = phrase(summary)
+    # A call/result example describes one invocation, not a source-to-target
+    # declaration. Removing its arguments first would turn f('x') -> b'y'
+    # into invented endpoint words. Keep genuine prose and plain arrows.
+    example = CODE_EXAMPLE.match(summary) or _call_example(summary)
+    relation = None if example else phrase(summary)
     if relation:
         evidence.append(('DOCSTRING_SUMMARY', *relation))
     parameters = [a for a in [*node.args.posonlyargs, *node.args.args] if a.arg not in ('self', 'cls')]
