@@ -7,6 +7,7 @@ separate comparisons, rather than fabricated in these policy unit tests.
 import copy
 import unittest
 from unittest.mock import patch
+from test_prepared_search import mock_prepared_search
 from forge_core import opportunities as op
 from forge_core.common import Blocked
 from forge_core.opportunity_examples import example_bundle, source, cite
@@ -20,7 +21,7 @@ def result_row(name, full=True):
 
 
 def run_leads(query, rows):
-    with patch('forge_core.corpus.search',return_value={'results':rows,'index_binding':'b'*64}):
+    with mock_prepared_search(return_value={'results':rows,'index_binding':'b'*64}):
         return op.code_leads([{'id':'m','code_queries':[query]}],[('catalog',{})],{})[0]
 
 

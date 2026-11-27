@@ -1,7 +1,7 @@
 """Second review prompted by real retained-corpus output, not only fixture counts."""
 import copy,unittest,json,tempfile
 from pathlib import Path
-from unittest.mock import patch
+from test_prepared_search import mock_prepared_search
 from forge_core.opportunities import *
 from forge_core.opportunity_examples import example_bundle,live_case_study,source,cite
 
@@ -22,22 +22,22 @@ class ResultReview(unittest.TestCase):
         h=evaluate(self.b)['hypotheses'][0];self.assertEqual(h['concept']['recommended_action'],'RESOLVE_EVIDENCE_FIRST');self.assertEqual(h['code_leads'],[])
     def test_partial_code_match_not_main_candidate(self):
         response={'results':[{'name':'unrelated','definition_id':'d1','source_id':'s1','all_query_terms_matched':False}], 'index_binding':'i'}
-        with patch('forge_core.corpus.search',return_value=response):
+        with mock_prepared_search(return_value=response):
             r=code_leads([self.b['mechanisms'][0]],[('c',{})],{})
         self.assertEqual(r[0]['candidates'],[]);self.assertGreater(r[0]['partial_matches_held_for_review'],0)
     def test_exact_symbol_preferred_over_incidental_all_terms(self):
         response={'results':[{'name':'other','definition_id':'d1','source_id':'s1','all_query_terms_matched':True,'exact_symbol_match':False},
                              {'name':'match_catalog_entry','definition_id':'d2','source_id':'s2','all_query_terms_matched':True,'exact_symbol_match':True}], 'index_binding':'i'}
         m=copy.deepcopy(self.b['mechanisms'][0]);m['code_queries']=['match_catalog_entry']
-        with patch('forge_core.corpus.search',return_value=response):r=code_leads([m],[('c',{})],{})
+        with mock_prepared_search(return_value=response):r=code_leads([m],[('c',{})],{})
         self.assertEqual([x['name'] for x in r[0]['candidates']],['match_catalog_entry'])
     def test_no_hit_never_invents_function(self):
-        with patch('forge_core.corpus.search',return_value={'results':[],'index_binding':'i'}):r=code_leads([self.b['mechanisms'][0]],[('c',{})],{})
+        with mock_prepared_search(return_value={'results':[],'index_binding':'i'}):r=code_leads([self.b['mechanisms'][0]],[('c',{})],{})
         self.assertEqual(r[0]['candidates'],[])
     def test_script_does_not_get_function_identity(self):
         response={'results':[{'name':'<module>','source_id':'s1','all_query_terms_matched':True,'exact_symbol_match':False}], 'index_binding':'i'}
         m=copy.deepcopy(self.b['mechanisms'][0]);m['code_queries']=['module operation']
-        with patch('forge_core.corpus.search',return_value=response):r=code_leads([m],[('c',{})],{})
+        with mock_prepared_search(return_value=response):r=code_leads([m],[('c',{})],{})
         self.assertIsNone(r[0]['candidates'][0]['definition_id'])
     def test_draft_cues_not_automatic_semantic_evidence(self):
         r=draft(source('p','A user must do a manual action.'));self.assertTrue(all(x['status']=='ANNOTATION_REQUIRED' for x in r['suggestions']))

@@ -239,9 +239,69 @@ class HandoffVerifierTests(unittest.TestCase):
             world['id'] = 'invented_by_adapter'
             value['plan']['model_input']['cases'][0]['worlds'].append(world)
         self.rewrite_handoff_payload(mutate)
-        result = self.verify()
-        self.assertEqual('FAIL', result['status'])
-        self.assertEqual('H01', result['failures'][0]['case_id'])
+        with self.assertRaisesRegex(ValueError, 'Export-derived model changed'):
+            self.verify()
+
+    def test_recomputed_handoff_claims_refuse_coherent_changes(self):
+        changes = [
+            ('H01', lambda v: v['plan'].__setitem__('evidence_authenticated', True)),
+            ('H01', lambda v: v['plan'].__setitem__('model_complete_in_reality', True)),
+            ('H01', lambda v: v['plan'].__setitem__('questions_sent', 12)),
+            ('H01', lambda v: v['burden'].__setitem__('timing_authenticated', True)),
+            ('H01', lambda v: v['plan']['question_sources'].__setitem__('receipt', 'Invented source')),
+            ('H01', lambda v: v['plan'].__setitem__('model_status', 'EXPORT_MODEL_CONFLICT')),
+            ('H01', lambda v: v['plan'].__setitem__('eliminated_histories', [])),
+            ('H01', lambda v: v['plan']['planner_result'].__setitem__('evidence_authenticated', True)),
+            ('H02', lambda v: v['plan']['planner_result'].__setitem__('questions_sent', 1)),
+            ('H02', lambda v: v['plan']['planner_result']['ask_all_baseline'].__setitem__('cost', 999)),
+            ('H02', lambda v: v['plan']['planner_result'].__setitem__('question_pair_coverage', {})),
+            ('H02', lambda v: v['plan']['planner_result'].__setitem__('decision_groups', {})),
+            ('H02', lambda v: v['plan']['manual_planner_result']['ask_all_baseline'].__setitem__('cost', 999)),
+            ('H03', lambda v: v['plan']['extraction'].pop('vendor_format_verified')),
+            ('H03', lambda v: v['plan']['extraction'].pop('native_package_decoded')),
+            ('H03', lambda v: v['plan']['extraction']['fields']['order_or_case']['provenance'][0]
+             .__setitem__('observation_profile', 'vendor_decoded')),
+            ('H01', lambda v: v['plan']['extraction']['fields'].pop('case_name')),
+            ('H01', lambda v: v['plan']['extraction']['fields'].__setitem__('invented_field',
+                {'status': 'UNKNOWN', 'value': None, 'provenance': [], 'reason': 'MISSING_OR_UNDOCUMENTED'})),
+            ('H02', lambda v: v['plan']['extraction'].__setitem__('ignored_fields', [])),
+            ('H04', lambda v: v['plan']['extraction'].__setitem__('native_package_declared', True)),
+        ]
+        for index, (case_id, mutate) in enumerate(changes):
+            with self.subTest(variant=index):
+                self.copy = self.root / (self._testMethodName + '_' + str(index))
+                shutil.copytree(self.original, self.copy)
+                self.rewrite_handoff_payload(mutate, case_id)
+                with self.assertRaises(ValueError):
+                    self.verify()
+
+    def test_semantic_json_whitespace_and_key_order_remain_valid(self):
+        def pretty_write(path, value):
+            path.write_text(json.dumps(value, indent=3, ensure_ascii=False), encoding='utf-8')
+        self.write = pretty_write
+        self.rewrite_handoff_payload(lambda value: value.__setitem__('plan',
+            dict(reversed(list(value['plan'].items())))))
+        self.assertEqual(self.verify()['status'], 'PASS')
+
+    def test_reordered_proof_multisets_remain_valid(self):
+        def reorder(value):
+            for field in value['plan']['extraction']['fields'].values():
+                field['provenance'].reverse()
+        self.rewrite_handoff_payload(reorder, 'H05')
+        self.assertEqual(self.verify()['status'], 'PASS')
+
+    def test_legacy_diagnostic_claim_changes_are_refused(self):
+        path = self.copy / 'execution/cases/legacy-24/stdout.bin'
+        value = self.read(path)
+        value['cases'][0]['evidence_authenticated'] = True
+        self.write(path, value)
+        raw = path.read_bytes()
+        def rewrite(execution):
+            execution['stdout'].update(bytes=len(raw), sha256=hashlib.sha256(raw).hexdigest())
+            execution['stream_bytes_seen_at_least']['stdout'] = len(raw)
+        self.rewrite_execution(rewrite)
+        with self.assertRaisesRegex(ValueError, 'Unsupported planner claim'):
+            self.verify()
 
     def test_changed_trusted_freeze_refused(self):
         path = self.copy / 'frozen/binding.json'

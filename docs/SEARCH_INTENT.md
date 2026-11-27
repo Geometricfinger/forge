@@ -4,6 +4,32 @@ Forge ranks source leads using declared names, documentation, structural metadat
 and profiled API observations. It does not execute the source or establish that a
 candidate satisfies the requested behavior.
 
+## Source scopes and repeated review questions
+
+Observed API calls are joined to a definition's qualified name, definition line,
+and end line. The analyzer's nested-scope marker is normalized to the structural
+name; repeated functions or classes with the same name remain separate. A
+decorator's starting line is not the function's definition line. Legacy
+observations without ranges are attached only when the name is unique in the
+segment. These are static call observations, not runtime validation.
+
+Library callers asking several questions about unchanged metadata can prepare
+one defensive snapshot:
+
+```python
+prepared = corpus.prepare_search(report)
+first = prepared.query("convert copper to silver", limit=12, distinct=True)
+second = prepared.query("has silver", limit=12, distinct=True)
+```
+
+Each result retains the original report receipt, coverage and source identities.
+Changing the caller's report or a returned result does not change the prepared
+snapshot. Prepare again to use changed observations. Ordinary `corpus.search`
+still checks the current mutable report on every call. Opportunity Lab prepares
+one snapshot per corpus for each batch of missing code-lead queries; its existing
+result cache and final corpus-change check remain in place. This avoids repeated
+metadata preparation within a batch, not the need to scan changed source.
+
 ## Literal and spelling evidence
 
 `None`, `True`, and `False` are retained as searchable Python literals. Existing

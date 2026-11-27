@@ -10,6 +10,7 @@ import csv
 from io import BytesIO
 import io
 import hashlib
+import itertools
 import json
 import math
 from pathlib import Path, PurePosixPath
@@ -168,6 +169,8 @@ def aggregate(events):
 
 
 def verify_burden(ledger, plan, supplied, elapsed_seconds):
+    equal(ledger['schema'], 1, 'Ledger schema changed')
+    equal(ledger['timing_authenticated'], False, 'Unsupported timing authentication claim')
     equal(ledger['case_id'], plan['case_id'], 'Ledger case identity changed')
     events = ledger['events']
     require(type(events) is list and len(events) <= 100, 'Burden event bound')
@@ -263,64 +266,181 @@ def verify_extraction(plan, supplied, work, source_fields):
     raw = {key: regular(work / relative(ref['path'])) for key, ref in refs.items()}
     csv_fields = {row['label']: row['field'] for row in source_fields['medit_csv_items']}
     native_fields = set(source_fields['shape_native_categories'])
+    expected = {}
+    ignored, notes = [], []
+    native_declared = False
+    scan_only = bool(refs) and all(ref['kind'] in ('scan_stl', 'scan_ply', 'reviewer_note')
+                                   for ref in refs.values())
+
+    def evidence(ref, locator, value, **extra):
+        return {'artifact_id': ref['id'], 'sha256': ref['sha256'], 'bytes': ref['bytes'],
+                'locator': locator, 'value': value, 'basis': ref['provenance'], **extra}
+
+    # Reconstruct the declared extraction evidence once per source. Inspecting
+    # only the proofs present in an output misses omitted fields/observations.
+    # This reads data only; no retained product or vendor code is executed.
+    for ref in supplied['raw_artifacts']:
+        if supplied['source'] == 'medit_export':
+            if ref['kind'] in ('case_information_pdf', 'exocad_project_manifest'):
+                notes.append({'artifact_id': ref['id'], 'reason': 'OPAQUE_LAYOUT_NOT_DOCUMENTED'})
+            if ref['kind'] != 'medit_csv':
+                continue
+            rows = list(csv.reader(io.StringIO(raw[ref['id']].decode('utf-8-sig'), newline=''), strict=True))
+            require(rows and len(rows) <= 1001 and rows[0] and len(rows[0]) <= 32
+                    and len(set(rows[0])) == len(rows[0])
+                    and all(len(row) == len(rows[0]) for row in rows[1:]), 'Invalid retained CSV profile')
+            headers = rows[0]
+            ignored.extend({'artifact_id': ref['id'], 'column': label, 'reason': 'UNDOCUMENTED_FIELD'}
+                           for label in headers if label not in csv_fields)
+            if 'Case Name' not in headers:
+                notes.append({'artifact_id': ref['id'], 'reason': 'CASE_SELECTOR_UNAVAILABLE'})
+                continue
+            selected = [index for index in range(1, len(rows))
+                        if rows[index][headers.index('Case Name')] == ref['selection']['case_name']]
+            if not selected:
+                notes.append({'artifact_id': ref['id'], 'reason': 'NO_MATCHING_CASE_ROW'})
+            for index in selected:
+                for label, value in zip(headers, rows[index]):
+                    if label in csv_fields and value.strip():
+                        expected.setdefault(csv_fields[label], []).append(
+                            evidence(ref, 'row:' + str(index + 1) + '/column:' + label, value))
+        elif supplied['source'] == '3shape_native' and ref['kind'] == 'native_package_manifest':
+            manifest = strict_json(raw[ref['id']])
+            require(manifest['case_id'] == supplied['case_id'], 'Native manifest case changed')
+            package = refs[manifest['package_artifact']]
+            if manifest['declared_format'] in ('stl', 'ply') or package['kind'] in ('scan_stl', 'scan_ply'):
+                scan_only = True
+                notes.append({'artifact_id': ref['id'], 'reason': 'SCAN_ONLY_NOT_NATIVE'})
+                continue
+            require(manifest['declared_format'] == '3oxz' and package['kind'] == 'opaque_native',
+                    'Unsupported native package declaration')
+            native_declared = True
+            for observation in manifest['observations']:
+                category = observation['category']
+                note = refs[observation['artifact_id']]
+                text = raw[note['id']].decode('utf-8', 'strict')
+                start, end, quote = (observation[key] for key in ('start', 'end', 'quote'))
+                require(note['kind'] == 'reviewer_note' and type(start) is int and type(end) is int
+                        and 0 <= start < end <= len(text) and text[start:end] == quote,
+                        'Native quotation is not bound to a reviewer note')
+                if category not in native_fields:
+                    ignored.append({'artifact_id': ref['id'], 'field': category, 'reason': 'UNDOCUMENTED_FIELD'})
+                    continue
+                synthetic = (manifest['provenance'] == package['provenance'] == note['provenance'] == 'synthetic'
+                             and quote == 'Synthetic reviewer observation: ' + category + ' content is present.')
+                if synthetic:
+                    present, profile = True, 'synthetic_presence_statement_v1'
+                else:
+                    claim = strict_json(quote.encode('utf-8'))
+                    require(type(claim) is dict and set(claim) == {'category', 'value'}
+                            and claim['category'] == category and claim['value'] in ('present', 'absent', 'unknown'),
+                            'Unsupported native category observation')
+                    present, profile = claim['value'] == 'present', 'reviewed_category_json_v1'
+                if present:
+                    expected.setdefault(category, []).append(evidence(note, 'characters:' + str(start) + '-' + str(end),
+                        'present', manifest_id=ref['id'], manifest_sha256=ref['sha256'], observation_profile=profile))
+                else:
+                    notes.append({'artifact_id': ref['id'], 'field': category, 'reason': 'CATEGORY_NOT_KNOWN_PRESENT'})
+    if supplied['source'] == '3shape_native' and scan_only and not native_declared:
+        notes.append({'reason': 'SCAN_ONLY_NOT_NATIVE'})
+    needed = {field for history in supplied['reviewer_decisions'] for field in history['conditions']}
+    needed.update(csv_fields.values() if supplied['source'] == 'medit_export'
+                  else native_fields if supplied['source'] == '3shape_native' else [])
+    require(type(plan['extraction']['fields']) is dict, 'Extraction field map')
+    equal(sorted(plan['extraction']['fields']), sorted(needed | set(expected)), 'Extraction field inventory changed')
+    for key in ('native_package_decoded', 'vendor_format_verified'):
+        equal(plan['extraction'][key], False, 'Unsupported vendor interpretation claim')
+    equal(plan['extraction']['native_package_declared'], native_declared, 'Native declaration changed')
+    route_kind = ('medit_documented_csv_profile' if supplied['source'] == 'medit_export' else
+                  'manual_supplied_model' if supplied['source'] == 'manual' else
+                  'reviewed_native_manifest' if native_declared else 'scan_only' if scan_only else 'native_unverified')
+    equal(plan['extraction']['route_kind'], route_kind, 'Extraction route changed')
+    for key, wanted in (('ignored_fields', ignored), ('notes', notes)):
+        require(type(plan['extraction'][key]) is list, 'Extraction ' + key + ' must be a list')
+        equal(sorted(plan['extraction'][key], key=canonical), sorted(wanted, key=canonical),
+              'Extraction ' + key + ' changed')
     for field_name, field in plan['extraction']['fields'].items():
         require(field['status'] in ('KNOWN', 'UNKNOWN', 'CONFLICT'), 'Extraction field status')
         proofs = field['provenance']
-        require(type(proofs) is list and len(proofs) <= 32_000, 'Extraction provenance bound')
-        if field['status'] == 'UNKNOWN':
-            require(field['value'] is None and proofs == [], 'Unknown field has invented evidence')
-        else:
-            require(proofs, 'Known or conflicting field has no evidence')
-        values = []
-        for proof in proofs:
-            ref = refs.get(proof['artifact_id'])
-            require(ref is not None, 'Unknown extraction artifact identity')
-            require(proof['sha256'] == ref['sha256'] and proof['bytes'] == ref['bytes']
-                    and proof['basis'] == ref['provenance'], 'Extraction provenance identity changed')
-            values.append(proof['value'])
-            if 'manifest_id' in proof:
-                manifest_ref = refs.get(proof['manifest_id'])
-                require(manifest_ref is not None and manifest_ref['kind'] == 'native_package_manifest'
-                        and proof['manifest_sha256'] == manifest_ref['sha256'],
-                        'Native provenance manifest identity changed')
-                manifest = strict_json(raw[manifest_ref['id']])
-                require(manifest['case_id'] == supplied['case_id'] and manifest['declared_format'] == '3oxz'
-                        and refs[manifest['package_artifact']]['kind'] == 'opaque_native',
-                        'Native provenance package identity changed')
-                require(field_name in native_fields and proof['value'] == 'present'
-                        and ref['kind'] == 'reviewer_note', 'Unsupported native provenance field')
-                matched = []
-                for row in manifest['observations']:
-                    locator = 'characters:' + str(row['start']) + '-' + str(row['end'])
-                    if row['category'] == field_name and row['artifact_id'] == ref['id'] and locator == proof['locator']:
-                        text = raw[ref['id']].decode('utf-8', 'strict')
-                        require(type(row['start']) is int and type(row['end']) is int
-                                and 0 <= row['start'] < row['end'] <= len(text)
-                                and text[row['start']:row['end']] == row['quote'],
-                                'Native quote source changed')
-                        matched.append(row)
-                require(matched, 'Native provenance not supported by retained manifest')
-            else:
-                require(ref['kind'] == 'medit_csv', 'Unsupported extraction provenance kind')
-                match = re.fullmatch(r'row:([0-9]+)/column:(.+)', proof['locator'])
-                require(match is not None, 'CSV provenance locator')
-                row_index, label = int(match.group(1)) - 1, match.group(2)
-                rows = list(csv.reader(io.StringIO(raw[ref['id']].decode('utf-8-sig'), newline=''), strict=True))
-                require(rows and label in rows[0] and csv_fields.get(label) == field_name
-                        and 1 <= row_index < len(rows), 'CSV provenance field or row changed')
-                require(rows[row_index][rows[0].index(label)] == proof['value']
-                        and rows[row_index][rows[0].index('Case Name')] == ref['selection']['case_name'],
-                        'CSV provenance value or selected case changed')
-        values = sorted(set(values))
-        if field['status'] == 'KNOWN':
-            equal(values, [field['value']], 'Known field contradicts source evidence')
-        elif field['status'] == 'CONFLICT':
-            require(field['value'] is None and len(values) > 1, 'Conflict field lacks differing source values')
+        require(type(proofs) is list and len(proofs) <= 32_000
+                and all(type(proof) is dict for proof in proofs), 'Extraction provenance bound or shape')
+        wanted = expected.get(field_name, [])
+        values = sorted({proof['value'] for proof in wanted})
+        equal(field['status'], 'UNKNOWN' if not values else 'KNOWN' if len(values) == 1 else 'CONFLICT',
+              'Extraction state disagrees with complete source observations')
+        # Proof order and JSON representation are not identities. Preserve
+        # multiplicity and every semantic locator while allowing reordering.
+        actual_proofs = [{key: value for key, value in proof.items() if key != 'interpretation'} for proof in proofs]
+        equal(sorted(actual_proofs, key=canonical), sorted(wanted, key=canonical),
+              'Extraction observations omitted, invented or changed')
+        equal(field['value'], values[0] if len(values) == 1 else None, 'Extraction value contradicts sources')
+        if len(values) > 1:
             equal(values, field['values'], 'Conflict field values contradict sources')
-    for kind in ('notes', 'ignored_fields'):
-        for row in plan['extraction'].get(kind, []):
-            if 'artifact_id' in row:
-                require(row['artifact_id'] in refs, 'Extraction note references unknown artifact')
+
+
+def verify_planner_diagnostics(result, case):
+    """Check derivable diagnostics; frozen independent labels check optima."""
+    worlds = sorted(case['worlds'], key=lambda world: world['id'])
+    questions = sorted((question for question in case['questions'] if question['available']),
+                       key=lambda question: question['id'])
+    pairs = [(a, b) for a, b in itertools.combinations(worlds, 2) if a['decision'] != b['decision']]
+    groups = {decision: [world['id'] for world in worlds if world['decision'] == decision]
+              for decision in sorted({world['decision'] for world in worlds})}
+    coverage = {question['id']: [index for index, (a, b) in enumerate(pairs)
+                if question['id'] in a['answers'] and question['id'] in b['answers']
+                and a['answers'][question['id']] != b['answers'][question['id']]] for question in questions}
+    covered = {index for values in coverage.values() for index in values}
+    all_cost = sum(question['cost'] for question in questions)
+    equal(result['decision_groups'], groups, 'Planner decision groups changed')
+    equal(result['cross_decision_pairs'], [[a['id'], b['id']] for a, b in pairs], 'Planner decision pairs changed')
+    equal(result['question_pair_coverage'], coverage, 'Planner coverage changed')
+    equal(result['ask_all_baseline'], {'questions': [question['id'] for question in questions],
+        'cost': all_cost, 'question_count': len(questions), 'distinguishes_decisions': len(covered) == len(pairs),
+        'within_budget': all_cost <= case['max_cost']}, 'Planner ask-all comparison changed')
+    equal(result['subsets_examined'], 0 if len(covered) != len(pairs) else 1 << len(questions),
+          'Planner subset count changed')
+    equal(result['plans_to_review'], [] if result['status'] == 'BUDGET_BLOCKED' else result['optimal_question_sets'],
+          'Planner recommendation differs from retained optima')
+    for key, value in (('model_complete_in_reality', False), ('evidence_authenticated', False),
+                       ('questions_sent', 0), ('search_complete_for_declared_model', True)):
+        equal(result[key], value, 'Unsupported planner claim: ' + key)
+
+
+def verify_plan(plan, supplied):
+    for key, value in (('schema', 1), ('version', 'handoff-bench-1'), ('evidence_authenticated', False),
+                       ('model_complete_in_reality', False), ('questions_sent', 0)):
+        equal(plan[key], value, 'Unsupported handoff claim: ' + key)
+    equal(plan['question_sources'], {question['id']: question['source'] for question in supplied['questions']},
+          'Question source declarations changed')
+    def model(histories):
+        return {'schema': 1, 'cases': [{'schema': 1, 'case_id': supplied['case_id'],
+            'worlds': [{key: history[key] for key in ('id', 'decision', 'answers')} for history in histories],
+            'questions': [{key: question[key] for key in ('id', 'label', 'cost', 'available')}
+                          for question in supplied['questions']], 'max_cost': supplied['budget']}]}
+    manual = model(supplied['reviewer_decisions'])
+    equal(plan['manual_model_input'], manual, 'Original supplied model changed')
+    verify_planner_diagnostics(plan['manual_planner_result'], manual['cases'][0])
+    fields = plan['extraction']['fields']
+    conflict = any(field['status'] == 'CONFLICT' for field in fields.values())
+    retained, eliminated = [], []
+    if not conflict:
+        for history in supplied['reviewer_decisions']:
+            mismatches = sorted(field for field, value in history['conditions'].items()
+                if fields[field]['status'] == 'KNOWN' and fields[field]['value'] != value)
+            if mismatches:
+                eliminated.append({'history_id': history['id'], 'fields': mismatches})
+            else:
+                retained.append(history)
+    status = 'EXPORT_EVIDENCE_CONFLICT' if conflict else 'CONSISTENT' if retained else 'EXPORT_MODEL_CONFLICT'
+    equal(plan['model_status'], status, 'Export model status changed')
+    equal(plan['eliminated_histories'], eliminated, 'History elimination evidence changed')
+    if status == 'CONSISTENT':
+        expected = model(retained)
+        equal(plan['model_input'], expected, 'Export-derived model changed')
+        verify_planner_diagnostics(plan['planner_result'], expected['cases'][0])
+    else:
+        equal(plan['model_input'], None, 'Conflicting evidence fabricated a model')
+        equal(plan['planner_result'], None, 'Conflicting evidence fabricated a plan')
 
 
 def legacy_expected(root):
@@ -471,6 +591,7 @@ def _verify(binding_path, run, trusted_freeze_sha256):
         output = strict_json(output_raw)
         if case_id == 'legacy-24':
             input_raw = regular(folder / 'work/input-batch.json')
+            legacy_input = strict_json(input_raw)
             require(output['input_sha256'] == digest(input_raw), 'Legacy input hash mismatch')
             require(output['version'] == 'evidence-recovery-0.2', 'Original planner version claim changed')
             actual_rows = [{name: value[name] for name in FIELDS} for value in output['cases']]
@@ -484,6 +605,8 @@ def _verify(binding_path, run, trusted_freeze_sha256):
                     'cost': naive['declared_cost'], 'question_count': naive['question_count'],
                     'distinguishes_decisions': naive['distinguishes_all_cross_decision_pairs'],
                     'within_budget': naive['within_budget']}, 'Original ask-all baseline disagreement')
+            for value, model in zip(output['cases'], legacy_input['cases']):
+                verify_planner_diagnostics(value, model)
             legacy_summary = {'exact_cases': 24 - len(mismatches), 'total_cases': 24,
                               'fields_per_case': len(FIELDS), 'mismatches': mismatches}
             failures.extend({'case_id': name, 'reason': 'Legacy semantic disagreement'} for name in mismatches)
@@ -503,6 +626,7 @@ def _verify(binding_path, run, trusted_freeze_sha256):
                 if claim in plan['extraction']:
                     require(plan['extraction'][claim] is False, 'Unsupported vendor interpretation claim')
             verify_extraction(plan, supplied, folder / 'work', source_fields)
+            verify_plan(plan, supplied)
             receipt = strict_json(regular(folder / 'work/result/receipt.json'))
             require(set(receipt) == {'schema', 'input_sha256', 'planner_core_sha256', 'files', 'stdout'}
                     and type(receipt['schema']) is int and receipt['schema'] == 1,

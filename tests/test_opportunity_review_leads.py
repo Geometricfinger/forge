@@ -1,7 +1,7 @@
 """Inspectable partial retrieval stays separate from selected source candidates."""
 import copy
 import unittest
-from unittest.mock import patch
+from test_prepared_search import mock_prepared_search
 
 from forge_core import corpus, opportunities as op
 from forge_core.common import Blocked, canonical
@@ -25,7 +25,7 @@ def response(rows, total=None):
 
 class ReviewLeadPolicy(unittest.TestCase):
     def run_leads(self, result, queries=None, corpora=None, cache=None):
-        with patch('forge_core.corpus.search',return_value=result) as search:
+        with mock_prepared_search(return_value=result) as search:
             groups=op.code_leads([{'id':'grouping','code_queries':queries or ['group records duplicates']}],
                                  corpora or [('parts',{})],{} if cache is None else cache)
         return groups[0],search
@@ -75,7 +75,7 @@ class ReviewLeadPolicy(unittest.TestCase):
         self.assertEqual(len(group['search_coverage']),4)
 
     def test_partial_also_found_by_a_full_query_is_not_duplicated_in_review(self):
-        with patch('forge_core.corpus.search',side_effect=[response([hit('shared')]),
+        with mock_prepared_search(side_effect=[response([hit('shared')]),
                                                         response([hit('shared',True)])]):
             group=op.code_leads([{'id':'m','code_queries':['group records','collect records']}],
                                 [('parts',{})],{})[0]
@@ -88,7 +88,7 @@ class ReviewLeadPolicy(unittest.TestCase):
                  response([hit(f'other_{i}',True) for i in range(12)],12),
                  response([hit(f'partial_{i}') for i in range(13)],43),
                  response([hit(f'more_{i}') for i in range(12)],12)]
-        with patch('forge_core.corpus.search',side_effect=results):
+        with mock_prepared_search(side_effect=results):
             group=op.code_leads([{'id':'m','code_queries':['one','two','three','four']}],[('parts',{})],{})[0]
         self.assertEqual(len(group['candidates']),12)
         self.assertEqual(len(group['review_candidates']),12)
@@ -126,7 +126,7 @@ class ReviewLeadPolicy(unittest.TestCase):
 
     def test_shared_search_is_cached_and_returned_terms_do_not_mutate_cache(self):
         result=response([hit('shared')]);before=canonical(result);cache={}
-        with patch('forge_core.corpus.search',return_value=result) as search:
+        with mock_prepared_search(return_value=result) as search:
             groups=op.code_leads([{'id':'a','code_queries':['group records']},
                                  {'id':'b','code_queries':['group records']}],[('parts',{})],cache)
         self.assertEqual(search.call_count,1)
@@ -167,7 +167,7 @@ class ReviewLeadRendering(unittest.TestCase):
     def test_partial_review_text_and_ids_are_escaped(self):
         value='<img src=x onerror=alert(1)>'
         result=response([hit(value)])
-        with patch('forge_core.corpus.search',return_value=result):
+        with mock_prepared_search(return_value=result):
             group=op.code_leads([{'id':value,'code_queries':[value]}],[(value,{})],{})[0]
         group['review_candidates'][0]['missing_query_terms']=[value]
         group['review_candidates_omitted']=2

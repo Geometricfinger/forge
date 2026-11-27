@@ -305,13 +305,41 @@ def _class_context(meta,segment):
         owner['member_'+key]=segment['start_line']+owner[key]-1 if owner.get(key) is not None else None
     return owner
 
+def _definition_apis(segment):
+    """Join observations to exact source scopes, once per segment.
+
+    Hound includes ``<locals>`` in nested scope names; structural names omit
+    that marker. Definition lines (not decorator starts) distinguish repeated
+    names. Older observations without ranges are usable only for a unique name.
+    """
+    definitions=segment['definitions']
+    names=collections.defaultdict(list);locations={}
+    for index,definition in enumerate(definitions):
+        names[definition['name']].append(index)
+        key=(definition['name'],definition.get('definition_line',definition['start_line']),definition['end_line'])
+        locations.setdefault(key,[]).append(index)
+    observed=collections.defaultdict(set)
+    for finding in segment.get('hound',{}).get('findings',[]):
+        if finding.get('scope_kind') in ('source','module','script'):continue
+        name=finding.get('qualified_name',finding.get('function',finding.get('function_name')))
+        api=finding.get('resolved_api',finding.get('api',''))
+        if not isinstance(name,str) or not isinstance(api,str) or not api:continue
+        name='.'.join(part for part in name.split('.') if part!='<locals>')
+        if 'function_lines' in finding:
+            span=finding['function_lines']
+            if not isinstance(span,list) or len(span)!=2 or any(type(n) is not int for n in span):continue
+            matches=locations.get((name,*span),[])
+        else:matches=names.get(name,[])
+        if len(matches)==1:observed[matches[0]].add(api)
+    return observed
+
 def rows(report):
     for r in report['sources']:
         source=r['source']
         for s in r['segments']:
-            for d in s['definitions']:
-                findings=[f for f in s.get('hound',{}).get('findings',[]) if f.get('qualified_name',f.get('function',f.get('function_name')))==d['name']]
-                apis=sorted(set(f.get('resolved_api',f.get('api','')) for f in findings if f.get('resolved_api',f.get('api'))))
+            observed=_definition_apis(s)
+            for position,d in enumerate(s['definitions']):
+                apis=sorted(observed.get(position,()))
                 yield {'record_kind':'function','definition_id':d['definition_id'],'name':d['name'],'parameters':d['parameters'],'source_id':s['source_id'],
                        'source_sha256':s['source_sha256'],'container_sha256':source['sha256'],'file_id':source['file_id'],'source_url':source['source_url'],
                        'container':source['path'],'path':s['path'],'logical_path_hint':s['logical_path_hint'],'member_chain':s['member_chain'],
@@ -403,6 +431,15 @@ def search_legacy(report,query,limit=20,include_tests=False):
 def search(report, query, limit=20, include_tests=False, *, distinct=False, filters=None):
     from .retrieval import search_report
     return search_report(report, query, limit, include_tests, distinct, filters)
+
+def prepare_search(report):
+    """Bind a defensive metadata snapshot for a batch of review questions.
+
+    A prepared query keeps this report's receipt and coverage even if the caller
+    later mutates the original report. Prepare again to use changed observations.
+    """
+    from .retrieval import prepare_report
+    return prepare_report(report)
 
 
 def dependency_context(report, definition_id):

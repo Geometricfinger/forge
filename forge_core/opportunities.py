@@ -394,6 +394,14 @@ def _unique_code_leads(rows):
 
 def code_leads(options,corpora,cache):
     from . import corpus
+    options=list(options);corpora=list(corpora)
+    queries=list(dict.fromkeys(query_intent(q)[0] for m in options for q in m['code_queries']))
+    for name,report in corpora:
+        missing=[q for q in queries if (name,q) not in cache]
+        if not missing:continue
+        prepared=corpus.prepare_search(report)
+        for q in missing:cache[(name,q)]=prepared.query(q,limit=CODE_SEARCH_LIMIT,distinct=True)
+        del prepared
     leads=[]
     for m in options:
         found=[];review=[];partial=0;symbol_excluded=0;coverage=[]
@@ -401,7 +409,6 @@ def code_leads(options,corpora,cache):
             q,exact_required=query_intent(requested_query)
             for name,report in corpora:
                 k=(name,q)
-                if k not in cache:cache[k]=corpus.search(report,q,limit=CODE_SEARCH_LIMIT,distinct=True)
                 result=cache[k]
                 ranked=list(enumerate(result['results'][:CODE_SEARCH_LIMIT],1))
                 hits=[(rank,h) for rank,h in ranked if h.get('all_query_terms_matched') is True]

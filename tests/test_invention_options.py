@@ -251,6 +251,40 @@ class EvidenceAndConditionsTests(unittest.TestCase):
         self.assertEqual(result['next_decision'], 'VERIFY_EXISTING_ROUTE_BEFORE_NEW_WORK')
         self.assertEqual(result['options'][0]['classification'], 'REUSE_EXISTING_OPTION')
 
+    def test_existing_only_chains_are_checked_before_new_work(self):
+        for length in (2, 3, 4):
+            with self.subTest(length=length):
+                bundle = fixture()
+                bundle['workflows'][0]['required_conditions'] = ['offline']
+                for index in range(length):
+                    before = 'file' if index == 0 else f'field{index}'
+                    after = 'identity' if index == length - 1 else f'field{index + 1}'
+                    row = mechanism(bundle, f'existing{index}', [before], [after], 'existing_option')
+                    condition(bundle, row, 'offline', 'supported')
+                mechanism(bundle, 'new', ['file'], ['identity'], 'new_work')
+                result = routes(bundle)
+                self.assertEqual(result['next_decision'], 'VERIFY_EXISTING_ROUTE_BEFORE_NEW_WORK')
+                # Classification still describes the multi-mechanism route.
+                self.assertEqual(result['options'][0]['classification'], 'COMBINE_DECLARED_MECHANISMS')
+                self.assertFalse(any(result['authority'].values()))
+
+    def test_unknown_existing_only_chain_requires_comparison(self):
+        self.bundle['workflows'][0]['required_conditions'] = ['offline']
+        self.row.update(role='existing_option', requires=['records'])
+        condition(self.bundle, self.row, 'offline', 'supported')
+        mechanism(self.bundle, 'upstream', ['file'], ['records'], 'existing_option')
+        result = routes(self.bundle)
+        self.assertEqual(result['next_decision'], 'COMPARE_CANDIDATE_ROUTES')
+        self.assertEqual(result['options'][0]['condition_status'], 'UNCONFIRMED')
+
+    def test_mixed_existing_route_does_not_claim_existing_only_preference(self):
+        for role in ('source_component', 'manual_step', 'new_work', 'unclassified'):
+            with self.subTest(role=role):
+                bundle = fixture()
+                mechanism(bundle, 'upstream', ['file'], ['records'], role)
+                mechanism(bundle, 'existing', ['records'], ['identity'], 'existing_option')
+                self.assertEqual(routes(bundle)['next_decision'], 'COMPARE_CANDIDATE_ROUTES')
+
     def test_unclassified_old_mechanism_is_not_labeled_available_code(self):
         self.row.pop('role')
         option, = routes(self.bundle)['options']

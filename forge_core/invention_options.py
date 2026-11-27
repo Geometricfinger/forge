@@ -317,8 +317,8 @@ def synthesize(hypothesis, mechanisms):
     result['status'] = ('BUILD_OPTIONS_FOR_REVIEW' if result['options']
                         else 'NO_PLAN_FOUND_WITHIN_BOUNDS')
     if result['options']:
-        existing = any(option['classification'] == 'REUSE_EXISTING_OPTION'
-                       and option['condition_status'] == 'DECLARED_SUPPORTED'
+        existing = any(option['condition_status'] == 'DECLARED_SUPPORTED'
+                       and all(step['role'] == 'existing_option' for step in option['steps'])
                        for option in options)
         result['next_decision'] = ('VERIFY_EXISTING_ROUTE_BEFORE_NEW_WORK' if existing
                                    else 'COMPARE_CANDIDATE_ROUTES')

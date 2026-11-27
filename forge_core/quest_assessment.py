@@ -41,6 +41,10 @@ def _same(left, right):
 def _artifact_reference(record, code):
     _fields(record, {'path', 'bytes', 'sha256'}, code)
     path = path_in_repo(record['path'])
+    try:
+        path.encode('utf-8')
+    except UnicodeError as exc:
+        raise Blocked(code) from exc
     _digest(record['sha256'], code)
     if type(record['bytes']) is not int or not 0 <= record['bytes'] <= MAX_ARTIFACT_BYTES:
         raise Blocked(code)
@@ -111,7 +115,7 @@ def validate_plan(recipe):
                     path = _artifact_reference(record, 'QUEST_EVALUATION_INPUTS')
                 except Blocked as exc:
                     invalid(field,
-                            f'Use a relative normalized path, integer bytes from 0 to {MAX_ARTIFACT_BYTES}, '
+                            f'Use a relative normalized UTF-8 path, integer bytes from 0 to {MAX_ARTIFACT_BYTES}, '
                             'and a lowercase SHA-256 digest. Each input must fit the assessment size limit.', str(exc))
                 if path in paths or (path in input_files and input_files[path] != record):
                     invalid(field, 'Use each input path once per case and the same binding wherever it is reused.',

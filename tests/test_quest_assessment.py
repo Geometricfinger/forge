@@ -473,6 +473,37 @@ class QuestAssessmentTests(unittest.TestCase):
             self.assertEqual((code, result['reason']), (2, reason))
             self.assertFalse(self.build_dir.exists())
 
+    def test_surrogate_input_paths_are_refused_with_field_diagnostics(self):
+        for point in (0xd800, 0xdbff, 0xdc00, 0xdc80, 0xdfff):
+            reference = {'path': 'inputs/' + chr(point) + '.json', 'bytes': 2, 'sha256': sha(b'{}')}
+            self.recipe['evaluation_plan']['cases'][0]['inputs'] = [reference]
+            with self.subTest(point=point), self.assertRaisesRegex(Blocked, '^QUEST_EVALUATION_INPUTS$') as caught:
+                validate_plan(self.recipe)
+            self.assertEqual(caught.exception.detail['field'], 'evaluation_plan.cases[0].inputs[0]')
+            self.assertNotIn(reference['path'], str(caught.exception.detail))
+
+    def test_surrogate_observation_paths_have_a_structured_cli_refusal(self):
+        self.build()
+        results = self.results()
+        for point in (0xd800, 0xdbff, 0xdc00, 0xdc80, 0xdfff):
+            results['cases'][0]['artifact']['path'] = 'observed/' + chr(point) + '.json'
+            with self.subTest(point=point):
+                code, result = self.assess(results)
+                self.assertEqual((code, result['reason']), (2, 'QUEST_ASSESS_ARTIFACT'))
+                self.assertFalse(self.out.exists())
+
+    def test_valid_unicode_input_and_observation_paths_preserve_bytes(self):
+        reference = self.artifact('資料/café-𐐀.txt', b'6\r\n')
+        self.recipe['evaluation_plan']['cases'][0]['inputs'] = [reference]
+        self.build()
+        results = self.results()
+        data = canonical(self.recipe['evaluation_plan']['cases'][0]['expected'])
+        results['cases'][0]['artifact'] = self.artifact('観測/Δ-é.json', data)
+        code, result = self.assess(results)
+        self.assertEqual((code, result['outcome_status']), (0, 'REPORTED_PASS'))
+        self.assertEqual((self.out / 'artifacts' / reference['path']).read_bytes(), b'6\r\n')
+        self.assertEqual((self.out / 'artifacts/観測/Δ-é.json').read_bytes(), data)
+
     def test_result_or_rehashed_receipt_cannot_replace_fixed_inputs(self):
         reference = self.artifact('inputs/value.txt', b'6\n')
         self.recipe['evaluation_plan']['cases'][0]['inputs'] = [reference]

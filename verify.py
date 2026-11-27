@@ -30,7 +30,7 @@ def main():
         # while retaining a bounded watchdog and process-group termination.
         command([sys.executable,str(ROOT/'run_tests.py'),'--out',str(out/'workbench-tests')],ROOT,out/'workbench-tests.log',300)
         t=loads(read(out/'workbench-tests/tests.json'))
-        if t['tests_run']!=1609 or any(t[k] for k in ('failures','errors','skips')):raise Blocked('WORKBENCH_TESTS_FAILED')
+        if t['tests_run']!=1633 or any(t[k] for k in ('failures','errors','skips')):raise Blocked('WORKBENCH_TESTS_FAILED')
         report['workbench_tests']=t
         w=initialize(out/'home')
         from forge_core import corpus,corpus_demo
