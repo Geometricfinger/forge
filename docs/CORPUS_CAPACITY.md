@@ -49,6 +49,15 @@ remains to emit the small refusal. Neither outcome is a completed scan.
 
 ## What a completed structural scan means
 
+The complete-statement partition path can extend the original 2,048-unit prefix
+to 4,096 units when the whole container fits a 14 MB growth budget and a bounded
+additional CPU allowance. It retains the original result before attempting the
+extension and records any fallback in partition metadata. The hard 16 MB worker
+result ceiling, 17 MB transport ceiling, 20 MB checkpoint read ceiling and parser
+CPU/memory limits remain unchanged. See [large-module growth](LARGE_MODULES.md#optional-growth-retains-the-original-bounded-result)
+for the exact policy and the distinction between an effective per-result limit
+and a guaranteed capacity for arbitrary code.
+
 Large modules may retain every definition while exceeding the API analyzer's
 separate source-size limit. Such reports remain `COMPLETED_WITH_GAPS`: searchable
 definitions do not imply complete API-call analysis. Check both the definition

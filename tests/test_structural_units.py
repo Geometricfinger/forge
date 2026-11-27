@@ -10,7 +10,7 @@ from unittest.mock import patch
 
 from forge_core.common import Blocked, sha
 from forge_core.mixed_intake import inspect_container
-from forge_core.structural_units import admitted_trees, plan
+from forge_core.structural_units import MAX_UNITS, admitted_trees, plan
 
 
 def padded(code):
@@ -225,7 +225,7 @@ def later(value: Base = SCALE):
                 with self.assertRaises(Blocked):
                     plan('pass\n', 100, max_units=value)
         with self.assertRaises(Blocked):
-            plan('pass\n', 100, max_units=2049)
+            plan('pass\n', 100, max_units=MAX_UNITS+1)
 
 
 if __name__ == '__main__':

@@ -5,11 +5,20 @@ Callers must remove them before checkpointing. Lines refer to the nearest text
 member; notebook code uses cell-local lines. Cross-block dependencies are unknown.
 """
 from __future__ import annotations
-import ast,bisect,collections,hashlib,io,json,re,stat,tokenize,zipfile
+import ast,bisect,collections,hashlib,io,json,re,stat,time,tokenize,zipfile
 from pathlib import PurePosixPath
 from .common import Blocked,canonical,sha,loads
 
-VERSION='mixed-intake-6-fence-analysis-view'
+VERSION='mixed-intake-7-unit-capacity'
+MAX_RESULT_BYTES=16_000_000
+# Optional structural growth must leave the original bounded result available.
+# These are additional growth budgets, not higher parser/worker permissions.
+EXTENDED_RESULT_BYTES=14_000_000
+EXTENSION_CPU_SECONDS=3.0
+EXTENSION_CPU_WINDOW=7.0
+FALLBACK_POLICIES={'RESULT_BUDGET':'unit-capacity-v2-bytes',
+                   'CPU_BUDGET':'unit-capacity-v2-cpu',
+                   'RESOURCE_LIMIT':'unit-capacity-v2-resource'}
 DEFAULTS={'max_container_bytes':8_000_000,'max_member_bytes':2_000_000,'max_source_bytes':250_000,
           'max_module_bytes':2_000_000,'max_total_bytes':25_000_000,'max_entries':2500,'max_depth':2,'max_segments':400,'max_ratio':200,'max_nodes':60_000}
 GAP_STATES={'CONTAINER_SIZE_LIMIT','MEMBER_SIZE_LIMIT','SOURCE_SIZE_LIMIT','MODULE_SIZE_LIMIT','DEFINITION_SIZE_LIMIT','EXPANSION_LIMIT','ENTRY_LIMIT','DEPTH_LIMIT','RATIO_LIMIT','SEGMENT_LIMIT','UNSAFE_MEMBER','AMBIGUOUS_MEMBER','INVALID_ARCHIVE','ENCRYPTED_MEMBER','UNSUPPORTED_COMPRESSION','UNSUPPORTED_ENCODING','UNCLOSED_FENCE','PYTHON_SYNTAX_ERROR','AST_LIMIT','AST_UNIT_LIMIT','MODULE_CONTEXT_LIMIT','STRUCTURAL_UNIT_COUNT_LIMIT','NOTEBOOK_LANGUAGE_UNSUPPORTED','NOTEBOOK_INVALID','READ_ERROR','LANGUAGE_NOT_ANALYZED','UNSUPPORTED_FORMAT'}
@@ -21,6 +30,16 @@ VENDOR={'.git','.venv','venv','node_modules','site-packages','__pycache__','vend
 # only, so it is not a credential-separation or DLP boundary (docs/THREAT_MODEL.md).
 SECRET_NAMES={'.env','id_rsa','id_ed25519','credentials.py','credentials.json','secrets.json','secrets.py','tokens.json'}
 STOP={'the','a','an','of','for','to','and','or','in','is','are','this','that','with','from','return','returns','self','none','true','false','def','class'}
+
+class _ExtensionAborted(Exception):
+    """Optional growth stopped; never turn this into an AST or syntax gap."""
+
+def _module_key(path,chain,fmt,start_line,cell):
+    return path,canonical(chain),fmt,start_line,cell
+
+def _segment_key(segment):
+    return _module_key(segment['path'],segment['member_chain'],segment['format'],
+                       segment['start_line'],segment['cell_index'])
 
 def tokens(value):
     value=re.sub(r'([a-z])([A-Z])',r'\1 \2',value)
@@ -112,14 +131,20 @@ def _source_windows(data,definitions,limit):
             'byte_basis':'UTF8_SEGMENT_SOURCE','complete':True}
 
 class Reader:
-    def __init__(self,name,limits):
+    def __init__(self,name,limits,*,unit_limit=None,check_budget=None):
+        from .structural_units import MAX_UNITS
         self.name=name;self.limits=DEFAULTS|dict(limits or {});self.segments=[];self.inventory=[];self.expanded=0;self.entries=0
+        self.unit_limit=MAX_UNITS if unit_limit is None else unit_limit
+        self.check_budget=check_budget;self.module_inventory={};self.syntax_refusals={}
         if set(self.limits)!=set(DEFAULTS):raise Blocked('UNKNOWN_INTAKE_LIMIT')
         for k,v in self.limits.items():
             if type(v) is not int or not 1<=v<=DEFAULTS[k]:raise Blocked('INVALID_INTAKE_LIMIT')
     def note(self,path,status,chain,**extra):
         self.inventory.append({'path':path,'status':status,'member_chain':chain,**extra})
     def add(self,code,path,chain,fmt,start_line=1,end_line=None,hint=None,cell=None,encoding='utf-8',fence_indent=0):
+        if self.check_budget is not None:self.check_budget()
+        inventory_start=len(self.inventory)
+        module_key=_module_key(path,chain,fmt,start_line,cell)
         b=code.encode('utf-8')
         # Preserve one module identity and AST context. Large modules are not
         # rewritten as standalone function programs and never sent to Hound.
@@ -150,13 +175,15 @@ class Reader:
                 tree=ast.parse(analysis_code)
                 if node_count(tree,self.limits['max_nodes'])>self.limits['max_nodes']:tree=None
             if tree is None:
-                planned=plan(analysis_code,self.limits['max_nodes'])
+                planned=plan(analysis_code,self.limits['max_nodes'],self.unit_limit,
+                             check_budget=self.check_budget)
                 module_context=prepare_module(planned['envelope'],planned['metadata']['module_context_complete'])
                 module_structure=module_context[0]
                 definition_structure={};definitions=[];imports=[]
                 decorators=_decorator_statements(analysis_code)
-                for tree in admitted_trees(analysis_code,planned):
+                for tree in admitted_trees(analysis_code,planned,check_budget=self.check_budget):
                     _,details=describe(tree,module_context)
+                    if self.check_budget is not None:self.check_budget()
                     definition_structure.update(details)
                     definitions.extend(_definitions(tree,analysis_code,decorators))
                     for n in ast.walk(tree):
@@ -174,8 +201,13 @@ class Reader:
                     elif isinstance(n,ast.ImportFrom):imports.extend('.'*n.level+(n.module+'.' if n.module else '')+a.name for a in n.names)
                 script_present=any(not isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef,ast.ClassDef,ast.Import,ast.ImportFrom)) and not (isinstance(n,ast.Expr) and isinstance(n.value,ast.Constant) and isinstance(n.value.value,str)) for n in tree.body)
         except (SyntaxError,ValueError,RecursionError,MemoryError,Blocked) as e:
+            if self.check_budget is not None and isinstance(e,(MemoryError,RecursionError)):
+                raise _ExtensionAborted('RESOURCE_LIMIT') from None
             status='AST_LIMIT' if isinstance(e,(MemoryError,RecursionError,Blocked)) else 'CONTEXT_ONLY' if fmt=='python_text' else 'PYTHON_SYNTAX_ERROR'
-            self.note(path,status,chain,start_line=start_line,syntax_line=getattr(e,'lineno',None));return
+            self.note(path,status,chain,start_line=start_line,syntax_line=getattr(e,'lineno',None))
+            if isinstance(e,(SyntaxError,ValueError)):
+                self.syntax_refusals[module_key]=self.inventory[inventory_start:]
+            return
         if fmt=='python_text' and not meaningful:self.note(path,'CONTEXT_ONLY',chain);return
         if planned is not None:
             if analysis_view is not None:
@@ -212,6 +244,7 @@ class Reader:
         if planned is not None:seg['structural_partition']=planned['metadata']
         if analysis_view is not None:seg['analysis_view']=analysis_view
         self.segments.append(seg);self.note(path,'PYTHON_SEGMENT',chain,segment_local_id=seg['segment_local_id'],start_line=start_line,end_line=end_line,cell_index=cell)
+        self.module_inventory[module_key]=self.inventory[inventory_start:]
     def text(self,data,path,chain,ext):
         try:t,enc=_decode(data)
         except (UnicodeError,SyntaxError,LookupError):self.note(path,'UNSUPPORTED_ENCODING',chain);return
@@ -260,6 +293,7 @@ class Reader:
                 self.add(src,path,chain,'notebook_cell',cell=i)
         except (ValueError,TypeError,KeyError,AttributeError):self.note(path,'NOTEBOOK_INVALID',chain)
     def visit(self,data,path,chain,depth=0):
+        if self.check_budget is not None:self.check_budget()
         excluded=_excluded(path)
         if excluded:self.note(path,excluded,chain);return
         ext=PurePosixPath(path).suffix.lower()
@@ -299,11 +333,122 @@ class Reader:
         elif not ext and data.startswith((b'#!/usr/bin/env python',b'#!/usr/bin/python')):self.text(data,path,chain,'.py')
         else:self.note(path,'LANGUAGE_NOT_ANALYZED' if ext in OTHER_CODE else 'UNSUPPORTED_FORMAT',chain)
 
-def inspect_container(data,name,limits=None):
-    if not isinstance(data,bytes) or not _path_ok(name):raise Blocked('CONTAINER_INPUT')
-    r=Reader(name,limits)
+def _read_container(data,name,limits,unit_limit,check_budget=None):
+    r=Reader(name,limits,unit_limit=unit_limit,check_budget=check_budget)
     if len(data)>r.limits['max_container_bytes']:r.note(name,'CONTAINER_SIZE_LIMIT',[])
     else:r.visit(data,name,[])
+    return r
+
+def _result(data,r):
     return {'schema':1,'version':VERSION,'container_sha256':sha(data),'segments':r.segments,'inventory':r.inventory,
             'gaps':[i for i in r.inventory if i['status'] in GAP_STATES],'expanded_bytes':r.expanded,'entries_seen':r.entries,
             'upstream_code_executed':False,'release_approved':False}
+
+def _fits_result(result,limit,check_budget=None):
+    from .streaming import canonical_chunks
+    size=0
+    for chunk in canonical_chunks(result):
+        if check_budget is not None:check_budget()
+        size+=len(chunk)
+        if size>limit:return False
+    return True
+
+def _retain_syntax_refusals(retained,refusals):
+    # A formerly unvalidated tail can expose a real syntax error. That module
+    # must not reappear as a usable prefix merely because growth was abandoned.
+    owners={id(row):key for key,rows in retained.module_inventory.items()
+            if key in refusals for row in rows}
+    inventory=[];inserted=set()
+    for row in retained.inventory:
+        key=owners.get(id(row))
+        if key is None:inventory.append(row)
+        elif key not in inserted:
+            inventory.extend(refusals[key]);inserted.add(key)
+    retained.inventory=inventory
+    retained.segments=[s for s in retained.segments if _segment_key(s) not in refusals]
+
+def _keeps_original_definitions(retained,extended):
+    current={_segment_key(s):s for s in extended.segments}
+    for segment in retained.segments:
+        key=_segment_key(segment)
+        if key in extended.syntax_refusals:continue
+        found=current.get(key)
+        if found is None:return False
+        identity=lambda d:(d['name'],d['definition_line'],d['end_line'],d['source_window']['sha256'])
+        if not {identity(d) for d in segment['definitions']} <= {identity(d) for d in found['definitions']}:
+            return False
+    return True
+
+def _fallback(data,retained,reason,*,compact=False,check_budget=None):
+    from .structural_units import LEGACY_MAX_UNITS,MAX_UNITS
+    partitions=[s['structural_partition'] for s in retained.segments
+                if s.get('structural_partition',{}).get('units_total',0)>LEGACY_MAX_UNITS]
+    if not compact and check_budget is not None:
+        try:check_budget()
+        except _ExtensionAborted:compact=True
+    if not compact:
+        for partition in partitions:
+            partition['capacity_fallback']={'reason':reason,'scope':'WHOLE_CONTAINER',
+                'requested_max_units':MAX_UNITS,'retained_max_units':LEGACY_MAX_UNITS,
+                'extension_result_budget_bytes':EXTENDED_RESULT_BYTES,
+                'extension_cpu_seconds':EXTENSION_CPU_SECONDS,
+                'per_call_cpu_window_seconds':EXTENSION_CPU_WINDOW}
+    result=_result(data,retained)
+    if not compact:
+        try:
+            compact=not _fits_result(result,MAX_RESULT_BYTES,check_budget)
+        except _ExtensionAborted:
+            compact=True
+    if compact:
+        # A receipt must not push a fitting old result past the hard ceiling.
+        # These documented policy codes are shorter than the regular policy;
+        # they also need no extra traversal after the CPU allowance is spent.
+        for partition in partitions:
+            partition.pop('capacity_fallback',None)
+            partition['policy']=FALLBACK_POLICIES[reason]
+    return result
+
+def inspect_container(data,name,limits=None):
+    if not isinstance(data,bytes) or not _path_ok(name):raise Blocked('CONTAINER_INPUT')
+    from .structural_units import LEGACY_MAX_UNITS,MAX_UNITS
+    started=time.process_time()
+    retained=_read_container(data,name,limits,LEGACY_MAX_UNITS)
+    result=_result(data,retained)
+    if not any(s.get('structural_partition',{}).get('units_total',0)>LEGACY_MAX_UNITS
+               for s in retained.segments):
+        return result
+    elapsed=time.process_time()-started
+    allowance=min(EXTENSION_CPU_SECONDS,EXTENSION_CPU_WINDOW-elapsed)
+    if allowance<=elapsed:return _fallback(data,retained,'CPU_BUDGET',compact=True)
+    def remaining_budget():
+        if time.process_time()-started>=EXTENSION_CPU_WINDOW:
+            raise _ExtensionAborted('CPU_BUDGET')
+    try:
+        if not _fits_result(result,EXTENDED_RESULT_BYTES,remaining_budget):
+            return _fallback(data,retained,'RESULT_BUDGET',check_budget=remaining_budget)
+    except _ExtensionAborted:
+        return _fallback(data,retained,'CPU_BUDGET',compact=True)
+    elapsed=time.process_time()-started
+    allowance=min(EXTENSION_CPU_SECONDS,EXTENSION_CPU_WINDOW-elapsed)
+    # Repeating even the old prefix would consume the remaining growth budget.
+    # Retain it now, reserving worker CPU for serialization and bounded steps.
+    if allowance<=elapsed:return _fallback(data,retained,'CPU_BUDGET',compact=True)
+    deadline=time.process_time()+allowance
+    def check_budget():
+        if time.process_time()>=deadline:raise _ExtensionAborted('CPU_BUDGET')
+    extended=Reader(name,limits,unit_limit=MAX_UNITS,check_budget=check_budget)
+    candidate=None;reason=None
+    try:
+        extended.visit(data,name,[])
+        check_budget()
+        candidate=_result(data,extended)
+        if not _keeps_original_definitions(retained,extended):reason='RESOURCE_LIMIT'
+        elif not _fits_result(candidate,EXTENDED_RESULT_BYTES,check_budget):reason='RESULT_BUDGET'
+    except _ExtensionAborted as exc:
+        reason=str(exc)
+    except (MemoryError,RecursionError):
+        reason='RESOURCE_LIMIT'
+    if reason is None:return candidate
+    _retain_syntax_refusals(retained,extended.syntax_refusals)
+    candidate=None;extended=None
+    return _fallback(data,retained,reason,check_budget=remaining_budget)

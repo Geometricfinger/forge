@@ -45,7 +45,7 @@ public test corpus are not by themselves a removed product capability.
 | Drive / chat-library retrieval | The supervising host supplied authorized copies. This repository does not contain a user's connected account credentials or a full native Drive/chat connector. |
 | Automatic semantic contracts and independent invention | Not demonstrated. Transfer Review validates supplied labels, not their truth. |
 | Continuously hosted model controller | No model service is started by these commands. Agent integration needs explicit authority, budgets and evaluation. |
-| Full language / large-module / archive coverage | Not complete. Large Python structure is bounded at 2 MB, 2,048 complete units and 60,000 AST nodes per unit/shared envelope. Indivisible oversized units and incomplete module context remain explicit; API observations beyond 250 kB remain unavailable. |
+| Full language / large-module / archive coverage | Not complete. Large Python structure is bounded at 2 MB and 60,000 AST nodes per unit/shared envelope. The original 2,048-unit result can grow to 4,096 units within separate whole-container byte and CPU budgets; otherwise its incomplete prefix and fallback reason remain explicit. Indivisible oversized units and incomplete module context remain explicit; API observations beyond 250 kB remain unavailable. See [large-module policy](LARGE_MODULES.md#optional-growth-retains-the-original-bounded-result). |
 
 These are tracked integration/research requirements, not reasons to publish private
 archives or label missing functions as verified. Test against new source families
