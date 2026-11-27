@@ -13,8 +13,9 @@ import tokenize
 
 from .common import Blocked, sha
 
-VERSION = 'complete-top-level-units-1'
-MAX_UNITS = 2048
+VERSION = 'complete-top-level-units-2'
+LEGACY_MAX_UNITS = 2048
+MAX_UNITS = 4096
 FAST_MODULE_BYTES = 250_000
 DECLARATIONS = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
 MEANINGFUL = (*DECLARATIONS, ast.Import, ast.ImportFrom, ast.Assign,
@@ -30,7 +31,7 @@ def node_count(tree, limit):
     return count
 
 
-def _unit_lines(code):
+def _unit_lines(code, check_budget=None):
     # tokenize does not recognize bare CR as a physical newline; AST does.
     # Normalize this transient view only. All slices use original coordinates.
     view = re.sub(r'\r\n|\r', '\n', code)
@@ -39,7 +40,9 @@ def _unit_lines(code):
     decorators = False
     current = None
     try:
-        for token in tokenize.generate_tokens(io.StringIO(view).readline):
+        for token_index, token in enumerate(tokenize.generate_tokens(io.StringIO(view).readline)):
+            if check_budget is not None and token_index % 1024 == 0:
+                check_budget()
             if token.type == tokenize.INDENT:
                 indent += 1
                 continue
@@ -99,7 +102,7 @@ def _parse(code, unit):
     return tree
 
 
-def plan(code, max_nodes, max_units=MAX_UNITS):
+def plan(code, max_nodes, max_units=MAX_UNITS, *, check_budget=None):
     """First pass: validate complete units and build bounded shared context.
 
     A syntax/lexical error aborts the whole module. Resource omissions remain
@@ -126,7 +129,9 @@ def plan(code, max_nodes, max_units=MAX_UNITS):
     meaningful = False
     script_present = False
     syntax_complete = True
-    for start_line, next_line in _unit_lines(code):
+    for start_line, next_line in _unit_lines(code, check_budget):
+        if check_budget is not None:
+            check_budget()
         total += 1
         start = char_offsets[start_line - 1]
         end = char_offsets[next_line - 1] if next_line is not None else len(code)
@@ -197,10 +202,12 @@ def plan(code, max_nodes, max_units=MAX_UNITS):
             'meaningful': meaningful, 'script_present': script_present}
 
 
-def admitted_trees(code, planned):
+def admitted_trees(code, planned, *, check_budget=None):
     """Second pass: yield one admitted AST at a time with original positions."""
     limit = planned['metadata']['limits']['max_unit_nodes']
     for unit in planned['units']:
+        if check_budget is not None:
+            check_budget()
         if unit['status'] != 'ANALYZED':
             continue
         payload = code[unit['char_start']:unit['char_end']].encode('utf-8')

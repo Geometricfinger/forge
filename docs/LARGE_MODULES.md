@@ -11,11 +11,13 @@ function fragments into standalone programs or run the inspected source.
   modules up to 250,000 bytes retain the whole-module fast path when their AST
   fits 60,000 nodes. Larger modules go directly to complete top-level units;
   a smaller module whose AST exceeds that cap can use the same unit path.
-- Structural units: at most 2,048 complete top-level statement units, each with
+- Structural units: up to 4,096 complete top-level statement units, each with
   at most 60,000 AST nodes. A compact shared declaration envelope also has a
   60,000-node cap. A lowered `max_nodes` applies to both caps. No function, class
-  or compound statement is split internally to evade a limit. The fixed worker's
-  CPU, memory, time and output limits are unchanged.
+  or compound statement is split internally to evade a limit. Optional growth
+  beyond the original 2,048-unit prefix has separate whole-container byte and
+  CPU budgets, described below. The fixed worker's CPU, memory, time and output
+  limits are unchanged.
 - Hound API analysis: at most 250,000 source bytes, unchanged. A larger module can
   have searchable definitions and dependency leads while still reporting
   `SOURCE_SIZE_LIMIT` / `SOURCE_LIMIT` and `COMPLETED_WITH_GAPS`.
@@ -68,6 +70,58 @@ Syntax or lexical errors encountered while scanning/parsing still reject the
 whole structural module. An unparsed resource-limited unit or count-limited tail
 explicitly records incomplete syntax validation. A module's bytes can be
 preserved even when its structure or complete syntax cannot be established.
+
+## Optional growth retains the original bounded result
+
+Intake first retains the original 2,048-unit result for the complete container.
+Ordinary modules still use their existing single-parse path; the partition unit
+count does not cap a small module whose whole AST already fits. If no partition
+has a count-limited tail, intake returns that original result directly.
+
+When more units could be admitted, intake can attempt a 4,096-unit result. The
+entire extended container must fit **14,000,000 canonical JSON bytes**, including
+all segments, transient source hex, inventory and gaps. This additional growth
+budget leaves headroom below the worker's unchanged **16,000,000-byte** ceiling.
+Several individually small segments can exceed the combined growth budget.
+
+The optional attempt receives at most **3 CPU seconds**, within a **7-second
+per-call CPU window** measured from the start of intake. It is skipped when that
+remaining allowance cannot cover the measured cost of the original result.
+Checks during token scanning, unit planning, metadata construction and byte
+accounting can abandon growth without reparsing the retained prefix. Timing is
+relative to the intake call, so earlier work in a long-lived caller does not use
+this allowance. These checks occur between bounded operations; they do not
+preempt one AST operation or replace the fixed Linux worker's 10-second CPU,
+768 MiB address-space and 64-file-descriptor limits. A hard resource refusal is
+still possible; retaining a prefix in memory is not a crash-recovery checkpoint.
+
+If byte, CPU or allocation limits prevent the extension, intake returns the
+retained original result. Each affected `structural_partition.capacity_fallback`
+records `RESULT_BUDGET`, `CPU_BUDGET` or `RESOURCE_LIMIT`, the requested and
+retained limits, and the whole-container scope. Its original count-limited tail,
+exact hashes, incomplete syntax status and conservative shared context remain.
+If a new syntax error was discovered before growth stopped, the corresponding
+module remains refused; fallback cannot restore its previously unvalidated
+prefix. Notebook cells, fenced blocks and archive members keep distinct original
+identities when these refusals are reconciled.
+
+A fallback receipt itself must not overflow an otherwise fitting result or
+start another byte traversal after the CPU allowance is spent. Near either
+boundary, a shorter `policy` value records the reason instead:
+
+| Compact policy | Fallback reason |
+|---|---|
+| `unit-capacity-v2-bytes` | `RESULT_BUDGET` |
+| `unit-capacity-v2-cpu` | `CPU_BUDGET` |
+| `unit-capacity-v2-resource` | `RESOURCE_LIMIT` |
+
+The ordinary policy is `complete-top-level-units-2`; `limits.max_units` always
+states the limit actually retained. Partition schema 1 and old
+`complete-top-level-units-1` records remain readable. A changed Forge checkout
+still requires a fresh code-bound workspace under the existing workspace rules.
+More discovered definitions do not clear API-analysis gaps or establish runtime
+behavior. Inspect the effective limit and coverage on each result rather than
+assuming every 4,096-unit module can be extended.
 
 ## Inspect an exact definition
 

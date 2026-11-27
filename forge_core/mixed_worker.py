@@ -8,7 +8,7 @@ if sys.platform.startswith('linux'):
     resource.setrlimit(resource.RLIMIT_CPU,(10,10))
     resource.setrlimit(resource.RLIMIT_NOFILE,(64,64))
 from forge_core.common import loads,canonical
-from forge_core.mixed_intake import DEFAULTS,inspect_container
+from forge_core.mixed_intake import DEFAULTS,MAX_RESULT_BYTES,inspect_container
 try:
     if sys.argv[1:]:
         # This fixed mode carries only the container bytes over stdin. The
@@ -26,7 +26,7 @@ try:
         if set(obj)!={'data_hex','name','limits'}:raise ValueError('FIELDS')
         result=inspect_container(bytes.fromhex(obj['data_hex']),obj['name'],obj['limits'])
     data=canonical(result)
-    if len(data)>16_000_000:raise ValueError('RESULT_LIMIT')
+    if len(data)>MAX_RESULT_BYTES:raise ValueError('RESULT_LIMIT')
     sys.stdout.buffer.write(data)
 except Exception as e:
     sys.stdout.buffer.write(canonical({'status':'BLOCKED','reason':str(e) if type(e) is ValueError else type(e).__name__}))
