@@ -195,6 +195,21 @@ Alias and subtype relationships are not established. Arbitrary requirements
 (including date-only parsing or absence of side effects) still require review and
 acceptance tests. See [search intent and limits](../docs/SEARCH_INTENT.md).
 
+A positive conversion question with one explicit destination can also use a
+`conversion_target_match` when the current Workbench supplies that helper. The
+runner recomputes the cue from captured corpus declarations only after the
+retained definition's name, location, complete body and hashes match. It does
+not accept this evidence from a lexical record. All captured conversion targets
+must agree, with no established forward/reverse relation or contradictory return
+metadata. Multiple-word or qualified destinations receive no destination-only
+cue. The cue shares the existing single-point partial-match allowance;
+ordinary complete coverage and literal identifiers keep their priority. It adds
+no matched query words and leaves the input `NOT_ESTABLISHED`. A destination
+spelling is neither a declared return type nor tested behavior. Query evidence
+identifies the top destination-only declaration separately. Legacy snapshots and
+older Workbenches without the helper receive no new cue, while a bound current
+source can retain it in a question that also includes a separate legacy source.
+
 The added result fields retain report schema 1. Runner code is part of mission
 identity, so existing completed missions must be recreated in a fresh external
 workspace after this update; do not rewrite their binding or checkpoint files.

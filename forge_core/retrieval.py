@@ -11,7 +11,7 @@ from .lexical import counts, expand_inflections, expand_query, words
 from .streaming import canonical_chunks
 from . import direction, query_intent, return_types
 
-VERSION = 'field-bm25-rrf-6-inflections-direct-fields'
+VERSION = 'field-bm25-rrf-7-conversion-destinations'
 K1, B, RRF_K = 1.2, 0.75, 60
 WEIGHTS = {'symbol': 5.0, 'documentation': 1.0, 'parameters': 0.4,
            'path': 0.3, 'observed_api': 4.0, 'declared_call': 1.3,
@@ -142,8 +142,46 @@ def query_evidence(terms, matched, basis):
             'unmatched_terms': unmatched, 'next_action': action}
 
 
+def conversion_target_match(requested, requested_output, row):
+    """A single declared destination spelling, without claiming its input.
+
+    All captured conversions must agree on that destination. A full forward or
+    reverse relation, ambiguous return metadata, a contradictory return name,
+    a stub or uncaptured context cannot earn this weaker, separate cue.
+    """
+    if (not requested or not requested_output or len(requested[1]) != 1
+            or not re.fullmatch(r'[A-Za-z_]\w*', requested_output)
+            or row.get('context_status') != 'CAPTURED'
+            or row.get('implementation_kind') != 'BODY_PRESENT_NOT_VERIFIED'):
+        return None
+    destination = direction.normalized(requested[1])
+    if destination != direction.normalized(words(requested_output)):
+        return None
+    if destination & direction.normalized(requested[0]):
+        return None
+    declarations = row.get('conversion_endpoints', ())
+    if not declarations:
+        return None
+    forward, reverse = direction.evaluate(requested, declarations)
+    if forward or reverse:
+        return None
+    if any(direction.normalized(item['output']) != destination or
+           destination & direction.normalized(item['input']) for item in declarations):
+        return None
+    captured = row.get('return_type_declarations')
+    if captured and captured.get('status') != 'CAPTURED':
+        return None
+    returned = return_types.compare(requested_output, captured, row['implementation_kind'])
+    if returned and not returned['name_match']:
+        return None
+    return {'requested_output': requested_output,
+            'declaration': copy.deepcopy(declarations[0]),
+            'input_match': 'NOT_ESTABLISHED',
+            'evidence': 'CONVERSION_DESTINATION_SPELLING_ONLY_NOT_RETURN_TYPE_OR_BEHAVIOR_PROOF'}
+
+
 _Score = collections.namedtuple('_Score',
-    'index group matched exact symbols lexical symbol call role forward reverse predicate output direct')
+    'index group matched exact symbols lexical symbol call role forward reverse predicate output direct destination')
 
 
 class SearchIndex:
@@ -248,6 +286,8 @@ class SearchIndex:
                                 else (None, None))
             predicate = (query_intent.predicate_match(query, row['name'], row.get('implementation_kind'), symbol_expansion)
                          if not self.legacy else None)
+            destination = (conversion_target_match(requested, requested_output, row)
+                           if not self.legacy else None)
             if support:
                 declared_terms = set(support['input'] + support['output'])
                 endpoint_terms = sorted(t for t, variants in expansion.items() if set(variants) & declared_terms)
@@ -290,7 +330,8 @@ class SearchIndex:
                 return _Score(i, group, len(matched), exact, symbols, total,
                               totals['symbol'], totals['observed_api'] + totals['declared_call'],
                               role_preference, bool(support), bool(reverse), bool(predicate),
-                              0 if returned is None else 1 if returned['name_match'] else -1, len(direct))
+                              0 if returned is None else 1 if returned['name_match'] else -1,
+                              len(direct), bool(destination))
             annotated = {k: v for k, v in row.items() if k not in ('conversion_endpoints', 'return_type_declarations')}
             annotated.update({'matched_query_terms': matched, 'match_count': len(matched),
                         'all_query_terms_matched': len(matched) == len(qt),
@@ -306,6 +347,8 @@ class SearchIndex:
                 breakdown['directional_conflict'] = reverse
             if predicate:
                 breakdown['predicate_match'] = predicate
+            if destination:
+                breakdown['conversion_target_match'] = destination
             if returned:
                 breakdown['declared_output'] = returned
                 if returned['name_match']:
@@ -349,7 +392,7 @@ class SearchIndex:
             has_output = any(score.output > 0 for score in scored)
             def intent_order(score):
                 conflict = has_forward and score.reverse or has_output and score.output < 0
-                preference = score.forward or score.predicate or score.output > 0
+                preference = score.forward or score.predicate or score.output > 0 or score.destination
                 return (-int(score.matched == len(qt) and not conflict),
                         -(score.matched + int(preference) - int(conflict)),
                         -int(preference), int(conflict))
@@ -391,7 +434,8 @@ class SearchIndex:
         if requested:
             orientation['requested_direction'] = {'input': requested[0], 'output': requested[1],
                 'matching_occurrences': sum(score.forward for score in scored),
-                'reverse_declared_occurrences': sum(score.reverse for score in scored)}
+                'reverse_declared_occurrences': sum(score.reverse for score in scored),
+                'destination_only_occurrences': sum(score.destination for score in scored)}
         if not self.legacy and query_intent.predicate_request(query):
             orientation['requested_predicate'] = {'matching_occurrences': sum(score.predicate for score in scored),
                 'evidence': 'PREDICATE_DECLARATION_NOT_BEHAVIOR_PROOF'}
@@ -407,7 +451,7 @@ class SearchIndex:
                 'results': displayed,
                 'search_status': 'MATCHES_FOUND' if any(score.matched == len(qt) for score in scored) else
                                  'PARTIAL_TERM_MATCHES_ONLY' if scored else 'NO_METADATA_MATCH',
-                'rank_meaning': ('legacy metadata coverage and exact symbols preserved; new call context requires reindexing; BM25 components diagnostic only' if self.legacy else 'literal identifier matches first; otherwise complete term coverage first except a reverse conversion or different declared return name when a matching declaration is available; a declared direction, return name, or subject-matching predicate can offset one missing term among partial matches; then exact symbols, coverage from direct rather than inherited/path/role fields, symbol matches and field-weighted BM25 / reciprocal rank fusion') + '; NOT confidence, code quality, or verified behavior',
+                'rank_meaning': ('legacy metadata coverage and exact symbols preserved; new call context requires reindexing; BM25 components diagnostic only' if self.legacy else 'literal identifier matches first; otherwise complete term coverage first except a reverse conversion or different declared return name when a matching declaration is available; a declared direction, return name, subject-matching predicate, or separately labeled conversion destination can offset one missing term among partial matches, without stacking allowances; destination-only evidence does not establish input matching or a return type; then exact symbols, coverage from direct rather than inherited/path/role fields, symbol matches and field-weighted BM25 / reciprocal rank fusion') + '; NOT confidence, code quality, or verified behavior',
                 'ranker_version': 'legacy-coverage-compatible-1' if self.legacy else 'field-bm25-rrf-1',
                 'ranking_extension_version': None if self.legacy else VERSION, 'index_binding': self.binding,
                 'ranking_mode': 'LEGACY_COMPATIBILITY' if self.legacy else 'STRUCTURED_RETRIEVAL',

@@ -146,7 +146,7 @@ def terms(s):
     return [x for x in re.findall('[a-z][a-z0-9]*',s.lower()) if x not in STOP]
 
 def rank_fusion(lexical,forge,limit=5,required_api=None,forge_observations=None,directional_matches=None,
-                directional_conflicts=None,predicate_matches=None,declared_outputs=None):
+                directional_conflicts=None,predicate_matches=None,declared_outputs=None,conversion_targets=None):
     check_int(limit,1,20);merged={}
     # A lexical assertion is not an observed API. Only FORGE contributes those.
     observed={r['id']:r.get('observed_apis',[]) for r in forge}
@@ -161,11 +161,14 @@ def rank_fusion(lexical,forge,limit=5,required_api=None,forge_observations=None,
             if required_api and required_api not in observed.get(r['id'],[]):continue
             if r['id'] not in merged:
                 merged[r['id']]={**r,'channels':[],'rrf':0.0,'observed_apis':observed.get(r['id'],[]),'runtime_validation':'NOT_RUN'}
+                # Only the bridge's checked corpus evidence can grant this cue.
+                merged[r['id']].pop('conversion_target_match',None)
             x=merged[r['id']];x['channels'].append(channel);x['rrf']+=1/(60+rank)
     for rid, support in (directional_matches or {}).items():
         if rid in merged:
             merged[rid]['directional_match'] = support
-    for field, evidence in [('directional_conflict',directional_conflicts),('predicate_match',predicate_matches),('declared_output',declared_outputs)]:
+    for field, evidence in [('directional_conflict',directional_conflicts),('predicate_match',predicate_matches),
+                            ('declared_output',declared_outputs),('conversion_target_match',conversion_targets)]:
         for rid, support in (evidence or {}).items():
             if rid in merged:
                 merged[rid][field] = support
@@ -174,7 +177,8 @@ def rank_fusion(lexical,forge,limit=5,required_api=None,forge_observations=None,
     def intent_order(r):
         output=r.get('declared_output')
         conflict=(has_forward and 'directional_conflict' in r or has_output and output is not None and not output['name_match'])
-        preference=('directional_match' in r or 'predicate_match' in r or output is not None and output['name_match'])
+        preference=('directional_match' in r or 'predicate_match' in r or output is not None and output['name_match']
+                    or 'conversion_target_match' in r)
         return (-int(len(r['matched_terms'])==r['term_count'] and not conflict),
                 -(len(r['matched_terms']) + int(preference) - int(conflict)),
                 -int(preference),int(conflict))
