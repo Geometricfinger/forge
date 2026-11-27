@@ -1,4 +1,5 @@
 """New frozen checks for source-of-truth, malformed records, and relevance labels."""
+from checkpoint_helpers import cache_files, cache_read, cache_write
 import copy,json,stat,unittest,zipfile,io
 from unittest.mock import patch
 from forge_core import corpus,mixed_intake
@@ -15,7 +16,7 @@ class CorpusRecheck(unittest.TestCase):
             with self.assertRaises(Blocked):self.runit()
         self.assertFalse((self.out/'corpus.json').exists())
     def test_checkpoint_list_is_controlled_blocker(self):
-        self.runit();p=next((self.out/'checkpoints').glob('*.json'));o=json.loads(p.read_bytes());o['result']=[];o['result_sha256']=sha(canonical([]));p.write_bytes(canonical(o))
+        self.runit();p=next(cache_files(self.out/'checkpoints'));o=cache_read(p);o['result']=[];o['result_sha256']=sha(canonical([]));cache_write(p,o)
         r=self.runit();self.assertEqual(r['status'],'INCOMPLETE');self.assertTrue(r['coverage']['blocked'])
     def test_report_list_is_controlled_blocker(self):
         self.runit();(self.out/'corpus.json').write_bytes(canonical([]));(self.out/'receipt.json').write_bytes(canonical({'report_sha256':sha(canonical([])),'source_bodies_retained':False}))

@@ -1,4 +1,5 @@
 """Markdown interpretation is explicit; original source bytes remain evidence."""
+from checkpoint_helpers import cache_read, cache_write
 import copy
 import json
 import tempfile
@@ -186,8 +187,8 @@ class FenceViewUnitTests(unittest.TestCase):
             recorder = Recorder()
             first = corpus.inspect_one(data, source(data), base, PROFILE, recorder, cache, 'synthetic-job')
             self.assertEqual(len(recorder.payloads), 1)
-            saved_path = cache / (first['segments'][0]['source_id'] + '.json')
-            original = json.loads(saved_path.read_text())
+            saved_path = cache / (first['segments'][0]['source_id'] + '.json.gz')
+            original = cache_read(saved_path)
             for area in ['analysis_view', 'hound', 'view_type']:
                 changed = copy.deepcopy(original)
                 if area == 'view_type':
@@ -196,11 +197,11 @@ class FenceViewUnitTests(unittest.TestCase):
                     key = 'analysis_sha256' if area == 'analysis_view' else 'source_sha256'
                     changed['result']['segment'][area][key] = '0' * 64
                 changed['result_sha256'] = sha(canonical(changed['result']))
-                saved_path.write_bytes(canonical(changed))
+                cache_write(saved_path, changed)
                 with self.subTest(area=area):
                     with self.assertRaisesRegex(Blocked, '^SEGMENT_CHECKPOINT_BINDING$'):
                         corpus.inspect_one(data, source(data), base, PROFILE, recorder, cache, 'synthetic-job')
-            saved_path.write_bytes(canonical(original))
+            cache_write(saved_path, original)
 
     def test_omitted_partition_unit_keeps_raw_and_analysis_coordinates(self):
         code = ('import hashlib\ndef oversized(value):\n' + '    value += 1\n' * 25 +

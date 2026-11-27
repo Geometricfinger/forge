@@ -11,7 +11,7 @@ from .common import *
 from .engine import Analyzer,ROOT,run_fixed
 from .mixed_intake import DEFAULTS,tokens
 from .policy import validate_profile
-from . import analysis_recovery
+from . import analysis_recovery,checkpoint_io
 from .corpus_checkpoint import validate_result,validate_segment
 
 SCHEMA=1
@@ -115,12 +115,16 @@ def inspect_one(data,source,home,profile,analyzer,segment_dir=None,job_binding=N
         'boundary_basis':'DEFINITION_BOUNDARIES_WHEN_POSSIBLE' if boundaries else 'RAW_CONTAINER_BYTES',
         'blocks_persisted':False,'blocks_are_standalone_programs':False}
     if validation is not None:result['acquisition_validation']=validation
+    profile_sha256=sha(canonical(profile))
     def analyze(segment):
-        segment=__import__('copy').deepcopy(segment)
+        # _parser owns a freshly decoded JSON tree. Each segment is transferred
+        # to one task after all shared boundary reads; no public object is reused.
         payload=bytes.fromhex(segment.pop('source_hex'))
-        if sha(payload)!=segment['source_sha256']:raise Blocked('SEGMENT_HASH')
+        payload_sha256=sha(payload)
+        if payload_sha256!=segment['source_sha256']:raise Blocked('SEGMENT_HASH')
         from .source_views import analysis_bytes
         analysis=analysis_bytes(segment,payload)
+        analysis_sha256=payload_sha256 if analysis is payload else sha(analysis)
         sid='source_'+sha(canonical({'file_id':source['file_id'],'container_sha256':source['sha256'],'segment':segment['segment_local_id']}))
         segment['source_id']=sid;segment['definitions_count']=len(segment['definitions'])
         for d in segment['definitions']:
@@ -132,17 +136,17 @@ def inspect_one(data,source,home,profile,analyzer,segment_dir=None,job_binding=N
             # executable program. Do not spend or misreport an analyzer attempt.
             segment['hound']={};segment['hound_status']='BLOCKED';segment['hound_reason']='SOURCE_LIMIT'
             return segment
-        key={'job':job_binding,'source':source['sha256'],'source_id':sid,'profile':sha(canonical(profile))}
+        key={'job':job_binding,'source':source['sha256'],'source_id':sid,'profile':profile_sha256}
         if 'analysis_view' in segment:key['analysis_view']=segment['analysis_view']
-        cache=(segment_dir/(sid+'.json')) if segment_dir is not None else None
+        cache=checkpoint_io.resolve(segment_dir/(sid+'.json')) if segment_dir is not None else None
         journal=analysis_recovery.Journal(segment_dir.parent/'analysis_attempts'/sid,key) if segment_dir is not None else None
         if cache is not None and cache.exists():
-            saved=_load_checkpoint(cache,key)
+            loaded=checkpoint_io.load(cache,key);saved=loaded.result
             cached=validate_segment(saved.get('segment'),source,'SEGMENT_CHECKPOINT_BINDING')
-            if cached['source_id']!=sid or cached['source_sha256']!=sha(payload) or canonical(cached.get('analysis_view'))!=canonical(segment.get('analysis_view')):raise Blocked('SEGMENT_CHECKPOINT_BINDING')
+            if cached['source_id']!=sid or cached['source_sha256']!=payload_sha256 or canonical(cached.get('analysis_view'))!=canonical(segment.get('analysis_view')):raise Blocked('SEGMENT_CHECKPOINT_BINDING')
             if saved['segment'].get('hound_status')!='INSPECTED':raise Blocked('SEGMENT_CHECKPOINT_STATUS')
-            if 'analysis_view' in segment and (cached.get('hound',{}).get('source_sha256')!=sha(analysis) or cached.get('hound',{}).get('source_id')!=sid):raise Blocked('SEGMENT_CHECKPOINT_BINDING')
-            if journal is not None:journal.cached_success(sha(canonical(saved)))
+            if 'analysis_view' in segment and (cached.get('hound',{}).get('source_sha256')!=analysis_sha256 or cached.get('hound',{}).get('source_id')!=sid):raise Blocked('SEGMENT_CHECKPOINT_BINDING')
+            if journal is not None:journal.cached_success(loaded.result_sha256)
             return saved['segment']
         if journal is not None and not journal.begin():
             segment['hound']={};segment['hound_status']='BLOCKED'
@@ -150,7 +154,7 @@ def inspect_one(data,source,home,profile,analyzer,segment_dir=None,job_binding=N
             return segment
         try:
             observed=analyzer.scan(analysis,sid,profile)
-            if observed.get('source_sha256')!=sha(analysis) or observed.get('source_id')!=sid or observed.get('upstream_code_executed') is not False:raise Blocked('HOUND_BINDING')
+            if observed.get('source_sha256')!=analysis_sha256 or observed.get('source_id')!=sid or observed.get('upstream_code_executed') is not False:raise Blocked('HOUND_BINDING')
             segment['hound']=observed;segment['hound_status']='INSPECTED'
         except Exception as e:
             reason=str(e) if isinstance(e,Blocked) else type(e).__name__
@@ -158,8 +162,9 @@ def inspect_one(data,source,home,profile,analyzer,segment_dir=None,job_binding=N
             if journal is not None:journal.finish('FAILED',reason)
         if cache is not None and segment['hound_status']=='INSPECTED':
             saved={'segment':segment,'upstream_code_executed':False}
-            write(cache,canonical({'binding':key,'result_sha256':sha(canonical(saved)),'result':saved}),new=True)
-            if journal is not None:journal.finish('SUCCEEDED',result_sha256=sha(canonical(saved)))
+            encoded=checkpoint_io.encode_result(saved)
+            checkpoint_io.write_checkpoint(cache,key,encoded,new=True)
+            if journal is not None:journal.finish('SUCCEEDED',result_sha256=encoded.sha256)
         return segment
     # Two ordinary subprocess-backed parser slots; no independent AI inference.
     from concurrent.futures import ThreadPoolExecutor
@@ -170,10 +175,7 @@ def inspect_one(data,source,home,profile,analyzer,segment_dir=None,job_binding=N
     return result
 
 def _load_checkpoint(p,binding):
-    obj=loads(read(p,20_000_000))
-    if not isinstance(obj,dict) or set(obj)!={'binding','result_sha256','result'} or obj['binding']!=binding or sha(canonical(obj['result']))!=obj['result_sha256']:raise Blocked('CORPUS_CHECKPOINT_INVALID')
-    if not isinstance(obj['result'],dict) or obj['result'].get('upstream_code_executed') is not False:raise Blocked('CORPUS_CHECKPOINT_AUTHORITY')
-    return obj['result']
+    return checkpoint_io.load(p,binding).result
 
 def run(workbench,source_root,manifest_file,out,profile=None,max_containers=20,analyzer=None):
     workbench.guard();source_root=safe_path(source_root);out=safe_path(out)
@@ -183,6 +185,7 @@ def run(workbench,source_root,manifest_file,out,profile=None,max_containers=20,a
     integer(max_containers,0,500)
     from .workspace import code_binding
     binding={'schema':SCHEMA,'code':code_binding(),'manifest_sha256':sha(canonical(m)),'source_root':str(source_root),'profile_sha256':sha(canonical(profile))}
+    job_sha256=sha(canonical(binding))
     if not out.exists():out.mkdir(parents=True,mode=0o700);write(out/'binding.json',canonical(binding),new=True)
     elif loads(read(out/'binding.json',2_000_000))!=binding:raise Blocked('CORPUS_BINDING_CHANGED_NEW_RUN_REQUIRED')
     analyzer=analyzer or Analyzer(workbench.home)
@@ -194,48 +197,54 @@ def run(workbench,source_root,manifest_file,out,profile=None,max_containers=20,a
             try:
                 b=read(local,DEFAULTS['max_container_bytes'])
                 if len(b)!=row['size'] or sha(b)!=row['sha256']:raise Blocked('SOURCE_VERSION_MISMATCH')
-                checkpoint=out/'checkpoints'/('source-'+sha(canonical(row))+'.json')
-                cb={'job':sha(canonical(binding)),'source':sha(canonical(row))}
+                row_sha256=sha(canonical(row))
+                checkpoint=checkpoint_io.resolve(out/'checkpoints'/('source-'+row_sha256+'.json'))
+                cb={'job':job_sha256,'source':row_sha256}
                 r=None;retry=False
                 if checkpoint.exists():
-                    r=_load_checkpoint(checkpoint,cb)
+                    loaded=checkpoint_io.load(checkpoint,cb);r=loaded.result
+                    source_metadata_bytes=loaded.result_bytes
                     # Validate typed cache contents independently of checkpoint
                     # hashes. Rehashed missing failures are not successful analysis.
                     validate_result(r,row)
                     cached_segments=r['segments']
                     for segment in cached_segments:
                         sid=segment['source_id']
-                        key={'job':sha(canonical(binding)),'source':row['sha256'],'source_id':sid,'profile':sha(canonical(profile))}
+                        key={'job':job_sha256,'source':row['sha256'],'source_id':sid,'profile':binding['profile_sha256']}
                         if 'analysis_view' in segment:key['analysis_view']=segment['analysis_view']
                         journal=analysis_recovery.Journal(out/'analysis_attempts'/sid,key)
+                        segment_cache=checkpoint_io.resolve(out/'segments'/(sid+'.json'))
                         if segment['hound_status']=='INSPECTED':
                             journal.cached_success(sha(canonical({'segment':segment,'upstream_code_executed':False})))
                             continue
-                        segment_cache=out/'segments'/(sid+'.json')
                         if segment_cache.exists():
                             # Successful segment publication can precede aggregate
                             # publication. Recover its exact cached result, no rerun.
-                            saved=_load_checkpoint(segment_cache,key)
+                            loaded_segment=checkpoint_io.load(segment_cache,key);saved=loaded_segment.result
                             found=validate_segment(saved.get('segment'),row,'RECOVERY_CACHE_DISAGREEMENT')
                             if found.get('source_id')!=sid or found.get('source_sha256')!=segment['source_sha256'] or found.get('hound_status')!='INSPECTED' or canonical(found.get('analysis_view'))!=canonical(segment.get('analysis_view')):raise Blocked('RECOVERY_CACHE_DISAGREEMENT')
                             if 'analysis_view' in segment and found.get('hound',{}).get('source_sha256')!=segment['analysis_view']['analysis_sha256']:raise Blocked('RECOVERY_CACHE_DISAGREEMENT')
-                            journal.cached_success(sha(canonical(saved)));retry=True
+                            journal.cached_success(loaded_segment.result_sha256);retry=True
                         else:
                             if journal.history and journal.history[-1]['state']=='STARTED':journal.finish('FAILED','ATTEMPT_INTERRUPTED')
                             if journal.summary(sid)['retry_eligible']:retry=True
                     if not retry or used>=max_containers:cached+=1
                 if r is None or (retry and used<max_containers):
                     if used>=max_containers:unread.append({'file_id':row['file_id'],'reason':'INVOCATION_BUDGET'});continue
-                    used+=1;fresh=inspect_one(b,row,workbench.home,profile,analyzer,out/'segments',sha(canonical(binding)))
+                    used+=1;fresh=inspect_one(b,row,workbench.home,profile,analyzer,out/'segments',job_sha256)
                     if sha(read(local,DEFAULTS['max_container_bytes']))!=row['sha256']:raise Blocked('SOURCE_CHANGED_DURING_READ')
                     if r is not None:
-                        previous=read(checkpoint,20_000_000);history=out/'recovery_history'/(sha(previous)+'.json')
+                        previous=read(checkpoint,checkpoint_io.MAX_CHECKPOINT_BYTES)
+                        extension='.json.gz' if checkpoint.name.endswith('.json.gz') else '.json'
+                        history=out/'recovery_history'/(sha(previous)+extension)
                         if history.exists():
-                            if read(history,20_000_000)!=previous:raise Blocked('RECOVERY_HISTORY_CHANGED')
+                            if read(history,checkpoint_io.MAX_CHECKPOINT_BYTES)!=previous:raise Blocked('RECOVERY_HISTORY_CHANGED')
                         else:write(history,previous,new=True)
                     r=fresh
-                    write(checkpoint,canonical({'binding':cb,'result_sha256':sha(canonical(r)),'result':r}),new=not checkpoint.exists())
-                source_metadata_bytes=len(canonical(r))
+                    encoded=checkpoint_io.encode_result(r)
+                    checkpoint_io.write_checkpoint(checkpoint,cb,encoded,new=not checkpoint.exists())
+                    source_metadata_bytes=encoded.byte_count
+                    del encoded
                 if metadata_bytes+source_metadata_bytes>MAX_REPORT_SOURCE_BYTES:
                     blocked.append({'file_id':row['file_id'],'reason':'CORPUS_METADATA_BUDGET'})
                     unread.extend({'file_id':remaining['file_id'],'reason':'CORPUS_METADATA_BUDGET'}

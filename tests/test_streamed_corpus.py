@@ -1,4 +1,5 @@
 """Publication identity, interrupted writes and aggregate metadata admission."""
+from checkpoint_helpers import cache_files
 import gzip
 import html
 import subprocess
@@ -149,7 +150,7 @@ class CorpusPublicationTests(unittest.TestCase):
         self.assertFalse(report['coverage']['definitions']['discovery_complete'])
         self.assertEqual(report['coverage']['blocked'][0]['reason'], 'CORPUS_METADATA_BUDGET')
         self.assertEqual(self.a.calls, calls)
-        self.assertEqual(len(list((self.out / 'checkpoints').glob('*.json'))), 2)
+        self.assertEqual(len(list(cache_files(self.out / 'checkpoints'))), 2)
         self.assertEqual(corpus.read_report(self.out), report)
 
     def test_metadata_budget_marks_remaining_containers_unread(self):
@@ -162,7 +163,7 @@ class CorpusPublicationTests(unittest.TestCase):
         self.assertEqual(len(report['coverage']['unread']), 2)
         self.assertEqual(report['cache']['new_containers'], 1)
         self.assertEqual(report['summary']['definitions'], 0)
-        self.assertEqual(len(list((self.out / 'checkpoints').glob('*.json'))), 1)
+        self.assertEqual(len(list(cache_files(self.out / 'checkpoints'))), 1)
 
     def test_report_limit_failure_never_publishes_success_receipt(self):
         with patch.object(corpus, 'REPORT_READ_LIMIT', 1):
@@ -170,7 +171,7 @@ class CorpusPublicationTests(unittest.TestCase):
                 self.runit()
         self.assertFalse((self.out / 'corpus.json').exists())
         self.assertFalse((self.out / 'receipt.json').exists())
-        self.assertEqual(len(list((self.out / 'checkpoints').glob('*.json'))), 2)
+        self.assertEqual(len(list(cache_files(self.out / 'checkpoints'))), 2)
 
 
     def test_large_gap_section_streams_exact_escaped_json(self):
@@ -206,7 +207,7 @@ class CorpusPublicationTests(unittest.TestCase):
         self.assertTrue((self.out / 'capabilities.ndjson.gz').exists())
         self.assertFalse((self.out / 'Review.html').exists())
         self.assertFalse((self.out / 'receipt.json').exists())
-        self.assertEqual(len(list((self.out / 'checkpoints').glob('*.json'))), 2)
+        self.assertEqual(len(list(cache_files(self.out / 'checkpoints'))), 2)
         count = self.a.calls
         with patch.object(corpus, '_parser', side_effect=AssertionError('Unnecessary reparse')):
             report = self.runit(max_containers=0)

@@ -1,4 +1,5 @@
 """Frozen recovery contract: deterministic faults; target source is never executed."""
+from checkpoint_helpers import cache_files
 import copy,json,tempfile,threading,unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -70,12 +71,13 @@ class RecoveryTests(unittest.TestCase):
         self.runit();p=json.loads((corpus.ROOT/'templates/corpus_profile.json').read_text());p['id']='new'
         with self.assertRaises(Blocked):self.runit(profile=p)
     def test_corrupted_container_never_used_to_retry(self):
-        self.runit();n=len(self.p.calls);cp=next((self.out/'checkpoints').glob('*.json'));cp.write_bytes(b'{}')
+        self.runit();n=len(self.p.calls);cp=next(cache_files(self.out/'checkpoints'));cp.write_bytes(b'{}')
         r=self.runit();self.assertEqual(r['status'],'INCOMPLETE');self.assertEqual(len(self.p.calls),n)
     def test_success_cache_bytes_preserved(self):
-        self.runit();old={p.name:p.read_bytes() for p in (self.out/'segments').glob('*.json')};self.runit()
+        self.runit();old={p.name:p.read_bytes() for p in cache_files(self.out/'segments')};self.runit()
+        self.assertEqual(len(old),1)
         for n,b in old.items():self.assertEqual((self.out/'segments'/n).read_bytes(),b)
-        self.assertEqual(len(list((self.out/'segments').glob('*.json'))),2)
+        self.assertEqual(len(list(cache_files(self.out/'segments'))),2)
     def test_cached_success_no_new_work(self):
         self.p=Probe(0);self.runit();n=len(self.p.calls);r=self.runit()
         self.assertEqual(n,len(self.p.calls));self.assertEqual(r['status'],'COMPLETED_FOR_SELECTED_CONTAINERS')
@@ -106,8 +108,8 @@ class RecoveryTests(unittest.TestCase):
         self.assertNotIn(A.decode(),text);self.assertNotIn(A.hex(),text)
         self.assertFalse(r['upstream_code_executed']);self.assertFalse(r['release_approved'])
     def test_old_failed_checkpoint_preserved_as_revision(self):
-        self.runit();old=next((self.out/'checkpoints').glob('*.json')).read_bytes();self.runit()
-        history=list((self.out/'recovery_history').glob('*.json'))
+        self.runit();old=next(cache_files(self.out/'checkpoints')).read_bytes();self.runit()
+        history=list(cache_files(self.out/'recovery_history'))
         self.assertTrue(history);self.assertIn(old,[p.read_bytes() for p in history])
     def test_io_failure_is_retryable(self):
         self.p=Probe(1,'TOOL_IO_FAILED');self.runit();r=self.runit();self.assertEqual(r['summary']['hound_segments'],2)
