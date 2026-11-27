@@ -37,6 +37,19 @@ def _class_terms(record):
     # A missing older declaration does not become reconstructed documentation.
     return sorted(context.get('terms',{}))
 
+
+def _bound_direct_text(record,metadata):
+    """New ranking evidence requires the retained bytes and exact source location."""
+    if any(record.get(k)!=metadata.get(k) or k not in metadata
+           for k in ('name','path','start_line','end_line')):
+        return False
+    window=metadata.get('source_window') or {}
+    expected=(metadata['source_sha256'] if metadata['record_kind']=='source_scope' else
+              window.get('sha256') if window.get('status')=='AVAILABLE' and window.get('complete') is True else None)
+    return (expected is not None and record.get('text_complete') is True
+            and record.get('text_sha256')==expected and isinstance(record.get('text'),str)
+            and sha(record['text'].encode('utf-8'))==expected)
+
 def verify_base(root):
     """Verify the FORGE engine this runner drives (by default, the enclosing repository).
 
@@ -257,13 +270,18 @@ class Lexical:
     def __init__(self,records):
         self.rows=records;self.db=sqlite3.connect(':memory:')
         self.db.execute('CREATE VIRTUAL TABLE docs USING fts5(symbol,classdoc,source)')
+        self.db.execute("CREATE VIRTUAL TABLE vocabulary USING fts5vocab(docs, 'row')")
         self.wordsets=[];self.symbolsets=[]
         for i,r in enumerate(records,1):
             fs=[' '.join(terms(r['name'])),' '.join(_class_terms(r)),' '.join(terms(r['text']))]
             self.wordsets.append(set(' '.join(fs).split()));self.symbolsets.append(set(fs[0].split()))
             self.db.execute('INSERT INTO docs(rowid,symbol,classdoc,source) VALUES(?,?,?,?)',(i,*fs))
+    def __contains__(self,word):
+        # Reuse the existing FTS index for bounded spelling membership checks;
+        # do not copy the complete source vocabulary into another Python set.
+        return self.db.execute('SELECT 1 FROM vocabulary WHERE term=? LIMIT 1',(word,)).fetchone() is not None
     def close(self):self.db.close()
-    def search(self,query,limit=10,expansion=None,symbol_expansion=None):
+    def search(self,query,limit=10,expansion=None,symbol_expansion=None,direct=False,row_expansions=None):
         qt=set(terms(query))
         if not qt:return []
         expansion=expansion or {t:[t] for t in qt}
@@ -274,21 +292,29 @@ class Lexical:
         rows=self.db.execute('SELECT rowid,bm25(docs,4,1,1) FROM docs WHERE docs MATCH ?',(expression,)).fetchall()
         results=[]
         for i,score in rows:
-            r=self.rows[i-1];matched=sorted(t for t,variants in expansion.items() if set(variants) & self.wordsets[i-1]
-                                           or set(symbol_expansion[t]) & self.symbolsets[i-1])
+            r=self.rows[i-1]
+            row_expansion,row_symbols=(row_expansions or {}).get(r['id'],(expansion,symbol_expansion))
+            matched=sorted(t for t,variants in row_expansion.items() if set(variants) & self.wordsets[i-1]
+                           or set(row_symbols[t]) & self.symbolsets[i-1])
             if matched:
-                results.append(project(r,query,matched,expansion,symbol_expansion)|{'lexical_score':score,'exact_symbol':query.strip() in (r['name'],r['name'].split('.')[-1])})
+                results.append(project(r,query,matched,row_expansion,row_symbols,direct)|{'lexical_score':score,'exact_symbol':query.strip() in (r['name'],r['name'].split('.')[-1])})
         results.sort(key=lambda r:(-int(r['exact_symbol']),-len(r['matched_terms']),r['lexical_score'],r['path'],r['start_line']))
         return results[:limit]
 
 
-def project(r,query,matched=None,expansion=None,symbol_expansion=None):
+def project(r,query,matched=None,expansion=None,symbol_expansion=None,direct=False):
     qt=set(terms(query));expansion=expansion or {t:[t] for t in qt}
     symbol_expansion=symbol_expansion or expansion
-    recorded=set(terms(r['name']+' '+r['text'])) | set(_class_terms(r))
+    own=set(terms(r['name']+' '+r['text']))
+    recorded=own | set(_class_terms(r))
     matched=matched if matched is not None else sorted(t for t,variants in expansion.items() if set(variants) & recorded
                                                       or set(symbol_expansion[t]) & set(terms(r['name'])))
     view={'analysis_view':r['analysis_view']} if 'analysis_view' in r else {}
+    if direct:
+        view['direct_matched_terms']=sorted(t for t,variants in expansion.items() if set(variants) & own
+                                           or set(symbol_expansion[t]) & set(terms(r['name'])))
+        if re.fullmatch(r'[A-Za-z_]\w*',query.strip()) and query.strip().casefold()==r['name'].split('.')[-1].casefold():
+            view['literal_symbol_match']=True
     context=r.get('class_documentation_context')
     class_matches=sorted(t for t,variants in expansion.items() if set(variants) & set((context or {}).get('terms',{})))
     if class_matches:
@@ -318,7 +344,8 @@ def investigate(q,source_results,forge_root):
                      if expander else {t:[t] for t in terms(q['query'])})
         symbol_expansion = (expander(set(terms(q['query'])), {t for r in records for t in terms(r['name'])}, retrieval.SYNONYMS)
                             if expander else expansion)
-        required_api=q.get('required_api')
+        inflector=getattr(retrieval,'expand_inflections',None)
+        required_api=q.get('required_api');structured=True;predicate_contexts={};direct_bound=set();modern_ids=set()
         by_id={r['id']:r for r in records}
         lists=[]
         for source in sorted(selected,key=lambda item:item['source']['id']):
@@ -327,6 +354,7 @@ def investigate(q,source_results,forge_root):
             if path:
                 report=corpus.read_report(Path(path).parent)
                 legacy=any(metadata.get('context_status') == 'REINDEX_REQUIRED' for metadata in corpus.all_rows(report))
+                structured=structured and not legacy
                 # API evidence comes from checksum-verified corpus rows, not
                 # declarations supplied by the lexical record. Keep it even
                 # when this query only matches full source text.
@@ -339,6 +367,8 @@ def investigate(q,source_results,forge_root):
                             raise Blocked('BRIDGE_EVIDENCE_BINDING')
                         class_contexts[rid]=_class_documentation(metadata.get('class_context'))
                         observations[rid]=metadata.get('observed_apis',[])
+                        if not legacy:modern_ids.add(rid)
+                        if not legacy and _bound_direct_text(original,metadata):direct_bound.add(rid)
                         if requested and not legacy and metadata.get('implementation_kind') != 'DECLARATION_OR_STUB':
                             if hasattr(directional,'evaluate'):
                                 support,reverse = directional.evaluate(requested, metadata.get('conversion_endpoints', ()))
@@ -349,9 +379,7 @@ def investigate(q,source_results,forge_root):
                             if reverse:
                                 conflicts[rid] = reverse
                         if intention and not legacy and intention.predicate_request(q['query']) and metadata.get('context_status') == 'CAPTURED':
-                            support=intention.predicate_match(q['query'],metadata.get('name',''),metadata.get('implementation_kind'),symbol_expansion)
-                            if support:
-                                predicates[rid]=support
+                            predicate_contexts[rid]=(metadata.get('name',''),metadata.get('implementation_kind'))
                         if returning and not legacy and metadata.get('context_status') == 'CAPTURED':
                             output=returning.compare(requested_output,metadata.get('return_type_declarations'),metadata.get('implementation_kind'))
                             if output:
@@ -366,8 +394,7 @@ def investigate(q,source_results,forge_root):
                 for r in found['results']:
                     original=by_id.get(occurrence_id(r))
                     if original is not None:
-                        source_rows.append(project(dict(original,observed_apis=observations[original['id']]),q['query'],
-                                                   expansion=expansion,symbol_expansion=symbol_expansion))
+                        source_rows.append(dict(original,observed_apis=observations[original['id']]))
             if source_rows:lists.append(source_rows)
         if any(original.get('class_documentation_context') is not None and
                canonical(original['class_documentation_context'])!=canonical(class_contexts.get(original['id']))
@@ -376,9 +403,30 @@ def investigate(q,source_results,forge_root):
         # Both channels apply observed-API eligibility before their top-k cut.
         eligible=[dict(r,observed_apis=observations.get(r['id'],[])) for r in records
                   if not required_api or required_api in observations.get(r['id'],[])]
+        direct=bool(inflector and structured and all(r['id'] in direct_bound for r in records))
+        row_expansions={}
         index=Lexical(eligible)
-        try:lexical=index.search(q['query'],10,expansion,symbol_expansion)
+        try:
+            # Source metadata and retained class-context bindings were checked
+            # before expansion. Exact retained-body binding separately gates
+            # the new direct/literal preferences; older lexical leads remain.
+            if inflector and modern_ids:
+                # A legacy source must not erase valid spelling evidence from
+                # an independently bound current source in the same question.
+                row_expansions={r['id']:(expansion,symbol_expansion) for r in records if r['id'] not in modern_ids}
+                expansion=inflector(expansion,index)
+                symbol_expansion={t:sorted(set(expansion[t]) | set(symbol_expansion[t])) for t in expansion}
+                evidence['query_expansion']=expansion
+                if row_expansions:evidence['query_expansion_scope']='STRUCTURED_CORPUS_RECORDS_ONLY'
+            lexical=index.search(q['query'],10,expansion,symbol_expansion,direct,row_expansions)
         finally:index.close()
+        for rid,(name,kind) in predicate_contexts.items():
+            support=intention.predicate_match(q['query'],name,kind,symbol_expansion)
+            if support:predicates[rid]=support
+        lists=[[project(row,q['query'],expansion=row_expansions.get(row['id'],(expansion,symbol_expansion))[0],
+                        symbol_expansion=row_expansions.get(row['id'],(expansion,symbol_expansion))[1],direct=direct)
+                for row in source_rows] for source_rows in lists]
+        lists=[[row for row in source_rows if row['matched_terms']] for source_rows in lists]
         forgerows=[row for layer in zip_longest(*lists) for row in layer if row is not None][:10]
         # Per-source list order is retained with deterministic round-robin policy;
         # no raw score equivalence across different source indexes is assumed.

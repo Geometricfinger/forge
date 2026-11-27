@@ -57,3 +57,80 @@ def expand_query(query_terms, vocabulary, synonyms=None):
         for part in compound_parts(token, query_terms):
             expansion[part].add(token)
     return {t: sorted(variants) for t, variants in expansion.items()}
+
+
+def _inflection_bases(token):
+    """Possible regular English bases, not a semantic or type-name stemmer."""
+    bases = {token}
+    if len(token) >= 4 and token.endswith(('ies', 'ied')):
+        bases.add(token[:-3] + 'y')
+    if len(token) >= 4 and token.endswith('s') and not token.endswith(('ss', 'us', 'is')):
+        bases.add(token[:-1])
+        if token.endswith(('ches', 'shes', 'ses', 'xes', 'zes')):
+            bases.add(token[:-2])
+    if token.endswith('ying'):
+        bases.add(token[:-4] + 'ie')
+    for ending in ('ing', 'ed'):
+        if token.endswith(ending) and len(token) - len(ending) >= 2:
+            base = token[:-len(ending)]
+            bases.update((base, base + 'e'))
+            if len(base) >= 4 and base[-1] == base[-2] and base[-1] not in 'aeiou':
+                bases.add(base[:-1])
+    return bases
+
+
+def _regular_forms(base):
+    forms = {base, base + 's'}
+    if base.endswith(('s', 'x', 'z', 'ch', 'sh')):
+        forms.add(base + 'es')
+    if base.endswith('y') and base[-2] not in 'aeiou':
+        forms.update((base[:-1] + 'ies', base[:-1] + 'ied', base + 'ing'))
+    elif base.endswith('e'):
+        forms.add(base + 'd')
+        forms.add(base + 'ing' if base.endswith(('ee', 'ye', 'oe')) else base[:-1] + 'ing')
+        if base.endswith('ie'):
+            forms.add(base[:-2] + 'ying')
+    else:
+        doubles = (base[-1] not in 'aeiouwxy' and base[-2] in 'aeiou' and base[-3] not in 'aeiou')
+        # A single vowel group gives the ordinary short CVC pattern: plan ->
+        # planned, not planed. Multisyllable stress and regional spelling are
+        # not inferred; both regular spellings remain possible lexical leads.
+        if not doubles or len(re.findall('[aeiou]+', base)) > 1:
+            forms.update((base + 'ed', base + 'ing'))
+        if doubles:
+            forms.update((base + base[-1] + 'ed', base + base[-1] + 'ing'))
+    return forms
+
+
+def inflection_variants(token):
+    """Bounded spelling alternatives for regular plurals, past and -ing forms.
+
+    Only one suffix is removed. No derivational endings are stripped: alternate
+    and alternative, multiple and multiplication, and iterable and iterator are
+    different words. Ambiguous regular forms remain lexical leads, not meaning.
+    Numbers, short tokens and arbitrary substrings are not expanded.
+    """
+    if not re.fullmatch('[a-z]{3,64}', token):
+        return {token}
+    variants = set()
+    for base in _inflection_bases(token):
+        if len(base) < 3:
+            continue
+        forms = _regular_forms(base)
+        if token in forms:
+            variants.update(forms)
+    return {word for word in variants if len(word) <= 64}
+
+
+def expand_inflections(expansion, vocabulary):
+    """Add only forms actually present in this index, without another index copy.
+
+    Opt-in for lexical retrieval. Declaration endpoint/type equivalence continues
+    to use expand_query's explicit spelling families, never these alternatives.
+    The bounded query drives membership lookups; vocabulary size is not scanned
+    per query and no source bodies or external dictionary are needed.
+    """
+    return {term: sorted(set(variants).union(
+                word for variant in variants for word in inflection_variants(variant)
+                if word in vocabulary))
+            for term, variants in expansion.items()}
