@@ -21,6 +21,10 @@ def _digest(value):
 
 def _path(value):
     path_in_repo(value)
+    try:
+        value.encode('utf-8')
+    except UnicodeError as exc:
+        raise Blocked('QUEST_SOURCE_PATH') from exc
     if not _path_ok(value) or _excluded(value):
         raise Blocked('QUEST_SOURCE_PATH')
     return value

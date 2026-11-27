@@ -148,6 +148,32 @@ class ArchiveQuestTests(unittest.TestCase):
         self.recipe['module_files'] = self.recipe['module_files'][1:]
         self.blocked('QUEST_MODULE_MAPPING_REQUIRED')
 
+    def test_unencodable_asset_paths_refused_before_preparation_or_build(self):
+        for index, surrogate in enumerate(('\ud800', '\udfff')):
+            self.recipe['assets'][-1]['path'] = 'notices/' + surrogate + '.txt'
+            self.recipe_file.write_bytes(canonical(self.recipe))
+            prepared = self.work / ('preparation-' + str(index))
+            code, result = self.cli('quest-prepare', '--quest', self.quest,
+                                    '--recipe', self.recipe_file, '--source-root', self.pool, '--out', prepared)
+            self.assertEqual((code, result['reason']), (2, 'QUEST_SOURCE_PATH'))
+            self.assertFalse(prepared.exists())
+            self.blocked('QUEST_SOURCE_PATH')
+
+    def test_valid_unicode_asset_destination_prepares_and_preserves_bytes(self):
+        destination = 'notices/caf\u00e9-\U0001f680.txt'
+        self.recipe['assets'][-1]['path'] = destination
+        self.recipe_file.write_bytes(canonical(self.recipe))
+        prepared = self.work / 'preparation'
+        code, result = self.cli('quest-prepare', '--quest', self.quest,
+                                '--recipe', self.recipe_file, '--source-root', self.pool, '--out', prepared)
+        self.assertEqual(code, 0, result)
+        code, result = self.cli('quest-build', '--quest', self.quest,
+                                '--recipe', prepared / 'recipe.prepared.json', '--entry', self.entry,
+                                '--source-root', self.pool, '--out', self.out)
+        self.assertEqual(code, 0, result)
+        with ZipFile(self.out / 'product.pyz') as archive:
+            self.assertEqual(archive.read(destination), self.files['release-1.0/LICENSE'])
+
     def test_nfkc_collision_reaches_preflight_after_path_validation(self):
         normal, distinct = 'K.py', '\U0001d542.py'
         self.assertNotEqual(normal.casefold(), distinct.casefold())

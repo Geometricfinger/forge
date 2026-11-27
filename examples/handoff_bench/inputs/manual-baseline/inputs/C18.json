@@ -1,0 +1,34 @@
+{
+  "case_id": "C18",
+  "max_cost": 10,
+  "questions": [
+    {
+      "available": true,
+      "cost": 1,
+      "id": "qx",
+      "label": "Synthetic evidence request qx"
+    }
+  ],
+  "schema": 1,
+  "worlds": [
+    {
+      "answers": {
+        "qx": "0"
+      },
+      "decision": "A",
+      "id": "w1"
+    },
+    {
+      "answers": {
+        "qx": "1"
+      },
+      "decision": "B",
+      "id": "w2"
+    },
+    {
+      "answers": {},
+      "decision": "C",
+      "id": "w3"
+    }
+  ]
+}

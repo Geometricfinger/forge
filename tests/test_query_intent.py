@@ -10,6 +10,31 @@ class QueryIntentTests(unittest.TestCase):
     def search(self, source, query):
         return corpus.search(report_from([('fixture.py', source)]), query)
 
+    def test_negative_request_forms_warn_without_claiming_enforcement(self):
+        source = 'def transform(value):\n    """Convert bronze to glass."""\n    return value\n'
+        warning = 'NATURAL_LANGUAGE_NEGATION_NOT_ENFORCED_USE_EXPLICIT_REQUIREMENTS'
+        for prefix in ('do not', "don't", 'don\u2019t', 'cannot', 'never', 'avoid',
+                       'avoiding', 'avoided', 'exclude', 'excludes', 'excluded',
+                       'excluding', 'without', 'no'):
+            query = prefix + ' convert bronze to glass'
+            with self.subTest(query=query):
+                result = self.search(source, query)
+                self.assertIn(warning, result['warnings'])
+                self.assertEqual(result['results'][0]['name'], 'transform')
+                self.assertEqual(result['runtime_validation'], 'NOT_RUN')
+                self.assertFalse(result['release_approved'])
+        for query in ('convert bronze except glass', 'convert bronze unless glass'):
+            with self.subTest(query=query):
+                self.assertIn(warning, self.search(source, query)['warnings'])
+
+    def test_negative_cues_do_not_match_positive_word_fragments(self):
+        source = 'def summarize(value):\n    """Catalog notable exceptions and exclusions."""\n    return value\n'
+        warning = 'NATURAL_LANGUAGE_NEGATION_NOT_ENFORCED_USE_EXPLICIT_REQUIREMENTS'
+        for query in ('notable catalog', 'exceptions exclusions', 'convert bronze to glass',
+                      'True False None'):
+            with self.subTest(query=query):
+                self.assertNotIn(warning, self.search(source, query)['warnings'])
+
     def test_python_literals_are_retrievable_documentation_terms(self):
         source = ('def optional(x):\n    """Preserve None."""\n    return x\n'
                   'def affirmative(x):\n    """Return True."""\n    return x\n'

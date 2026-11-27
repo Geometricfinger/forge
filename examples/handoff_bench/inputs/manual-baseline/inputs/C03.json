@@ -1,0 +1,29 @@
+{
+  "case_id": "C03",
+  "max_cost": 3,
+  "questions": [
+    {
+      "available": true,
+      "cost": 3,
+      "id": "receipt",
+      "label": "Synthetic evidence request receipt"
+    }
+  ],
+  "schema": 1,
+  "worlds": [
+    {
+      "answers": {
+        "receipt": "absent"
+      },
+      "decision": "HOLD",
+      "id": "w1"
+    },
+    {
+      "answers": {
+        "receipt": "present"
+      },
+      "decision": "REVIEW",
+      "id": "w2"
+    }
+  ]
+}

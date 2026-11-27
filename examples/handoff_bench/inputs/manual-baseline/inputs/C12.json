@@ -1,0 +1,37 @@
+{
+  "case_id": "C12",
+  "max_cost": 0,
+  "questions": [
+    {
+      "available": true,
+      "cost": 0,
+      "id": "free",
+      "label": "Synthetic evidence request free"
+    },
+    {
+      "available": true,
+      "cost": 2,
+      "id": "paid",
+      "label": "Synthetic evidence request paid"
+    }
+  ],
+  "schema": 1,
+  "worlds": [
+    {
+      "answers": {
+        "free": "0",
+        "paid": "0"
+      },
+      "decision": "A",
+      "id": "w1"
+    },
+    {
+      "answers": {
+        "free": "1",
+        "paid": "1"
+      },
+      "decision": "B",
+      "id": "w2"
+    }
+  ]
+}

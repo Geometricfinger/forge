@@ -1,0 +1,96 @@
+{
+  "budget": 3,
+  "burden_events": [
+    {
+      "actor": "human",
+      "id": "acq_human",
+      "measurement": "unknown",
+      "source": "Synthetic fixture: one declared required task; human actions and elapsed time were not observed.",
+      "stage": "acquisition",
+      "step_count": 1,
+      "wall_time_ns": null
+    },
+    {
+      "actor": "human",
+      "id": "interpret_human",
+      "measurement": "unknown",
+      "source": "Synthetic fixture: one declared required task; human actions and elapsed time were not observed.",
+      "stage": "interpretation",
+      "step_count": 1,
+      "wall_time_ns": null
+    },
+    {
+      "actor": "human",
+      "id": "model_human",
+      "measurement": "unknown",
+      "source": "Synthetic fixture: one declared required task; human actions and elapsed time were not observed.",
+      "stage": "model_preparation",
+      "step_count": 1,
+      "wall_time_ns": null
+    }
+  ],
+  "case_id": "H04",
+  "follow_up": [],
+  "questions": [
+    {
+      "available": true,
+      "cost": 3,
+      "id": "receipt",
+      "label": "Request the declared administrative evidence",
+      "source": "Synthetic reviewer-supplied question catalog; no question has been sent."
+    }
+  ],
+  "raw_artifacts": [
+    {
+      "bytes": 397,
+      "id": "native_manifest",
+      "kind": "native_package_manifest",
+      "path": "artifacts/h04-manifest.json",
+      "provenance": "synthetic",
+      "selection": {},
+      "sha256": "5426ea916e32cd348a7fce3c4f48f0925906e33ce5c9193c9fd42ea4b4d1a08e"
+    },
+    {
+      "bytes": 129,
+      "id": "scan_fixture",
+      "kind": "scan_stl",
+      "path": "artifacts/h04-Completed.stl",
+      "provenance": "synthetic",
+      "selection": {},
+      "sha256": "38cc943bfac1811ee2c540b57a8372fa3ad5c3fbf56b89b5e33e103a3d612d44"
+    },
+    {
+      "bytes": 61,
+      "id": "review_note",
+      "kind": "reviewer_note",
+      "path": "artifacts/h04-review.txt",
+      "provenance": "synthetic",
+      "selection": {},
+      "sha256": "a28d93f9cb8b3760d18218d9299758f7b314d58c4043cd413eee4ac578d087e2"
+    }
+  ],
+  "reviewer_decisions": [
+    {
+      "answers": {
+        "receipt": "present"
+      },
+      "conditions": {
+        "order_or_case": "present"
+      },
+      "decision": "REVIEW_EXPORT",
+      "id": "positive"
+    },
+    {
+      "answers": {
+        "receipt": "absent"
+      },
+      "conditions": {
+        "order_or_case": "absent"
+      },
+      "decision": "REQUEST_REVIEW",
+      "id": "negative"
+    }
+  ],
+  "schema": 1,
+  "source": "3shape_native"
+}

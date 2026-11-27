@@ -1,0 +1,37 @@
+{
+  "case_id": "C06",
+  "max_cost": 4,
+  "questions": [
+    {
+      "available": true,
+      "cost": 2,
+      "id": "qa",
+      "label": "Synthetic evidence request qa"
+    },
+    {
+      "available": true,
+      "cost": 2,
+      "id": "qb",
+      "label": "Synthetic evidence request qb"
+    }
+  ],
+  "schema": 1,
+  "worlds": [
+    {
+      "answers": {
+        "qa": "0",
+        "qb": "old"
+      },
+      "decision": "A",
+      "id": "w1"
+    },
+    {
+      "answers": {
+        "qa": "1",
+        "qb": "new"
+      },
+      "decision": "B",
+      "id": "w2"
+    }
+  ]
+}

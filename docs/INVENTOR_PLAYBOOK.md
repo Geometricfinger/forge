@@ -58,6 +58,13 @@ python3 forge.py --home "$WORK/home" quest-start --run-id parts --out "$WORK/sco
 
 Read the leads in `quest.json`. Idea mode searches the index. Scout mode samples up to 40 definitions across eligible modules. A builder can search the same corpus for additional definitions and inspect the original modules, imports and dependencies. Choose a user, a purpose, and at least one observable acceptance check. Copy `recipe.template.json` to `recipe.json`, fill those fields, and put the selected definition IDs in `components`. Each selected definition brings its **whole module** into the product. Plain Python files keep their original import paths by default; `support_modules` selects indexed dependencies and package initializers at those paths. For archived modules, explicit path mappings, resources and notices, use the recipe fields below.
 
+Use `quest-prepare` with that reviewed recipe to add required original indexed
+package initializers and inspect selected-source preflight before writing the
+entry point. It retains unresolved dependency, resource and rights review, and
+changes no business expectations. See [recipe preparation](QUEST_PREPARATION.md)
+for its commands, exact-byte bindings and limitations. Direct `quest-build`
+remains available when every selection is already explicit.
+
 Write `main.py` to connect the selected code. Keep a separate acceptance check with expected results, including what should happen on bad input. The example below uses the files-first quest.
 
 ```sh
@@ -172,7 +179,8 @@ line endings, resources and selected notices are preserved. The optional
 and member chain; module origins separately label the normalized analysis hash.
 
 Select the original package initializers explicitly and map them to their
-corresponding destination packages. An unrelated initializer cannot substitute
+corresponding destination packages, or use `quest-prepare` to add those original
+indexed mappings from the selected package paths. An unrelated initializer cannot substitute
 for the one belonging to a selected module. Output paths must be unambiguous:
 file/directory overlaps, case-folded duplicate paths and module/package collisions
 are refused. Python and native importable files cannot be supplied as opaque

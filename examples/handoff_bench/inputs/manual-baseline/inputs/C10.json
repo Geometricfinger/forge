@@ -1,0 +1,27 @@
+{
+  "case_id": "C10",
+  "max_cost": 10,
+  "questions": [
+    {
+      "available": true,
+      "cost": 1,
+      "id": "receipt",
+      "label": "Synthetic evidence request receipt"
+    }
+  ],
+  "schema": 1,
+  "worlds": [
+    {
+      "answers": {
+        "receipt": "present"
+      },
+      "decision": "A",
+      "id": "w1"
+    },
+    {
+      "answers": {},
+      "decision": "B",
+      "id": "w2"
+    }
+  ]
+}

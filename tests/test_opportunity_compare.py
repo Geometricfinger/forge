@@ -7,7 +7,9 @@ import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
+from unittest import mock
 
+from forge_core import opportunities
 from forge_core.common import Blocked
 from forge_core.opportunities import OpportunityStore
 from forge_core.opportunity_examples import cite, example_bundle, source
@@ -185,15 +187,27 @@ class OpportunityComparisonTests(unittest.TestCase):
     def test_cli_reads_existing_run_id_without_rewriting_either_run(self):
         store = OpportunityStore(initialize(self.home))
         # This fixture's ID was captured before the comparison command existed.
+        # Retain that historical identity explicitly, then compare it under the
+        # current algorithm. No source corpus is part of this synthetic fixture.
         original_id = 'opp_3586a50ea9e12411df39c87cecb5a56a62e09e7af5220151904907b350982b1f'
-        self.assertEqual(store.run(example_bundle())['id'], original_id)
-        updated_id = store.run(annotated('Check the label.', 'label'))['id']
+        historical_version = 'opportunity-1.1-inventor-audit'
+        current_version = opportunities.VERSION
+        with mock.patch.object(opportunities, 'VERSION', historical_version):
+            original = store.run(example_bundle())
+        self.assertEqual(original['id'], original_id)
+        self.assertEqual(original['version'], historical_version)
+        self.assertEqual(opportunities.VERSION, current_version)
+        self.assertNotEqual(opportunities.evaluate(example_bundle())['id'], original_id)
+        updated = store.run(annotated('Check the label.', 'label'))
+        updated_id = updated['id']
+        self.assertEqual(updated['version'], current_version)
         saved = snapshot(store.root)
         expected = store.compare(original_id, updated_id)
         result = self.cli(original_id, updated_id)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(json.loads(result.stdout), expected)
         self.assertEqual(snapshot(store.root), saved)
+        self.assertEqual(store.get(original_id)['version'], historical_version)
 
     def test_cli_with_missing_home_leaves_no_new_workspace(self):
         unknown_id = 'opp_' + '0' * 64

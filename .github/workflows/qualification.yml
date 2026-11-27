@@ -89,6 +89,9 @@ jobs:
       - name: Full qualification (verify.py)
         run: python3 verify.py --out "$EVIDENCE/qualification" > "$EVIDENCE/verify-stdout.json" 2> "$EVIDENCE/verify-stderr.log"
 
+      - name: Reviewed handoff bench and verifier controls (Linux)
+        run: python3 examples/handoff_bench/qualify.py --out "$EVIDENCE/handoff-bench" > "$EVIDENCE/handoff-bench-stdout.json" 2> "$EVIDENCE/handoff-bench-stderr.log"
+
       - name: Research runner tests
         working-directory: runner
         run: python3 run_tests.py > "$EVIDENCE/runner-tests.log" 2>&1

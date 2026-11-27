@@ -1,0 +1,36 @@
+{
+  "case_id": "C11",
+  "max_cost": 5,
+  "questions": [
+    {
+      "available": true,
+      "cost": 1,
+      "id": "incomplete",
+      "label": "Synthetic evidence request incomplete"
+    },
+    {
+      "available": true,
+      "cost": 4,
+      "id": "evidence",
+      "label": "Synthetic evidence request evidence"
+    }
+  ],
+  "schema": 1,
+  "worlds": [
+    {
+      "answers": {
+        "evidence": "old",
+        "incomplete": "0"
+      },
+      "decision": "A",
+      "id": "w1"
+    },
+    {
+      "answers": {
+        "evidence": "new"
+      },
+      "decision": "B",
+      "id": "w2"
+    }
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "case_id": "C19",
+  "max_cost": 5,
+  "questions": [
+    {
+      "available": true,
+      "cost": 3,
+      "id": "zeta",
+      "label": "Synthetic evidence request zeta"
+    },
+    {
+      "available": true,
+      "cost": 2,
+      "id": "alpha",
+      "label": "Synthetic evidence request alpha"
+    }
+  ],
+  "schema": 1,
+  "worlds": [
+    {
+      "answers": {
+        "alpha": "0",
+        "zeta": "1"
+      },
+      "decision": "C",
+      "id": "M4"
+    },
+    {
+      "answers": {
+        "alpha": "0",
+        "zeta": "0"
+      },
+      "decision": "A",
+      "id": "N9"
+    },
+    {
+      "answers": {
+        "alpha": "1",
+        "zeta": "0"
+      },
+      "decision": "B",
+      "id": "A1"
+    }
+  ]
+}

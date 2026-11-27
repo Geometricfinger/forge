@@ -1,0 +1,37 @@
+{
+  "case_id": "C13",
+  "max_cost": 2,
+  "questions": [
+    {
+      "available": true,
+      "cost": 0,
+      "id": "noise",
+      "label": "Synthetic evidence request noise"
+    },
+    {
+      "available": true,
+      "cost": 2,
+      "id": "separator",
+      "label": "Synthetic evidence request separator"
+    }
+  ],
+  "schema": 1,
+  "worlds": [
+    {
+      "answers": {
+        "noise": "same",
+        "separator": "0"
+      },
+      "decision": "A",
+      "id": "w1"
+    },
+    {
+      "answers": {
+        "noise": "same",
+        "separator": "1"
+      },
+      "decision": "B",
+      "id": "w2"
+    }
+  ]
+}

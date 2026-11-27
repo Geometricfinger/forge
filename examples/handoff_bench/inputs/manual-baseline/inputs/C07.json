@@ -1,0 +1,45 @@
+{
+  "case_id": "C07",
+  "max_cost": 2,
+  "questions": [
+    {
+      "available": true,
+      "cost": 2,
+      "id": "flag",
+      "label": "Synthetic evidence request flag"
+    },
+    {
+      "available": true,
+      "cost": 0,
+      "id": "detail",
+      "label": "Synthetic evidence request detail"
+    }
+  ],
+  "schema": 1,
+  "worlds": [
+    {
+      "answers": {
+        "detail": "0",
+        "flag": "0"
+      },
+      "decision": "A",
+      "id": "w1"
+    },
+    {
+      "answers": {
+        "detail": "1",
+        "flag": "0"
+      },
+      "decision": "A",
+      "id": "w2"
+    },
+    {
+      "answers": {
+        "detail": "0",
+        "flag": "1"
+      },
+      "decision": "B",
+      "id": "w3"
+    }
+  ]
+}

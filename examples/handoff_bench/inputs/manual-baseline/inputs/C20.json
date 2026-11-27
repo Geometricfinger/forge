@@ -1,0 +1,54 @@
+{
+  "case_id": "C20",
+  "max_cost": 2,
+  "questions": [
+    {
+      "available": true,
+      "cost": 1,
+      "id": "qa",
+      "label": "Synthetic evidence request qa"
+    },
+    {
+      "available": true,
+      "cost": 1,
+      "id": "qb",
+      "label": "Synthetic evidence request qb"
+    },
+    {
+      "available": true,
+      "cost": 2,
+      "id": "whole",
+      "label": "Synthetic evidence request whole"
+    }
+  ],
+  "schema": 1,
+  "worlds": [
+    {
+      "answers": {
+        "qa": "0",
+        "qb": "0",
+        "whole": "A"
+      },
+      "decision": "A",
+      "id": "w1"
+    },
+    {
+      "answers": {
+        "qa": "1",
+        "qb": "0",
+        "whole": "B"
+      },
+      "decision": "B",
+      "id": "w2"
+    },
+    {
+      "answers": {
+        "qa": "0",
+        "qb": "1",
+        "whole": "C"
+      },
+      "decision": "C",
+      "id": "w3"
+    }
+  ]
+}

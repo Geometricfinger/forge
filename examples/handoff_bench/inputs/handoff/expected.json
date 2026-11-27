@@ -1,0 +1,720 @@
+{
+  "baseline_kind": "independent_agent_hand_labeled_synthetic_handoff_contract",
+  "cases": [
+    {
+      "case_id": "H01",
+      "expected": {
+        "plan": {
+          "case_id": "H01",
+          "comparison": {
+            "export_plus_planner": {
+              "candidate_ids": [
+                "positive"
+              ],
+              "decision": "REVIEW_EXPORT",
+              "recorded_questions_asked": 0,
+              "status": "RESOLVED",
+              "synthetic_questions_asked": 0,
+              "unresolved_count": 0
+            },
+            "export_reconciliation": {
+              "candidate_ids": [
+                "positive"
+              ],
+              "decision": "REVIEW_EXPORT",
+              "recorded_questions_asked": 0,
+              "status": "RESOLVED",
+              "synthetic_questions_asked": 0,
+              "unresolved_count": 0
+            },
+            "manual_model": {
+              "candidate_ids": [
+                "negative",
+                "positive"
+              ],
+              "decision": null,
+              "recorded_questions_asked": 0,
+              "status": "UNRESOLVED",
+              "synthetic_questions_asked": 0,
+              "unresolved_count": 1
+            }
+          },
+          "extraction": {
+            "fields": {
+              "status": {
+                "status": "KNOWN",
+                "value": "Completed"
+              }
+            }
+          },
+          "manual_model_input": {
+            "cases": [
+              {
+                "case_id": "H01",
+                "max_cost": 4,
+                "questions": [
+                  {
+                    "available": true,
+                    "cost": 4,
+                    "id": "receipt",
+                    "label": "Request the declared administrative evidence"
+                  }
+                ],
+                "schema": 1,
+                "worlds": [
+                  {
+                    "answers": {
+                      "receipt": "Completed"
+                    },
+                    "decision": "REVIEW_EXPORT",
+                    "id": "positive"
+                  },
+                  {
+                    "answers": {
+                      "receipt": "Pending"
+                    },
+                    "decision": "REQUEST_REVIEW",
+                    "id": "negative"
+                  }
+                ]
+              }
+            ],
+            "schema": 1
+          },
+          "manual_planner_result": {
+            "case_id": "H01",
+            "indistinguishable_pairs": [],
+            "minimum_cost": 4,
+            "minimum_question_count": 1,
+            "omitted_optimal_plan_count": 0,
+            "optimal_plan_count": 1,
+            "optimal_question_sets": [
+              [
+                "receipt"
+              ]
+            ],
+            "status": "QUESTIONS_FOR_REVIEW"
+          },
+          "model_input": {
+            "cases": [
+              {
+                "case_id": "H01",
+                "max_cost": 4,
+                "questions": [
+                  {
+                    "available": true,
+                    "cost": 4,
+                    "id": "receipt",
+                    "label": "Request the declared administrative evidence"
+                  }
+                ],
+                "schema": 1,
+                "worlds": [
+                  {
+                    "answers": {
+                      "receipt": "Completed"
+                    },
+                    "decision": "REVIEW_EXPORT",
+                    "id": "positive"
+                  }
+                ]
+              }
+            ],
+            "schema": 1
+          },
+          "planner_result": {
+            "case_id": "H01",
+            "indistinguishable_pairs": [],
+            "minimum_cost": 0,
+            "minimum_question_count": 0,
+            "omitted_optimal_plan_count": 0,
+            "optimal_plan_count": 1,
+            "optimal_question_sets": [
+              []
+            ],
+            "status": "NO_QUESTION_NEEDED"
+          },
+          "source": "medit_export"
+        }
+      },
+      "fixture": "handoff-001.json",
+      "rationale": "The documented Status item is known Completed. It contradicts only the supplied negative history's Pending condition. The remaining positive history requires REVIEW_EXPORT, so the unchanged planner needs zero questions. The manual counterfactual retains two decisions and needs the sole cost-four question. No actual question was asked.",
+      "source": "medit_export",
+      "synthetic_truth": {
+        "decision": "REVIEW_EXPORT",
+        "world_id": "positive"
+      }
+    },
+    {
+      "case_id": "H02",
+      "expected": {
+        "plan": {
+          "case_id": "H02",
+          "comparison": {
+            "export_plus_planner": {
+              "candidate_ids": [
+                "negative",
+                "positive"
+              ],
+              "decision": null,
+              "recorded_questions_asked": 0,
+              "status": "UNRESOLVED",
+              "synthetic_questions_asked": 0,
+              "unresolved_count": 1
+            },
+            "export_reconciliation": {
+              "candidate_ids": [
+                "negative",
+                "positive"
+              ],
+              "decision": null,
+              "recorded_questions_asked": 0,
+              "status": "UNRESOLVED",
+              "synthetic_questions_asked": 0,
+              "unresolved_count": 1
+            },
+            "manual_model": {
+              "candidate_ids": [
+                "negative",
+                "positive"
+              ],
+              "decision": null,
+              "recorded_questions_asked": 0,
+              "status": "UNRESOLVED",
+              "synthetic_questions_asked": 0,
+              "unresolved_count": 1
+            }
+          },
+          "extraction": {
+            "fields": {
+              "implant_identity": {
+                "status": "UNKNOWN",
+                "value": null
+              },
+              "status": {
+                "status": "UNKNOWN",
+                "value": null
+              }
+            }
+          },
+          "manual_model_input": {
+            "cases": [
+              {
+                "case_id": "H02",
+                "max_cost": 4,
+                "questions": [
+                  {
+                    "available": true,
+                    "cost": 4,
+                    "id": "receipt",
+                    "label": "Request the declared administrative evidence"
+                  }
+                ],
+                "schema": 1,
+                "worlds": [
+                  {
+                    "answers": {
+                      "receipt": "Completed"
+                    },
+                    "decision": "REVIEW_EXPORT",
+                    "id": "positive"
+                  },
+                  {
+                    "answers": {
+                      "receipt": "Pending"
+                    },
+                    "decision": "REQUEST_REVIEW",
+                    "id": "negative"
+                  }
+                ]
+              }
+            ],
+            "schema": 1
+          },
+          "manual_planner_result": {
+            "case_id": "H02",
+            "indistinguishable_pairs": [],
+            "minimum_cost": 4,
+            "minimum_question_count": 1,
+            "omitted_optimal_plan_count": 0,
+            "optimal_plan_count": 1,
+            "optimal_question_sets": [
+              [
+                "receipt"
+              ]
+            ],
+            "status": "QUESTIONS_FOR_REVIEW"
+          },
+          "model_input": {
+            "cases": [
+              {
+                "case_id": "H02",
+                "max_cost": 4,
+                "questions": [
+                  {
+                    "available": true,
+                    "cost": 4,
+                    "id": "receipt",
+                    "label": "Request the declared administrative evidence"
+                  }
+                ],
+                "schema": 1,
+                "worlds": [
+                  {
+                    "answers": {
+                      "receipt": "Completed"
+                    },
+                    "decision": "REVIEW_EXPORT",
+                    "id": "positive"
+                  },
+                  {
+                    "answers": {
+                      "receipt": "Pending"
+                    },
+                    "decision": "REQUEST_REVIEW",
+                    "id": "negative"
+                  }
+                ]
+              }
+            ],
+            "schema": 1
+          },
+          "planner_result": {
+            "case_id": "H02",
+            "indistinguishable_pairs": [],
+            "minimum_cost": 4,
+            "minimum_question_count": 1,
+            "omitted_optimal_plan_count": 0,
+            "optimal_plan_count": 1,
+            "optimal_question_sets": [
+              [
+                "receipt"
+              ]
+            ],
+            "status": "QUESTIONS_FOR_REVIEW"
+          },
+          "source": "medit_export"
+        }
+      },
+      "fixture": "handoff-002.json",
+      "rationale": "The selected CSV subset omits Status. Implant Identity is not an allowlisted documented export item, so it cannot rule out either supplied history. The sole supplied receipt question distinguishes the two decisions at cost four. Recommending that question is not a recorded answer; both outcome views remain unresolved.",
+      "source": "medit_export",
+      "synthetic_truth": {
+        "decision": "REQUEST_REVIEW",
+        "world_id": "negative"
+      }
+    },
+    {
+      "case_id": "H03",
+      "expected": {
+        "plan": {
+          "case_id": "H03",
+          "comparison": {
+            "export_plus_planner": {
+              "candidate_ids": [
+                "positive"
+              ],
+              "decision": "REVIEW_EXPORT",
+              "recorded_questions_asked": 0,
+              "status": "RESOLVED",
+              "synthetic_questions_asked": 0,
+              "unresolved_count": 0
+            },
+            "export_reconciliation": {
+              "candidate_ids": [
+                "positive"
+              ],
+              "decision": "REVIEW_EXPORT",
+              "recorded_questions_asked": 0,
+              "status": "RESOLVED",
+              "synthetic_questions_asked": 0,
+              "unresolved_count": 0
+            },
+            "manual_model": {
+              "candidate_ids": [
+                "negative",
+                "positive"
+              ],
+              "decision": null,
+              "recorded_questions_asked": 0,
+              "status": "UNRESOLVED",
+              "synthetic_questions_asked": 0,
+              "unresolved_count": 1
+            }
+          },
+          "extraction": {
+            "fields": {
+              "order_or_case": {
+                "status": "KNOWN",
+                "value": "present"
+              }
+            }
+          },
+          "manual_model_input": {
+            "cases": [
+              {
+                "case_id": "H03",
+                "max_cost": 3,
+                "questions": [
+                  {
+                    "available": true,
+                    "cost": 3,
+                    "id": "receipt",
+                    "label": "Request the declared administrative evidence"
+                  }
+                ],
+                "schema": 1,
+                "worlds": [
+                  {
+                    "answers": {
+                      "receipt": "present"
+                    },
+                    "decision": "REVIEW_EXPORT",
+                    "id": "positive"
+                  },
+                  {
+                    "answers": {
+                      "receipt": "absent"
+                    },
+                    "decision": "REQUEST_REVIEW",
+                    "id": "negative"
+                  }
+                ]
+              }
+            ],
+            "schema": 1
+          },
+          "manual_planner_result": {
+            "case_id": "H03",
+            "indistinguishable_pairs": [],
+            "minimum_cost": 3,
+            "minimum_question_count": 1,
+            "omitted_optimal_plan_count": 0,
+            "optimal_plan_count": 1,
+            "optimal_question_sets": [
+              [
+                "receipt"
+              ]
+            ],
+            "status": "QUESTIONS_FOR_REVIEW"
+          },
+          "model_input": {
+            "cases": [
+              {
+                "case_id": "H03",
+                "max_cost": 3,
+                "questions": [
+                  {
+                    "available": true,
+                    "cost": 3,
+                    "id": "receipt",
+                    "label": "Request the declared administrative evidence"
+                  }
+                ],
+                "schema": 1,
+                "worlds": [
+                  {
+                    "answers": {
+                      "receipt": "present"
+                    },
+                    "decision": "REVIEW_EXPORT",
+                    "id": "positive"
+                  }
+                ]
+              }
+            ],
+            "schema": 1
+          },
+          "planner_result": {
+            "case_id": "H03",
+            "indistinguishable_pairs": [],
+            "minimum_cost": 0,
+            "minimum_question_count": 0,
+            "omitted_optimal_plan_count": 0,
+            "optimal_plan_count": 1,
+            "optimal_question_sets": [
+              []
+            ],
+            "status": "NO_QUESTION_NEEDED"
+          },
+          "source": "3shape_native"
+        }
+      },
+      "fixture": "handoff-003.json",
+      "rationale": "The synthetic reviewer manifest declares a native route and quotes a supplied, byte-bound reviewer observation of the documented order/case category. This establishes only a reviewed declaration in the bench. It rules out the explicitly absent alternative, leaving one decision and zero planner questions. The payload is expressly not a decoded vendor package.",
+      "source": "3shape_native",
+      "synthetic_truth": {
+        "decision": "REVIEW_EXPORT",
+        "world_id": "positive"
+      }
+    },
+    {
+      "case_id": "H04",
+      "expected": {
+        "plan": {
+          "case_id": "H04",
+          "comparison": {
+            "export_plus_planner": {
+              "candidate_ids": [
+                "negative",
+                "positive"
+              ],
+              "decision": null,
+              "recorded_questions_asked": 0,
+              "status": "UNRESOLVED",
+              "synthetic_questions_asked": 0,
+              "unresolved_count": 1
+            },
+            "export_reconciliation": {
+              "candidate_ids": [
+                "negative",
+                "positive"
+              ],
+              "decision": null,
+              "recorded_questions_asked": 0,
+              "status": "UNRESOLVED",
+              "synthetic_questions_asked": 0,
+              "unresolved_count": 1
+            },
+            "manual_model": {
+              "candidate_ids": [
+                "negative",
+                "positive"
+              ],
+              "decision": null,
+              "recorded_questions_asked": 0,
+              "status": "UNRESOLVED",
+              "synthetic_questions_asked": 0,
+              "unresolved_count": 1
+            }
+          },
+          "extraction": {
+            "fields": {
+              "order_or_case": {
+                "status": "UNKNOWN",
+                "value": null
+              }
+            }
+          },
+          "manual_model_input": {
+            "cases": [
+              {
+                "case_id": "H04",
+                "max_cost": 3,
+                "questions": [
+                  {
+                    "available": true,
+                    "cost": 3,
+                    "id": "receipt",
+                    "label": "Request the declared administrative evidence"
+                  }
+                ],
+                "schema": 1,
+                "worlds": [
+                  {
+                    "answers": {
+                      "receipt": "present"
+                    },
+                    "decision": "REVIEW_EXPORT",
+                    "id": "positive"
+                  },
+                  {
+                    "answers": {
+                      "receipt": "absent"
+                    },
+                    "decision": "REQUEST_REVIEW",
+                    "id": "negative"
+                  }
+                ]
+              }
+            ],
+            "schema": 1
+          },
+          "manual_planner_result": {
+            "case_id": "H04",
+            "indistinguishable_pairs": [],
+            "minimum_cost": 3,
+            "minimum_question_count": 1,
+            "omitted_optimal_plan_count": 0,
+            "optimal_plan_count": 1,
+            "optimal_question_sets": [
+              [
+                "receipt"
+              ]
+            ],
+            "status": "QUESTIONS_FOR_REVIEW"
+          },
+          "model_input": {
+            "cases": [
+              {
+                "case_id": "H04",
+                "max_cost": 3,
+                "questions": [
+                  {
+                    "available": true,
+                    "cost": 3,
+                    "id": "receipt",
+                    "label": "Request the declared administrative evidence"
+                  }
+                ],
+                "schema": 1,
+                "worlds": [
+                  {
+                    "answers": {
+                      "receipt": "present"
+                    },
+                    "decision": "REVIEW_EXPORT",
+                    "id": "positive"
+                  },
+                  {
+                    "answers": {
+                      "receipt": "absent"
+                    },
+                    "decision": "REQUEST_REVIEW",
+                    "id": "negative"
+                  }
+                ]
+              }
+            ],
+            "schema": 1
+          },
+          "planner_result": {
+            "case_id": "H04",
+            "indistinguishable_pairs": [],
+            "minimum_cost": 3,
+            "minimum_question_count": 1,
+            "omitted_optimal_plan_count": 0,
+            "optimal_plan_count": 1,
+            "optimal_question_sets": [
+              [
+                "receipt"
+              ]
+            ],
+            "status": "QUESTIONS_FOR_REVIEW"
+          },
+          "source": "3shape_native"
+        }
+      },
+      "fixture": "handoff-004.json",
+      "rationale": "The source says 3shape_native, but the declared route and actual supplied scan artifact are STL. A quoted administrative claim cannot promote scan-only evidence to native case information. The filename and mesh do not infer histories. Both supplied histories remain and the sole cost-three question is only a recommendation; the case remains unresolved.",
+      "source": "3shape_native",
+      "synthetic_truth": {
+        "decision": "REQUEST_REVIEW",
+        "world_id": "negative"
+      }
+    },
+    {
+      "case_id": "H05",
+      "expected": {
+        "plan": {
+          "case_id": "H05",
+          "comparison": {
+            "export_plus_planner": {
+              "candidate_ids": [
+                "negative",
+                "positive"
+              ],
+              "decision": null,
+              "recorded_questions_asked": 0,
+              "status": "CONFLICT",
+              "synthetic_questions_asked": 0,
+              "unresolved_count": 1
+            },
+            "export_reconciliation": {
+              "candidate_ids": [
+                "negative",
+                "positive"
+              ],
+              "decision": null,
+              "recorded_questions_asked": 0,
+              "status": "CONFLICT",
+              "synthetic_questions_asked": 0,
+              "unresolved_count": 1
+            },
+            "manual_model": {
+              "candidate_ids": [
+                "negative",
+                "positive"
+              ],
+              "decision": null,
+              "recorded_questions_asked": 0,
+              "status": "UNRESOLVED",
+              "synthetic_questions_asked": 0,
+              "unresolved_count": 1
+            }
+          },
+          "extraction": {
+            "fields": {
+              "status": {
+                "status": "CONFLICT",
+                "value": null
+              }
+            }
+          },
+          "manual_model_input": {
+            "cases": [
+              {
+                "case_id": "H05",
+                "max_cost": 4,
+                "questions": [
+                  {
+                    "available": true,
+                    "cost": 4,
+                    "id": "receipt",
+                    "label": "Request the declared administrative evidence"
+                  }
+                ],
+                "schema": 1,
+                "worlds": [
+                  {
+                    "answers": {
+                      "receipt": "Completed"
+                    },
+                    "decision": "REVIEW_EXPORT",
+                    "id": "positive"
+                  },
+                  {
+                    "answers": {
+                      "receipt": "Pending"
+                    },
+                    "decision": "REQUEST_REVIEW",
+                    "id": "negative"
+                  }
+                ]
+              }
+            ],
+            "schema": 1
+          },
+          "manual_planner_result": {
+            "case_id": "H05",
+            "indistinguishable_pairs": [],
+            "minimum_cost": 4,
+            "minimum_question_count": 1,
+            "omitted_optimal_plan_count": 0,
+            "optimal_plan_count": 1,
+            "optimal_question_sets": [
+              [
+                "receipt"
+              ]
+            ],
+            "status": "QUESTIONS_FOR_REVIEW"
+          },
+          "model_input": null,
+          "planner_result": null,
+          "source": "medit_export"
+        }
+      },
+      "fixture": "handoff-005.json",
+      "rationale": "Two matching-case rows disagree on Status. No row wins by order. Reconciliation is blocked as CONFLICT; both original history IDs stay visible diagnostically. No empty or fabricated replacement model is passed to the optimizer. The unchanged original-model counterfactual still has its single cost-four question. Fixture truth is deliberately unspecified.",
+      "source": "medit_export",
+      "synthetic_truth": {
+        "decision": null,
+        "world_id": null
+      }
+    }
+  ],
+  "expected_comparison": "Recursive subset over stable semantic output; timing checked separately.",
+  "not_a_practitioner_study": true,
+  "runtime_truth_input": false,
+  "schema": 1
+}

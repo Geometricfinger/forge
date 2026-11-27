@@ -194,6 +194,11 @@ def main():
     mode.add_argument('--opportunity-run',help='saved opportunity run containing the product workflow')
     a.add_argument('--workflow',help='workflow ID from the selected opportunity run')
     a.add_argument('--out',type=Path,required=True)
+    a=s.add_parser('quest-prepare',help='complete original indexed package initializers and review selected sources; no execution')
+    a.add_argument('--quest',type=Path,required=True)
+    a.add_argument('--recipe',type=Path,required=True)
+    a.add_argument('--source-root',type=Path,required=True)
+    a.add_argument('--out',type=Path,required=True)
     a=s.add_parser('quest-build',help='assemble reviewed modules and a builder-written entry point into a Python zipapp')
     a.add_argument('--quest',type=Path,required=True)
     a.add_argument('--recipe',type=Path,required=True)
@@ -213,6 +218,7 @@ def main():
     a=s.add_parser('corpus-run');a.add_argument('--source-root',type=Path,required=True,help='folder holding the sources');a.add_argument('--manifest',type=Path,help='manifest JSON; omit it to analyse every .py/.pyi/.pyw/.ipynb/.zip/.txt/.md/.rst file in --source-root as provider "local"');a.add_argument('--run-id',required=True);a.add_argument('--max-containers',type=int,default=20);a.add_argument('--profile',type=Path,help='data-only exact-API profile JSON (schema 1); default templates/corpus_profile.json')
     a=s.add_parser('corpus-search');a.add_argument('--run-id',required=True);a.add_argument('--query',required=True);a.add_argument('--include-tests',action='store_true');a.add_argument('--out',type=Path)
     a.add_argument('--distinct',action='store_true');a.add_argument('--filters',type=Path)
+    a.add_argument('--limit',type=int,help='display 1 to 100 results (default 20, or 50 with --out)')
     a=s.add_parser('corpus-symbol',help='look up a literal indexed function or method name and its captured call spellings')
     a.add_argument('--run-id',required=True);a.add_argument('--name',required=True)
     a.add_argument('--include-tests',action='store_true');a.add_argument('--limit',type=int,default=20)
@@ -237,13 +243,16 @@ def main():
     a.human='--human' in argv;a.pretty='--pretty' in argv
     OUTPUT_MODE='human' if a.human else 'pretty' if a.pretty else 'json'
     home=a.home.absolute()
-    if a.command in ('quest-start','quest-build','quest-assess'):
+    if a.command in ('quest-start','quest-prepare','quest-build','quest-assess'):
         from forge_core import creation_quest
         current=Workbench(home)
         if not current.home.is_dir():raise Blocked('QUEST_EXISTING_CORPUS_REQUIRED')
         if a.command=='quest-start':
             value=creation_quest.start(current,a.run_id,a.idea,a.out,
                                        opportunity_run=a.opportunity_run,workflow=a.workflow)
+        elif a.command=='quest-prepare':
+            from forge_core.quest_preparation import prepare
+            value=prepare(current,a.quest,a.recipe,a.source_root,a.out)
         elif a.command=='quest-build':
             value=creation_quest.build(current,a.quest,a.recipe,a.entry,a.source_root,a.out,a.check_file)
         else:
@@ -408,6 +417,7 @@ def main():
         from forge_core import corpus
         r=corpus.get(w,a.run_id)
         options={'distinct':a.distinct,'include_tests':a.include_tests,'filters':loads(read(a.filters,8000)) if a.filters else None}
+        if a.limit is not None:options['limit']=a.limit
         value=corpus.export_search(r,a.query,a.out,**options) if a.out else corpus.search(r,a.query,**options)
     elif a.command=='corpus-symbol':
         from forge_core import corpus, symbol_lookup
@@ -463,8 +473,9 @@ if __name__=='__main__':
             os.write(1,b'{"reason": "MEMORY_BUDGET_EXHAUSTED", "release_approved": false, "status": "BLOCKED"}\n')
         raise SystemExit(2) from None
     except (Blocked,OSError,ValueError,KeyError) as e:
+        from forge_core.quest_diagnostics import DiagnosticBlocked
         out={'status':'BLOCKED','reason':str(e) if isinstance(e,Blocked) else type(e).__name__,'release_approved':False}
-        if isinstance(e,PacketUnavailable):out['detail']=e.detail
+        if isinstance(e,(PacketUnavailable,DiagnosticBlocked)):out['detail']=e.detail
         if isinstance(e,OSError) and getattr(e,'filename',None):out['file']=str(e.filename)
         if OUTPUT_MODE=='human':out['help']='See docs/ERROR_CODES.md for what '+out['reason']+' means and how to fix it.'
         emit(out);raise SystemExit(2)

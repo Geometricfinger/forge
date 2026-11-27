@@ -16,6 +16,15 @@ What Forge does **not** do:
 
 ## Driving a creation quest
 
+When the user needs possible builds rather than a fixed product idea, begin with
+reviewed workflow and alternative-product evidence in Opportunity Lab. Its
+`build_options` compose exact declared mechanism inputs and outputs while
+retaining unknown operating conditions, missing bridges and reasons to prefer an
+existing option. The agent supplies product research and semantic interpretation;
+the search does not infer an empty market from a listing's omissions. See
+[build options](docs/INVENTION_OPTIONS.md) for the schema, bounds and a synthetic
+example. Select a route for a bounded experiment before writing its adapter.
+
 When the user asks you to make something from a folder, start with a saved corpus. Use `quest-start --idea` for a stated job or `quest-start --scout` to explore the available modules. Use `quest-start --opportunity-run ID --workflow ID` to carry an observed complete workflow from Opportunity Lab into creation. Map proposed outcomes to the selected needs and source leads in the recipe. Inspect the candidates, select a user and an observable outcome, write the adapter, and run `quest-build`. When authorized to run the reviewed prototype, test the exact packaged archive and report what worked or failed. The [creation quest playbook](docs/INVENTOR_PLAYBOOK.md#run-a-creation-quest) gives the commands and recipe fields.
 
 Use `module_files` to map whole indexed module source IDs to product import paths,
@@ -25,6 +34,13 @@ bytes from the same indexed source containers. The existing build command reads
 the original files or bounded ZIP members without extracting or executing them.
 It preserves raw bytes and records their source-to-product mapping. Dependency
 completion, package-data selection and reuse-rights review remain builder work.
+
+After explicit component and archive destination selection, `quest-prepare`
+can add required original indexed package initializer mappings and write a
+source-only preflight and support review. Keep the original recipe and inspect
+the added mappings; dependencies, resources, notices and reuse rights still need
+review. Build with `recipe.prepared.json` after reviewing the adapter. See
+[recipe preparation](docs/QUEST_PREPARATION.md).
 
 Before building, add an `evaluation_plan` to map fixed expected observations to
 the recipe's acceptance checks and promised needs. Declare each case's input
@@ -36,6 +52,14 @@ next decision. Preserve failures, incomplete cases and unaddressed needs. See
 and [product direction](docs/PRODUCT_DIRECTION.md) for the complete creation goal.
 
 ## Requirements
+
+The [handoff bench](docs/HANDOFF_BENCH.md) is a separately reviewed executable
+example for comparing documented export fields with the same frozen planner and
+a separate burden ledger. Its static builder does not execute product code.
+Explicit Linux qualification runs the original 24 cases and five synthetic
+handoffs through one archive and verifier. Unknown human work and unverified
+native-format decoding remain visible. This adds no product execution path to
+FORGE's analysis commands; see the example README before running it.
 
 - Python 3.11 or newer with SQLite FTS5 (included in standard CPython builds). Check with `python3 --version`.
 - Linux or macOS. Windows is not supported.
@@ -224,6 +248,10 @@ python3 "$FORGE/forge.py" --home "$WORK/forge-home" corpus-list
 ```
 
 Search options: `--include-tests` adds test code, `--distinct` groups byte-identical duplicates, and `--filters` accepts `required_apis`, `exclude_apis`, `record_kind` (`function` or `source_scope`) and `container_ids` (manifest `file_id`s). Each result has `path`, `name`, `start_line`, `end_line`, `observed_apis` and `definition_id`. Ranking is lexical relevance, not confidence. `search_status: NO_METADATA_MATCH` does not mean the capability is absent.
+
+`--limit` selects 1 to 100 displayed search results, including exported packets.
+Without it, search displays 20 and a packet retains 50. Total match counts still
+describe the full indexed search, not only the displayed rows.
 
 For a known Python function or method name, use the literal lookup. It distinguishes a definition with an inspectable ID from code that only calls it.
 

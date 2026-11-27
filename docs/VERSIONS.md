@@ -31,7 +31,11 @@ The analyzer files themselves are identified by hash, not by version: `contracts
 
 ## Algorithm and format identifiers
 
-String identifiers such as `field-bm25-rrf-2-role-state` (`forge_core/retrieval.py`), `identifier-fields-1` (`lexical.py`), `lexical-context-2-class-state` (`structure.py`), `mixed-intake-2-context` (`mixed_intake.py`) and `opportunity-1.1-inventor-audit` (`opportunities.py`) name the behaviour of one algorithm. They are part of cache keys and run identities, so changing one invalidates the matching cached results. Integer `schema` / `schema_version` fields version individual JSON formats.
+String identifiers such as `field-bm25-rrf-2-role-state` (`forge_core/retrieval.py`), `identifier-fields-1` (`lexical.py`), `lexical-context-2-class-state` (`structure.py`), `mixed-intake-2-context` (`mixed_intake.py`) and `opportunity-1.2-review-leads` (`opportunities.py`) name the behaviour of one algorithm. They are part of cache keys and run identities, so changing one invalidates the matching cached results. Integer `schema` / `schema_version` fields version individual JSON formats.
+
+Retained Opportunity Lab records keep their original algorithm version and run
+identity. `opportunity-compare` reads those stored records without relabeling or
+rewriting them, including records created under `opportunity-1.1-inventor-audit`.
 
 ## Historical labels
 

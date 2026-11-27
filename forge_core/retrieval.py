@@ -373,7 +373,7 @@ class SearchIndex:
         else:
             displayed = [evaluate(score.index, detailed=True) for score in scored[:limit]]
         warnings = ['REINDEX_REQUIRED_FOR_STRUCTURED_RANKING'] if self.legacy else []
-        if set(words(query)) & {'not', 'without', 'never', 'exclude', 'no'}:
+        if query_intent.negative_request(query):
             warnings.append('NATURAL_LANGUAGE_NEGATION_NOT_ENFORCED_USE_EXPLICIT_REQUIREMENTS')
         if filters.get('exclude_apis'):
             warnings.append('ABSENT_API_OBSERVATION_DOES_NOT_PROVE_ABSENCE_OF_BEHAVIOR')
@@ -409,7 +409,26 @@ class SearchIndex:
 _CACHE = collections.OrderedDict()
 _CACHE_LOCK = threading.RLock()
 
-def search_report(report, query, limit=20, include_tests=False, distinct=False, filters=None):
+class PreparedSearch:
+    """An explicit metadata snapshot for several questions about one report.
+
+    Preparation binds and defensively copies index inputs. Later caller changes
+    require a new preparation; query results retain the original receipt and do
+    not share mutable rows with the snapshot or with each other.
+    """
+    __slots__ = ('_index', '_coverage_status', '_receipt_binding')
+
+    def __init__(self, index, coverage_status, receipt_binding):
+        self._index = index
+        self._coverage_status = coverage_status
+        self._receipt_binding = receipt_binding
+
+    def query(self, query, limit=20, include_tests=False, distinct=False, filters=None):
+        result = self._index.query(query, limit, include_tests, distinct, filters)
+        return result | {'coverage_status': self._coverage_status, 'receipt_binding': self._receipt_binding}
+
+
+def prepare_report(report):
     from .corpus import all_rows, SCHEMA
     if not isinstance(report, dict) or report.get('schema') != SCHEMA or report.get('source_bodies_retained') is not False or report.get('upstream_code_executed') is not False:
         raise Blocked('CORPUS_REPORT')
@@ -432,5 +451,10 @@ def search_report(report, query, limit=20, include_tests=False, distinct=False, 
         else:
             del rows
             _CACHE.move_to_end(binding)
-    result = index.query(query, limit, include_tests, distinct, filters)
-    return result | {'coverage_status': report['status'], 'receipt_binding': receipt_binding}
+    return PreparedSearch(index, report['status'], receipt_binding)
+
+
+def search_report(report, query, limit=20, include_tests=False, distinct=False, filters=None):
+    # Ordinary calls rebind the current mutable report, as before. Batch callers
+    # explicitly prepare once and retain only that immutable metadata snapshot.
+    return prepare_report(report).query(query, limit, include_tests, distinct, filters)

@@ -25,7 +25,7 @@ def _steps_for_need(workflow, target_id):
     return selected
 
 
-def _scope(hypothesis, workflow):
+def _scope(hypothesis, workflow, mechanism_catalog=()):
     need = hypothesis['need']
     citations = {('need', need['id']): need['evidence']}
     annotations = {('need', need['id']): (need['step'], need['pattern'], need['why'], need['basis'])}
@@ -40,10 +40,21 @@ def _scope(hypothesis, workflow):
         slot = ('observation', observation['id'])
         citations[slot] = observation['evidence']
         annotations[slot] = (observation['kind'], observation['scope'], observation['statement'])
-    for option in hypothesis['mechanisms']:
+    mechanisms = {option['id']: option for option in hypothesis['mechanisms']}
+    selected = {mid for plan in hypothesis.get('build_options', {}).get('options', [])
+                for mid in plan['mechanism_ids']}
+    selected.update(hypothesis.get('build_options', {}).get('coverage', {}).get('relevant_mechanism_ids', []))
+    for option in mechanism_catalog:
+        if option['id'] in selected and option['id'] not in mechanisms:
+            mechanisms[option['id']] = option
+    for option in mechanisms.values():
         slot = ('mechanism', option['id'])
         citations[slot] = option['evidence']
-        annotations[slot] = {k: v for k, v in option.items() if k != 'evidence'}
+        annotations[slot] = {k: v for k, v in option.items() if k not in {'evidence', 'conditions'}}
+        for condition in option.get('conditions', []):
+            slot = ('mechanism_condition', option['id'] + ':' + condition['condition'])
+            citations[slot] = condition['evidence']
+            annotations[slot] = condition['status']
     return citations, annotations
 
 
@@ -56,6 +67,16 @@ def _at(citation):
 
 def _location(citation):
     return citation['source'], citation['start'], citation['end'], citation['quote']
+
+
+def _plan_annotations(value):
+    # Plan IDs and evidence-reference hashes change when an identical quotation
+    # moves. Citation comparison handles that separately; it is not a changed
+    # component route or condition declaration by itself.
+    if isinstance(value,dict):
+        return {key:_plan_annotations(item) for key,item in value.items() if key not in {'id','evidence'}}
+    if isinstance(value,list):return [_plan_annotations(item) for item in value]
+    return value
 
 
 def _citation_changes(previous, current, old_sources, new_sources, registers, occurrences):
@@ -134,14 +155,16 @@ def compare(before, after):
         elif b is None:
             status, key = 'REMOVED', 'removed'
         else:
-            previous, old_annotations = _scope(a, old_workflows[a['workflow']])
-            current, new_annotations = _scope(b, new_workflows[b['workflow']])
+            previous, old_annotations = _scope(a, old_workflows[a['workflow']], old.get('mechanism_catalog', ()))
+            current, new_annotations = _scope(b, new_workflows[b['workflow']], new.get('mechanism_catalog', ()))
             citations = _citation_changes(previous, current, old_sources, new_sources, registers, occurrences)
             reasons.update(c['status'] for c in citations if c['status'] not in {'RETAINED', 'MOVED'})
             if any(c['source_metadata_changed'] for c in citations):
                 reasons.add('SOURCE_METADATA_CHANGED')
             if a['state'] != b['state']:
                 reasons.add('EVIDENCE_STATE_CHANGED')
+            if _plan_annotations(a.get('build_options')) != _plan_annotations(b.get('build_options')):
+                reasons.add('BUILD_OPTIONS_CHANGED')
             if (old_annotations != new_annotations or a['workflow_context'] != b['workflow_context']
                     or a['concept'] != b['concept']
                     or a.get('workflow_readiness') != b.get('workflow_readiness')):

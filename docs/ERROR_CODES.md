@@ -78,6 +78,10 @@ If `reason` is a Python exception name instead of a code:
 | <a id="behavior_unexecuted_observations"></a>`BEHAVIOR_UNEXECUTED_OBSERVATIONS` | ERROR, SKIPPED and NOT_RUN rows must have empty observations; explain the outcome in detail. | forge_core/behavior_review.py |
 | <a id="body_length"></a>`BODY_LENGTH` | Input or stored state failed a validation check (see the raising module). | forge_core/server.py |
 | <a id="branch"></a>`BRANCH` | Input or stored state failed a validation check (see the raising module). | forge_core/policy.py |
+| <a id="build_options_changed"></a>`BUILD_OPTIONS_CHANGED` | Retained options differ from deterministic synthesis of the recorded contracts. Restore the original record or start a new reviewed run. | forge_core/opportunities.py |
+| <a id="build_options_missing"></a>`BUILD_OPTIONS_MISSING` | A current-version hypothesis is missing its required option report. Historical reports are not assigned invented options. | forge_core/opportunities.py |
+| <a id="build_option_catalog_missing"></a>`BUILD_OPTION_CATALOG_MISSING` | A current option report is missing the shared mechanism catalog needed to resolve and regenerate its routes. | forge_core/opportunities.py |
+| <a id="build_option_input_binding"></a>`BUILD_OPTION_INPUT_BINDING` | The recorded catalog, workflow, need, evidence state or available inputs disagree with the retained reviewed bundle. | forge_core/opportunities.py |
 | <a id="candidate_changed"></a>`CANDIDATE_CHANGED` | A pinned input changed after it was recorded (hash/identity no longer matches). Start a new run/home, or restore the original file. | forge_core/store.py |
 | <a id="candidate_count_limit"></a>`CANDIDATE_COUNT_LIMIT` | A safety size/count limit was exceeded. | forge_core/reuse.py |
 | <a id="canonicalization_failed"></a>`CANONICALIZATION_FAILED` | Input or stored state failed a validation check (see the raising module). | forge_core/interop.py |
@@ -136,6 +140,7 @@ If `reason` is a Python exception name instead of a code:
 | <a id="doc_link_reference_limit"></a>`DOC_LINK_REFERENCE_LIMIT` | Split the document into sections containing at most 256 dotted reference occurrences per input. | forge_core/doc_links.py |
 | <a id="duplicate_candidate"></a>`DUPLICATE_CANDIDATE` | The input repeats an item that must be unique. | forge_core/reuse.py |
 | <a id="duplicate_citation"></a>`DUPLICATE_CITATION` | The input repeats an item that must be unique. | forge_core/opportunities.py |
+| <a id="duplicate_condition"></a>`DUPLICATE_CONDITION` | A mechanism declares the same operating condition more than once. Retain one explicit reviewed state per condition. | forge_core/opportunities.py |
 | <a id="duplicate_corpus_source"></a>`DUPLICATE_CORPUS_SOURCE` | Two manifest rows share a `file_id` or `path`. | forge_core/corpus.py |
 | <a id="duplicate_finding"></a>`DUPLICATE_FINDING` | The input repeats an item that must be unique. | forge_core/reuse.py |
 | <a id="duplicate_id"></a>`DUPLICATE_ID` | The input repeats an item that must be unique. | forge_core/opportunities.py |
@@ -233,6 +238,8 @@ If `reason` is a Python exception name instead of a code:
 | <a id="limit_keys"></a>`LIMIT_KEYS` | A safety size/count limit was exceeded. | forge_core/policy.py |
 | <a id="local_folder_empty"></a>`LOCAL_FOLDER_EMPTY` | The plain folder has no supported files (.py .pyi .pyw .ipynb .zip .txt .md .markdown .rst; hidden files are skipped). | forge_core/corpus.py |
 | <a id="malformed_opportunity_input"></a>`MALFORMED_OPPORTUNITY_INPUT` | An opportunity bundle, run or packet failed validation. | forge_core/opportunities.py |
+| <a id="mechanism_condition_state"></a>`MECHANISM_CONDITION_STATE` | A mechanism condition must be supported, incompatible or unknown, with an ordinary evidence citation. | forge_core/opportunities.py |
+| <a id="mechanism_role"></a>`MECHANISM_ROLE` | Use existing_option, source_component, new_work, manual_step or unclassified as the declared mechanism role. | forge_core/opportunities.py |
 | <a id="mechanism_scope"></a>`MECHANISM_SCOPE` | Input or stored state failed a validation check (see the raising module). | forge_core/opportunities.py |
 | <a id="memory_budget_exhausted"></a>`MEMORY_BUDGET_EXHAUSTED` | The command could not allocate memory. Preserve any existing checkpoints and rerun a smaller selection in a fresh run; no completion is claimed. | forge.py |
 | <a id="mission_cancelled"></a>`MISSION_CANCELLED` | The mission was cancelled; create a new one. | forge_core/store.py |
@@ -285,6 +292,7 @@ If `reason` is a Python exception name instead of a code:
 | <a id="opportunity_packet_schema"></a>`OPPORTUNITY_PACKET_SCHEMA` | Wrong or missing `schema` version. | forge_core/opportunities.py |
 | <a id="opportunity_query"></a>`OPPORTUNITY_QUERY` | Invalid query text or terms. | forge_core/server.py |
 | <a id="opportunity_receipt_changed"></a>`OPPORTUNITY_RECEIPT_CHANGED` | A pinned input changed after it was recorded (hash/identity no longer matches). Start a new run/home, or restore the original file. | forge_core/opportunities.py |
+| <a id="opportunity_record_bounds"></a>`OPPORTUNITY_RECORD_BOUNDS` | The exact serialized input, report and checksum exceed 10,000,000 bytes. Nothing is published; split the reviewed collection into smaller runs. | forge_core/opportunities.py |
 | <a id="opportunity_request"></a>`OPPORTUNITY_REQUEST` | An opportunity bundle, run or packet failed validation. | forge_core/server.py |
 | <a id="opportunity_row"></a>`OPPORTUNITY_ROW` | An opportunity bundle, run or packet failed validation. | forge_core/opportunities.py |
 | <a id="opportunity_run_id"></a>`OPPORTUNITY_RUN_ID` | An opportunity bundle, run or packet failed validation. | forge_core/opportunities.py |
@@ -352,7 +360,7 @@ If `reason` is a Python exception name instead of a code:
 | <a id="quest_product_path_collision"></a>`QUEST_PRODUCT_PATH_COLLISION` | Choose destinations without duplicate case-folded paths or a file occupying another file's directory. | forge_core/quest_sources.py |
 | <a id="quest_product_size"></a>`QUEST_PRODUCT_SIZE` | Keep the combined module, resource, notice and entry-point payload within the product byte limit. | forge_core/creation_quest.py |
 | <a id="quest_recipe"></a>`QUEST_RECIPE` | Fill the schema-1 recipe template with the audience, purpose, acceptance checks and components. | forge_core/creation_quest.py |
-| <a id="quest_select_package_initializer"></a>`QUEST_SELECT_PACKAGE_INITIALIZER` | Explicitly select the original indexed package initializer through support_modules or module_files, mapped to the corresponding destination package. | forge_core/creation_quest.py, forge_core/quest_sources.py |
+| <a id="quest_select_package_initializer"></a>`QUEST_SELECT_PACKAGE_INITIALIZER` | Select the original indexed package initializer at its corresponding destination, or use quest-prepare to complete indexed originals. Conflicting mappings and existing but unindexed initializers remain blocked. | forge_core/creation_quest.py, forge_core/quest_sources.py, forge_core/quest_preparation.py |
 | <a id="quest_separate_source_root"></a>`QUEST_SEPARATE_SOURCE_ROOT` | Keep the source directory, workspace and product directory separate. | forge_core/creation_quest.py |
 | <a id="quest_source_archive"></a>`QUEST_SOURCE_ARCHIVE` | Supply the original readable ZIP container and supported nested ZIP members. | forge_core/quest_sources.py |
 | <a id="quest_source_binding"></a>`QUEST_SOURCE_BINDING` | The original member bytes or normalized analysis identity differ from the declared source reference. | forge_core/quest_sources.py |

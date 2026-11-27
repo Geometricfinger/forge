@@ -4,6 +4,18 @@ import re
 from .lexical import words
 
 
+def negative_request(query):
+    """Recognize explicit negative cues for disclosure, never enforcement.
+
+    Keep the existing token cues, including underscore-separated names. Word
+    boundaries on additional prose forms avoid treating ``exceptions`` or
+    ``notable`` as prohibitions. This is deliberately not a negation parser.
+    """
+    return bool(set(words(query)) & {'not', 'without', 'never', 'exclude', 'no'} or
+                re.search(r"\b(?:cannot|avoid(?:s|ed|ing)?|exclud(?:e[ds]?|ing)|"
+                          r"except|unless|[a-z]+n['\u2019]t)\b", query, re.I))
+
+
 def predicate_request(query):
     return bool(re.search(r'\b(?:determine|check|test|tell)\s+(?:whether|if)\b|\bpredicate\b', query, re.I))
 

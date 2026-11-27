@@ -11,8 +11,11 @@ from urllib.parse import urlsplit
 from .common import Blocked, canonical, integer, read, safe_path, sha, text, write
 from . import __version__
 
-VERSION='opportunity-1.1-inventor-audit'
+VERSION='opportunity-1.3-build-options'
 MAX_INPUT=384_000
+MAX_RECORD_BYTES=10_000_000
+CODE_SEARCH_LIMIT=12
+CODE_LEAD_LIMIT=12
 PATTERNS={'identity_loss','manual_bridge','verification_gap','information_gap','format_gap','recovery_gap','coordination_gap'}
 KINDS={'firsthand','product_listing','product_docs','issue','research','source_review','synthetic'}
 OBS={'pain','manual','missing','supported','unknown','not_described','refutes'}
@@ -89,6 +92,39 @@ def unique(rows,field='id'):
     return {x[field]:x for x in rows}
 
 
+def _mechanism_refs(values,sources):
+    if sources is not None:return refs(values,sources)
+    # A portable report retains citations, but not all original source text.
+    # Check shape for deterministic option replay; exact correspondence was
+    # checked against the input bundle, not authenticated by this report.
+    for r in arr(values,8,1):
+        obj(r,{'source','start','end','quote'});key(r['source'])
+        integer(r['start'],0,24000);integer(r['end'],r['start']+1,24000)
+        if not isinstance(r['quote'],str) or len(r['quote'])!=r['end']-r['start'] or '\0' in r['quote']:
+            raise Blocked('EVIDENCE_QUOTE_MISMATCH')
+
+
+def mechanism_record(m,sources):
+    from .invention_options import ROLES,CONDITION_STATES
+    obj(m,{'id','title','domain','purpose','mechanism','addresses','requires','provides','limits','evidence','code_queries'},
+        {'role','conditions'})
+    key(m['id'])
+    for f in ['title','domain','purpose','mechanism']:text(m[f],1200)
+    strings(m['addresses'],10);strings(m['requires'],30);strings(m['provides'],30);strings(m['limits'],10)
+    if not m['addresses'] or set(m['addresses'])-PATTERNS or not m['limits']:raise Blocked('MECHANISM_SCOPE')
+    _mechanism_refs(m['evidence'],sources);strings(m['code_queries'],4)
+    for q in m['code_queries']:text(q,160)
+    if m.get('role','unclassified') not in ROLES:raise Blocked('MECHANISM_ROLE')
+    conditions=arr(m.get('conditions',[]),16)
+    seen=set()
+    for row in conditions:
+        obj(row,{'condition','status','evidence'});key(row['condition'])
+        if row['condition'] in seen:raise Blocked('DUPLICATE_CONDITION')
+        seen.add(row['condition'])
+        if row['status'] not in CONDITION_STATES:raise Blocked('MECHANISM_CONDITION_STATE')
+        _mechanism_refs(row['evidence'],sources)
+
+
 def _validate(bundle):
     b=copy.deepcopy(bundle)
     try:encoded=canonical(b)
@@ -111,8 +147,9 @@ def _validate(bundle):
     for i in sources:visit(i,set(),done)
     arr(b['workflows'],20,1);workflows=unique(b['workflows'])
     for w in b['workflows']:
-        obj(w,{'id','title','actor','domain','purpose','initial_fields','steps','needs'})
+        obj(w,{'id','title','actor','domain','purpose','initial_fields','steps','needs'}, {'required_conditions'})
         for f in ['title','actor','domain','purpose']:text(w[f],1000)
+        for condition in strings(w.get('required_conditions',[]),16):key(condition)
         strings(w['initial_fields'],80);arr(w['steps'],30,1);steps=unique(w['steps'])
         for s in w['steps']:
             obj(s,{'id','action','requires','produces','evidence'});text(s['action'],500)
@@ -131,13 +168,7 @@ def _validate(bundle):
         if o['kind'] not in OBS or o['scope'] not in {'target','analogy','unspecified'}:raise Blocked('OBSERVATION_KIND')
         text(o['statement'],1200);refs(o['evidence'],sources)
     arr(b['mechanisms'],40);unique(b['mechanisms'])
-    for m in b['mechanisms']:
-        obj(m,{'id','title','domain','purpose','mechanism','addresses','requires','provides','limits','evidence','code_queries'})
-        for f in ['title','domain','purpose','mechanism']:text(m[f],1200)
-        strings(m['addresses'],10);strings(m['requires'],30);strings(m['provides'],30);strings(m['limits'],10)
-        if not m['addresses'] or set(m['addresses'])-PATTERNS or not m['limits']:raise Blocked('MECHANISM_SCOPE')
-        refs(m['evidence'],sources);strings(m['code_queries'],4)
-        for q in m['code_queries']:text(q,160)
+    for m in b['mechanisms']:mechanism_record(m,sources)
     if not isinstance(b['preferences'],dict) or set(b['preferences'])-PATTERNS:raise Blocked('PREFERENCE_FIELDS')
     for v in b['preferences'].values():integer(v,1,5)
     return b
@@ -334,37 +365,83 @@ def query_intent(value):
     return value,exact
 
 
+def _code_lead(hit,name,query,exact_required,result,rank):
+    if not (hit.get('definition_id') or hit.get('source_id')):
+        raise Blocked('CODE_RESULT_ID_MISSING')
+    matched=list(hit.get('matched_query_terms',[]))
+    terms=result.get('query_terms',[])
+    return {'corpus':name,'query':query,
+            'search_mode':'EXACT_SYMBOL' if exact_required else 'CONCEPT_TERMS_WITH_EXACT_PREFERENCE',
+            'rank':rank,'name':hit['name'],'definition_id':hit.get('definition_id'),
+            'source_id':hit.get('source_id'),'source_sha256':hit.get('source_sha256'),
+            'container_id':hit.get('file_id'),'path':hit.get('member_path',hit.get('path')),
+            'start_line':hit.get('member_start_line',hit.get('start_line')),
+            'end_line':hit.get('member_end_line',hit.get('end_line')),
+            'all_query_terms_matched':hit.get('all_query_terms_matched',False),
+            'matched_query_terms':matched,'missing_query_terms':[term for term in terms if term not in matched],
+            'index_binding':result.get('index_binding'),'evidence_level':'METADATA_RETRIEVAL_ONLY',
+            'runtime_tested':False,'rights_reviewed':False}
+
+
+def _unique_code_leads(rows):
+    # Keep the first inspectable query route for each source identity. Corpus is
+    # part of the key: equal definition IDs in two corpora are separate bindings.
+    unique={}
+    for row in rows:
+        unique.setdefault(canonical([row['corpus'],row['definition_id'],row['source_id']]),row)
+    return unique
+
+
 def code_leads(options,corpora,cache):
     from . import corpus
+    options=list(options);corpora=list(corpora)
+    queries=list(dict.fromkeys(query_intent(q)[0] for m in options for q in m['code_queries']))
+    for name,report in corpora:
+        missing=[q for q in queries if (name,q) not in cache]
+        if not missing:continue
+        prepared=corpus.prepare_search(report)
+        for q in missing:cache[(name,q)]=prepared.query(q,limit=CODE_SEARCH_LIMIT,distinct=True)
+        del prepared
     leads=[]
     for m in options:
-        found=[];partial=0
+        found=[];review=[];partial=0;symbol_excluded=0;coverage=[]
         for requested_query in m['code_queries']:
             q,exact_required=query_intent(requested_query)
             for name,report in corpora:
                 k=(name,q)
-                if k not in cache:cache[k]=corpus.search(report,q,limit=3,distinct=True)
                 result=cache[k]
-                hits=[h for h in result['results'] if h.get('all_query_terms_matched') is True]
-                partial += len(result['results'])-len(hits)
+                ranked=list(enumerate(result['results'][:CODE_SEARCH_LIMIT],1))
+                hits=[(rank,h) for rank,h in ranked if h.get('all_query_terms_matched') is True]
+                partial_hits=[(rank,h) for rank,h in ranked if h.get('all_query_terms_matched') is not True]
+                partial += len(partial_hits)
+                total=result.get('distinct_matching_groups')
+                coverage.append({'corpus':name,'query':requested_query,'limit':CODE_SEARCH_LIMIT,
+                                 'results_considered':len(ranked),'distinct_matching_groups':total,
+                                 'distinct_groups_omitted':max(0,total-len(ranked)) if type(total) is int else None})
                 # An exact symbol query should not be padded with incidental mentions.
-                exact_hits=[h for h in hits if h['name']==q or h['name'].endswith('.'+q)]
+                exact_hits=[(rank,h) for rank,h in hits if h['name']==q or h['name'].endswith('.'+q)]
                 if exact_required or exact_hits:hits=exact_hits
-                elif any(h.get('exact_symbol_match') for h in hits):hits=[h for h in hits if h.get('exact_symbol_match')]
-                for hit in hits:
-                    ident=hit.get('definition_id') or hit.get('source_id')
-                    if not ident:raise Blocked('CODE_RESULT_ID_MISSING')
-                    found.append({'corpus':name,'query':requested_query,'search_mode':'EXACT_SYMBOL' if exact_required else 'CONCEPT_TERMS_WITH_EXACT_PREFERENCE','name':hit['name'],'definition_id':hit.get('definition_id'),
-                                  'source_id':hit.get('source_id'),'source_sha256':hit.get('source_sha256'),
-                                  'container_id':hit.get('file_id'),'path':hit.get('member_path',hit.get('path')),
-                                  'start_line':hit.get('member_start_line',hit.get('start_line')),
-                                  'end_line':hit.get('member_end_line',hit.get('end_line')),
-                                  'all_query_terms_matched':hit.get('all_query_terms_matched',False),
-                                  'index_binding':result.get('index_binding'),'evidence_level':'METADATA_RETRIEVAL_ONLY',
-                                  'runtime_tested':False,'rights_reviewed':False})
-        # Keep repeated search routes, but not duplicate candidate records per mechanism.
-        unique_hits={canonical([h['corpus'],h['definition_id'],h['source_id']]):h for h in found}
-        leads.append({'mechanism':m['id'],'candidates':list(unique_hits.values())[:12],'partial_matches_held_for_review':partial,'status':'CANDIDATES_FOR_REVIEW' if found else 'NO_METADATA_MATCH_ESTABLISHED'})
+                elif any(h.get('exact_symbol_match') for _,h in hits):hits=[(rank,h) for rank,h in hits if h.get('exact_symbol_match')]
+                for rank,hit in hits:
+                    found.append(_code_lead(hit,name,requested_query,exact_required,result,rank))
+                for rank,hit in partial_hits:
+                    if exact_required and not (hit['name']==q or hit['name'].endswith('.'+q)):
+                        symbol_excluded += 1
+                        continue
+                    review.append({**_code_lead(hit,name,requested_query,exact_required,result,rank),
+                                   'review_reason':'PARTIAL_QUERY_TERMS',
+                                   'next_step':'Inspect the complete source and refine the reviewed query before selecting this lead.'})
+        unique_hits=_unique_code_leads(found)
+        # A later full query match belongs in the main list, not both lists.
+        unique_review={key:row for key,row in _unique_code_leads(review).items() if key not in unique_hits}
+        leads.append({'mechanism':m['id'],'candidates':list(unique_hits.values())[:CODE_LEAD_LIMIT],
+                      'review_candidates':list(unique_review.values())[:CODE_LEAD_LIMIT],
+                      'candidates_omitted':max(0,len(unique_hits)-CODE_LEAD_LIMIT),
+                      'review_candidates_omitted':max(0,len(unique_review)-CODE_LEAD_LIMIT),
+                      'search_coverage':coverage,'partial_matches_held_for_review':partial,
+                      'partial_matches_excluded_by_symbol':symbol_excluded,
+                      'review_status':'INSPECT_OR_REFINE' if unique_review else 'NO_PARTIAL_REVIEW_LEADS',
+                      'status':'CANDIDATES_FOR_REVIEW' if found else 'NO_METADATA_MATCH_ESTABLISHED'})
     return leads
 
 
@@ -390,17 +467,27 @@ def evaluate(bundle,corpora=()):
                       min(ev['independent_origin_groups'],3),b['preferences'].get(n['pattern'],2),
                       sum(not m['missing_prerequisites'] for m in options)]
             hid='hyp_'+sha(canonical([w['id'],n['id'],n['field']]))[:32]
-            links=[] if state in {'EXISTING_OPTION_TO_VERIFY','CONFLICT_REQUIRES_REVIEW','COUNTEREVIDENCE_REVIEW','STALE_EVIDENCE_RECHECK'} else code_leads(options,corpora,cache)
             out.append({'id':hid,'workflow':w['id'],'need':n,'state':state,'evidence':ev,
-                        'workflow_context':{k:w[k] for k in ('title','actor','domain','purpose')},
+                        'workflow_context':{**{k:w[k] for k in ('title','actor','domain','purpose')},
+                                            'required_conditions':copy.deepcopy(w.get('required_conditions',[]))},
                         'handoff_missing_in_declared_map':n['field'] in missing[n['step']],
                         'workflow_readiness':copy.deepcopy(trace[n['step']]),
-                        'mechanisms':options,'code_leads':links,'priority_components':priority,
+                        'mechanisms':options,'code_leads':[],'priority_components':priority,
                         'priority_is_probability':False,'concept':concept(w,n,state,options),
                         'counter_searches':counter_plan(w,n,state),'experiment':experiment(w,n),
                         'human_judgment_needed':True})
             from .invention_plan import next_investigation
             out[-1]['next_investigation']=next_investigation(out[-1])
+            from .invention_options import synthesize,GATED_STATES
+            build_options=synthesize(out[-1],b['mechanisms'])
+            out[-1]['build_options']=build_options
+            # Upstream components of a composed route may use another pattern
+            # and need not survive the six single-mechanism display positions.
+            selected={mid for option in build_options['options'] for mid in option['mechanism_ids']}
+            linked={m['id']:m for m in options}
+            linked.update({m['id']:m for m in b['mechanisms'] if m['id'] in selected})
+            if state not in GATED_STATES:
+                out[-1]['code_leads']=code_leads(list(linked.values()),corpora,cache)
     if bindings != [{'name':name,'sha256':sha(canonical(r))} for name,r in corpora]:raise Blocked('OPPORTUNITY_CORPUS_CHANGED')
     out.sort(key=lambda h:(tuple(-x for x in h['priority_components']),h['id']))
     freshness={s['id']:(as_of-date(s['observed_on'])).days<=b['max_age_days'] for s in b['sources']}
@@ -411,6 +498,7 @@ def evaluate(bundle,corpora=()):
                                 'capture_method':s.get('capture_method','attributed_summary'),
                                 'group':groups[s['id']]} for s in b['sources']],
             'bundle_sha256':sha(canonical(b)),'corpus_bindings':bindings,
+            'mechanism_catalog':copy.deepcopy(b['mechanisms']),
             'summary':{'workflows':len(b['workflows']),'hypotheses':len(out),'sources':len(sources),
                        'source_groups':len(set(groups.values())),
                        'states':{s:sum(h['state']==s for h in out) for s in sorted({h['state'] for h in out})},
@@ -435,6 +523,10 @@ class OpportunityStore:
         self.w.guard();report=evaluate(bundle,corpora);self.w.guard();rid=report['id'];dest=self.root/rid
         payload={'bundle':validate(bundle),'report':report}
         record={'payload':payload,'sha256':sha(canonical(payload))}
+        record_bytes=canonical(record)
+        # A valid input can expand into many cited routes. Refuse before any
+        # publication if the exact retained record could not be read back.
+        if len(record_bytes)>MAX_RECORD_BYTES:raise Blocked('OPPORTUNITY_RECORD_BOUNDS')
         self.root.mkdir(parents=True,exist_ok=True)
         from .corpus import _lock
         with _lock(self.root/'publication.lock'):
@@ -443,7 +535,7 @@ class OpportunityStore:
                 if old!=report:raise Blocked('IMMUTABLE_RUN_CONFLICT')
             else:
                 dest.mkdir(mode=0o700)
-                try:write(dest/'record.json',canonical(record),new=True)
+                try:write(dest/'record.json',record_bytes,new=True)
                 except Exception:
                     # Incomplete state remains an explicit blocker, not an empty success.
                     raise
@@ -455,12 +547,13 @@ class OpportunityStore:
         self.w.guard();p=self.path(rid)
         from .common import loads
         if not (p/'record.json').is_file():raise Blocked('OPPORTUNITY_RUN_MISSING')
-        v=loads(read(p/'record.json',10_000_000));obj(v,{'payload','sha256'})
+        v=loads(read(p/'record.json',MAX_RECORD_BYTES));obj(v,{'payload','sha256'})
         if sha(canonical(v['payload']))!=v['sha256']:raise Blocked('OPPORTUNITY_RECEIPT_CHANGED')
-        data=v['payload'];obj(data,{'bundle','report'});validate(data['bundle'])
+        data=v['payload'];obj(data,{'bundle','report'});bundle=validate(data['bundle'])
         if data['report']['id']!=rid or data['report']['bundle_sha256']!=sha(canonical(data['bundle'])):raise Blocked('OPPORTUNITY_BINDING')
         expected='opp_'+sha(canonical({'version':data['report']['version'],'bundle':data['bundle'],'corpora':data['report']['corpus_bindings']}))
         if expected!=rid or data['report'].get('authority')!=AUTHORITY:raise Blocked('OPPORTUNITY_AUTHORITY')
+        validate_build_input_binding(bundle,data['report'])
         validate_investigation_report(data['report'])
         return data
     def get(self,rid):
@@ -510,6 +603,38 @@ class OpportunityStore:
         write(out/'receipt.json',canonical(receipt),new=True);return receipt
 
 
+def validate_build_input_binding(bundle,report):
+    """Bind new plan inputs to the retained bundle, not just to another report field."""
+    if 'mechanism_catalog' not in report:return  # Historical report, no invented catalog.
+    if report['mechanism_catalog']!=bundle['mechanisms']:raise Blocked('BUILD_OPTION_INPUT_BINDING')
+    sources={s['id']:s for s in bundle['sources']};groups=families(bundle['sources'])
+    expected={};as_of=date(bundle['as_of'])
+    for workflow in bundle['workflows']:
+        trace=workflow_trace(workflow)
+        for need in needs_for(workflow):
+            observations=[o for o in bundle['observations'] if o['workflow']==workflow['id'] and o['need']==need['id']]
+            state,_=state_for(observations,sources,as_of,bundle['max_age_days'],groups,
+                              need['field'] in trace[need['step']]['missing_prerequisites'])
+            hid='hyp_'+sha(canonical([workflow['id'],need['id'],need['field']]))[:32]
+            expected[hid,workflow['id'],need['step']]={
+                'workflow':workflow['id'],'need':need,'state':state,
+                'workflow_context':{**{k:workflow[k] for k in ('title','actor','domain','purpose')},
+                                    'required_conditions':workflow.get('required_conditions',[])},
+                'workflow_readiness':trace[need['step']],
+            }
+    try:
+        rows=arr(report['hypotheses'],80)
+        if len(rows)!=len(expected):raise Blocked('BUILD_OPTION_INPUT_BINDING')
+        seen=set()
+        for row in rows:
+            identity=(row['id'],row['workflow'],row['need']['step']);declared=expected.get(identity)
+            if identity in seen or declared is None or any(row.get(k)!=v for k,v in declared.items()):
+                raise Blocked('BUILD_OPTION_INPUT_BINDING')
+            seen.add(identity)
+    except (TypeError,KeyError,IndexError,AttributeError) as exc:
+        raise Blocked('BUILD_OPTION_INPUT_BINDING') from exc
+
+
 def validate_investigation_report(report):
     """Validate deterministic plans at storage/export boundaries.
 
@@ -517,14 +642,28 @@ def validate_investigation_report(report):
     it is not an external signature or an equally-privileged-host security layer.
     """
     from .invention_plan import next_investigation
+    from .invention_options import synthesize
     try:
+        catalog=report.get('mechanism_catalog')
+        if catalog is not None:
+            arr(catalog,40);unique(catalog)
+            for mechanism in catalog:mechanism_record(mechanism,None)
+        elif report.get('version')==VERSION:raise Blocked('BUILD_OPTION_CATALOG_MISSING')
         for h in arr(report['hypotheses'],80):
             if 'next_investigation' not in h:
                 if report.get('version')==VERSION:raise Blocked('INVESTIGATION_PLAN_MISSING')
-                continue  # Historical version: no plan is invented.
-            if h['next_investigation'] != next_investigation(h):
+                # Historical version: no plan is invented.
+            elif h['next_investigation'] != next_investigation(h):
                 raise Blocked('INVESTIGATION_PLAN_CHANGED')
-    except (TypeError,KeyError,IndexError,AttributeError,RecursionError) as exc:
+            if 'build_options' not in h:
+                if report.get('version')==VERSION:raise Blocked('BUILD_OPTIONS_MISSING')
+            else:
+                if catalog is None:raise Blocked('BUILD_OPTION_CATALOG_MISSING')
+                strings(h['workflow_readiness']['available_before'],1000)
+                for condition in strings(h['workflow_context'].get('required_conditions',[]),16):key(condition)
+                text(h['need']['field'],160)
+                if h['build_options']!=synthesize(h,catalog):raise Blocked('BUILD_OPTIONS_CHANGED')
+    except (TypeError,KeyError,IndexError,AttributeError,RecursionError,UnicodeError) as exc:
         raise Blocked('INVALID_INVESTIGATION_REPORT') from exc
 
 
@@ -557,7 +696,31 @@ def draft(source,as_of=None):
             'status':'DRAFT_CUES_NOT_CLAIMS','model_calls':0,'instructions_in_source_executed':False}
 
 
+def _review_leads_html(groups,escape):
+    parts=[]
+    for group in groups:
+        if 'review_candidates' not in group:
+            continue  # Historical reports did not retain inspectable partials.
+        parts.append('<h4>Partial matches to inspect: '+escape(group['mechanism'])+'</h4>')
+        if not group['review_candidates']:
+            parts.append('<p>No partial review leads retained for this mechanism.</p>')
+            continue
+        parts.append('<p>Review only. Inspect complete sources and refine the reviewed query before selecting a lead.</p><ul>')
+        for row in group['review_candidates']:
+            matched=', '.join(row.get('matched_query_terms',[])) or 'Not recorded'
+            missing=', '.join(row.get('missing_query_terms',[])) or 'Not recorded'
+            parts.append('<li><b>'+escape(row['name'])+'</b> · '+escape(row['corpus'])+' · '
+                         +escape(row['definition_id'] or row['source_id'])+'<br>Query: '+escape(row['query'])
+                         +' · Rank: '+escape(row['rank'])+'<br>Matched terms: '+escape(matched)
+                         +'<br>Missing terms: '+escape(missing)+'</li>')
+        parts.append('</ul>')
+        if group.get('review_candidates_omitted'):
+            parts.append('<p>'+escape(group['review_candidates_omitted'])+' additional distinct partial leads omitted from this shortlist.</p>')
+    return ''.join(parts)
+
+
 def render(r):
+    from .invention_view import render_build_options
     validate_investigation_report(r)
     e=lambda x:html.escape(str(x),quote=True)
     cards=[]
@@ -565,9 +728,11 @@ def render(r):
         mechanisms=''.join('<li><b>'+e(m['title'])+'</b>: '+e(m['mechanism'])+'<br>Output fit: '+e(m['output_fit'].replace('_',' ').lower())+'<br>Prerequisites unresolved: '+e(', '.join(m['missing_prerequisites']) or 'None in the declared map; still unverified')+'</li>' for m in h['mechanisms'])
         agenda=''.join('<li><b>'+e(t['question'])+'</b><br>What could disprove it: '+e(t['falsifier'])+'</li>' for t in h.get('next_investigation',{}).get('tasks',[]))
         agenda=('<h3>Next evidence to collect</h3><ol>'+agenda+'</ol><p><small>Planned investigation only. No research, contact, acquisition or execution is authorized by this plan.</small></p>') if agenda else ''
+        agenda+=render_build_options(h)
         citations=''.join('<li>'+e(ev['source_uri'])+' — '+e(ev['citation']['quote'])+'</li>' for o in h['evidence']['observations'] for ev in o['checked_evidence'])
         code=''.join('<li>'+e(c['name'])+' · '+e(c['corpus'])+' · '+e(c['definition_id'])+'</li>' for m in h['code_leads'] for c in m['candidates'])
-        cards.append('<article><span class="tag">'+e(h['state'].replace('_',' '))+'</span><h2>'+e(h['concept']['title'])+'</h2><p>'+e(h['concept']['problem_hypothesis'])+'</p><p><b>Next action:</b> '+e(h['concept']['recommended_action'].replace('_',' ').lower())+'</p><p><b>User:</b> '+e(h['concept']['user'])+'</p><p><b>Proposed intervention:</b> '+e(h['concept']['proposed_intervention'])+'</p>'+agenda+'<h3>Mechanisms, not promises</h3><ul>'+mechanisms+'</ul><h3>What could disprove it?</h3><p>'+e(h['counter_searches'][0]['question'])+'</p><p>'+e(h['experiment']['question'])+'</p><p><small>Experiment is a plan, not an executed validation. Source interpretations and mechanism mappings require review.</small></p><details><summary>Evidence and implementation leads</summary><ul>'+citations+'</ul><ul>'+code+'</ul></details></article>')
+        review=_review_leads_html(h['code_leads'],e)
+        cards.append('<article><span class="tag">'+e(h['state'].replace('_',' '))+'</span><h2>'+e(h['concept']['title'])+'</h2><p>'+e(h['concept']['problem_hypothesis'])+'</p><p><b>Next action:</b> '+e(h['concept']['recommended_action'].replace('_',' ').lower())+'</p><p><b>User:</b> '+e(h['concept']['user'])+'</p><p><b>Proposed intervention:</b> '+e(h['concept']['proposed_intervention'])+'</p>'+agenda+'<h3>Mechanisms, not promises</h3><ul>'+mechanisms+'</ul><h3>What could disprove it?</h3><p>'+e(h['counter_searches'][0]['question'])+'</p><p>'+e(h['experiment']['question'])+'</p><p><small>Experiment is a plan, not an executed validation. Source interpretations and mechanism mappings require review.</small></p><details><summary>Evidence and implementation leads</summary><ul>'+citations+'</ul><ul>'+code+'</ul>'+review+'</details></article>')
     return '<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>FORGE Opportunity Review</title><style>body{font:16px/1.6 system-ui;background:#10141c;color:#e9eef7;max-width:1080px;margin:auto;padding:32px}h1{font-size:40px;line-height:1.15}article{background:#1b2431;border:1px solid #344151;border-radius:12px;padding:28px;margin:20px 0}.tag{color:#7ddac6;font-size:12px;font-weight:700}p,li{overflow-wrap:anywhere}summary{cursor:pointer}small{color:#aebdce}h3{margin-bottom:6px}@media(max-width:600px){body{padding:16px}h1{font-size:28px}article{padding:18px}}</style><small>FORGE '+e(__version__)+' / OPPORTUNITY DISCOVERY</small><h1>'+e(r['title'])+'</h1><p>Find the missing step. Challenge the idea. Trace a plausible mechanism.</p><p><b>'+e(r['summary']['hypotheses'])+' hypotheses · '+e(r['summary']['sources'])+' input sources · '+e(r['summary']['code_lead_count'])+' code leads</b></p><p>Deterministic rule-generated hypotheses from reviewed inputs. Not a market census, independent AI invention or validated business. No source code executed.</p>'+''.join(cards)+'<footer>Source and code identities remain private. All proposals require review, independent task evidence, rights checks and qualified experiments.</footer></html>'
 
 
