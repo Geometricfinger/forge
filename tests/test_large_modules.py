@@ -3,6 +3,7 @@
 The fixtures are synthetic source; none is imported or executed. Expected
 definition bodies and relationships are specified separately from the reader.
 """
+from checkpoint_helpers import cache_bytes
 import copy
 import io
 import json
@@ -324,8 +325,9 @@ class LargeModuleCorpusTests(unittest.TestCase):
         self.assertFalse(report['source_bodies_retained'])
         self.assertNotIn('source_hex', json.dumps(report))
         self.assertNotIn('return value * SCALE', json.dumps(report))
-        for path in (self.workbench.home / 'corpora' / 'run').rglob('*.json'):
-            self.assertNotIn('source_hex', path.read_text())
+        for path in (self.workbench.home / 'corpora' / 'run').rglob('*'):
+            if path.name.endswith(('.json', '.json.gz')):
+                self.assertNotIn(b'source_hex', cache_bytes(path))
 
     def test_large_source_is_never_imported_or_executed(self):
         self.write_input(padded('raise AssertionError("LARGE_SOURCE_MUST_NOT_EXECUTE")\n' + MODULE))

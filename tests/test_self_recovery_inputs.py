@@ -64,6 +64,11 @@ class TrialInputs(unittest.TestCase):
         self.assertEqual(summary["second"]["new_attempts"], 1)
         self.assertEqual(summary["third"]["new_attempts"], 0)
         self.assertTrue(summary["cart_identical_to_steady"])
+        self.assertEqual(summary['successful_segment_cache_count'], 1)
+        self.assertEqual(summary['expected_successful_segment_cache_count'], 1)
+        self.assertTrue(summary['successful_segment_cache_bytes_unchanged'])
+        caches = list((self.out / 'home/corpora/recovery/segments').glob('*.json.gz'))
+        self.assertEqual(len(caches), 2)
         self.assertIn("supplied", summary["source_origin"].lower())
         self.assertEqual(summary.get("source_manifest_sha256"),
                          hashlib.sha256(manifest.read_bytes()).hexdigest())
@@ -76,6 +81,27 @@ class TrialInputs(unittest.TestCase):
         self.assertEqual(summary["source_files"], len(list((ROOT / "forge_core").glob("*.py"))))
         self.assertEqual(summary.get("source_manifest_sha256"),
                          hashlib.sha256((self.out / "self-source-manifest.json").read_bytes()).hexdigest())
+
+    def test_empty_success_cache_inventory_cannot_establish_preservation(self):
+        source = self.work / 'source'; source.mkdir()
+        data = (b'def inspect_one(data,source,home,profile,analyzer,segment_dir=None,job_binding=None):\n'
+                b'    return None\n')
+        (source / 'only.py').write_bytes(data)
+        manifest = self.work / 'one.json'
+        manifest.write_text(json.dumps({'schema': 1, 'files': [{
+            'file_id': 'only', 'path': 'only.py', 'provider': 'synthetic',
+            'source_url': 'fixture://only', 'size': len(data),
+            'sha256': hashlib.sha256(data).hexdigest(),
+        }]}), encoding='utf-8')
+        result = self.run_trial('--source-root', source, '--manifest', manifest)
+        self.assertEqual(result.returncode, 2, result.stderr)
+        summary = json.loads((self.out / 'SUMMARY.json').read_bytes())
+        self.assertEqual(summary['injected_timeouts'], 1)
+        self.assertEqual(summary['second']['new_attempts'], 1)
+        self.assertEqual(summary['successful_segment_cache_count'], 0)
+        self.assertEqual(summary['expected_successful_segment_cache_count'], 0)
+        self.assertFalse(summary['successful_segment_cache_bytes_unchanged'])
+        self.assertEqual(summary['status'], 'RECOVERY_NOT_DEMONSTRATED')
 
 
 if __name__ == "__main__":

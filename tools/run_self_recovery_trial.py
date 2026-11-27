@@ -66,7 +66,9 @@ def main():
     initial_actual=len(analyzer.events)
     fault=ObservedAnalyzer(True);destination=w.home/'corpora'/'recovery'
     first=corpus.run(w,source,manifest,destination,analyzer=fault)
-    prior={p.name:sha(read(p,20_000_000)) for p in (destination/'segments').glob('*.json')}
+    prior={p.name:sha(read(p,20_000_000)) for p in (destination/'segments').glob('*')
+           if p.name.endswith(('.json','.json.gz'))}
+    expected_prior=first['summary']['hound_segments']
     n1=len(fault.events);second=corpus.run(w,source,manifest,destination,analyzer=fault)
     n2=len(fault.events);third=corpus.run(w,source,manifest,destination,analyzer=fault)
     n3=len(fault.events)
@@ -95,7 +97,9 @@ def main():
       'actual_hound_successes':sum(e.get('completed',False) for e in analyzer.events+fault.events),
       'injected_timeouts':sum(e['action']=='INJECTED_TOOL_TIMEOUT' for e in fault.events),
       'source_bytes_unchanged':source_before=={r['path']:sha(read(source/r['path'],30_000_000)) for r in selected['files']},
-      'successful_segment_cache_bytes_unchanged':all(sha(read(destination/'segments'/n,20_000_000))==h for n,h in prior.items()),
+      'successful_segment_cache_count':len(prior),
+      'expected_successful_segment_cache_count':expected_prior,
+      'successful_segment_cache_bytes_unchanged':expected_prior>0 and len(prior)==expected_prior and all(sha(read(destination/'segments'/n,20_000_000))==h for n,h in prior.items()),
       'recovered_rows_equal_steady':list(corpus.all_rows(second))==list(corpus.all_rows(steady)),
       'query_semantics_equal_steady':semantically_equal,
       'cart_identical_to_steady':read(destination/'capabilities.ndjson.gz',3_000_000)==read(w.home/'corpora/steady/capabilities.ndjson.gz',3_000_000),
@@ -110,6 +114,7 @@ def main():
         and second['gaps'] == third['gaps'] == steady['gaps']
         and n2 - n1 == 1 and n3 == n2
         and summary['source_bytes_unchanged']
+        and expected_prior > 0
         and summary['successful_segment_cache_bytes_unchanged']
         and summary['recovered_rows_equal_steady']
         and summary['query_semantics_equal_steady']

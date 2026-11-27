@@ -19,6 +19,39 @@ publication can leave checkpoints or an unreceipted report; readback must still
 verify the receipt before accepting a report. This is not a multi-file filesystem
 transaction or an execution attestation.
 
+## Internal checkpoint storage
+
+New source and successful-segment checkpoints use explicit **`.json.gz`** files
+in `checkpoints/` and `segments/`. Each contains one deterministic gzip member
+(compression level 1) whose decoded value is the existing canonical JSON wrapper:
+`binding`, `result`, and `result_sha256`. The result is encoded once for its
+checksum, publication and source-metadata byte count. This changes internal
+storage, not the public report, capability records, review-page record shape or
+the capability cart's compression settings.
+
+The checkpoint ceiling remains **20,000,000 bytes**. Both the stored file and
+the decoded wrapper must fit it. Reads reject malformed or truncated gzip,
+checksum failure, extra members and all trailing bytes. Strict JSON, binding,
+result checksum, authority and typed coverage checks still apply after decoding.
+New writes must fit before publication; compression cannot admit a larger decoded
+checkpoint. As with reports, a temporary file is synchronized before replacement,
+and an interrupted write leaves the previous file intact.
+
+Existing raw **`.json`** checkpoints remain readable and are updated in their
+original format when recovery is needed. No automatic migration or deletion is
+performed. If both extensions exist for the same checkpoint, Forge refuses the
+conflict with `CORPUS_CHECKPOINT_FORMAT_CONFLICT`, even when their decoded values
+agree. Preserve both files for diagnosis and rebuild from the pinned sources in
+a fresh run. A code upgrade still requires a fresh code-bound home; raw-format
+compatibility does not override that rule.
+
+Recovery revisions retain the exact original stored bytes and their matching
+`.json` or `.json.gz` suffix. Successful sibling caches are not rewritten during
+retry. Recovery journals and result digests continue to refer to canonical
+decoded results; hashes of stored-file evidence cover its actual compressed or
+raw bytes. These checks establish consistency and observed recovery, not execution
+of the inspected source.
+
 ## Aggregate metadata budget
 
 A run retains at most **160,000,000 canonical JSON bytes of source records**.

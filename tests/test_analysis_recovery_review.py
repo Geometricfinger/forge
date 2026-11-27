@@ -1,4 +1,5 @@
 """Second review: crash windows, cache binding, conservative evidence."""
+from checkpoint_helpers import cache_files, cache_read, cache_write
 import json,shutil,unittest
 from unittest.mock import patch
 from pathlib import Path
@@ -12,11 +13,11 @@ class RecoveryReviewTests(unittest.TestCase):
     prepare=fixture.RecoveryTests.prepare
     runit=fixture.RecoveryTests.runit
     def test_crash_between_segment_success_and_container_publication(self):
-        self.runit();real=corpus.write
-        def fail(path,data,new=False):
+        self.runit();real=corpus.checkpoint_io.write_checkpoint
+        def fail(path,binding,data,new=False):
             if Path(path).parent.name=='checkpoints':raise OSError('simulated aggregate publication loss')
-            return real(path,data,new=new)
-        with patch.object(corpus,'write',side_effect=fail):middle=self.runit()
+            return real(path,binding,data,new=new)
+        with patch.object(corpus.checkpoint_io,'write_checkpoint',side_effect=fail):middle=self.runit()
         self.assertEqual(middle['status'],'INCOMPLETE');n=len(self.p.calls)
         final=self.runit();self.assertEqual(final['status'],'COMPLETED_FOR_SELECTED_CONTAINERS');self.assertEqual(len(self.p.calls),n)
     def test_finish_missing_after_cached_success_is_reconciled(self):
@@ -28,13 +29,13 @@ class RecoveryReviewTests(unittest.TestCase):
         except Blocked:return
         self.assertEqual(final['status'],'INCOMPLETE')
     def test_inconsistent_cached_gap_list_rejected(self):
-        self.runit();p=next((self.out/'checkpoints').glob('*.json'));obj=json.loads(p.read_bytes());obj['result']['hound_errors']=[];obj['result_sha256']=sha(canonical(obj['result']));p.write_bytes(canonical(obj))
+        self.runit();p=next(cache_files(self.out/'checkpoints'));obj=cache_read(p);obj['result']['hound_errors']=[];obj['result_sha256']=sha(canonical(obj['result']));cache_write(p,obj)
         final=self.runit();self.assertEqual(final['status'],'INCOMPLETE')
     def test_attempt_budget_survives_aggregate_checkpoint_removal(self):
         self.p=fixture.Probe(100)
         for _ in range(6):
             self.runit()
-            for p in (self.out/'checkpoints').glob('*.json'):p.unlink()
+            for p in cache_files(self.out/'checkpoints'):p.unlink()
         self.assertEqual(sum(h==sha(fixture.A) for _,h in self.p.calls),3)
     def test_foreign_attempt_member_rejected(self):
         self.runit();p=next((self.out/'analysis_attempts').iterdir());(p/'extra.json').write_bytes(b'{}')

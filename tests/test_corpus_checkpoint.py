@@ -1,4 +1,5 @@
 """Rehashed local caches must retain typed, mutually consistent coverage."""
+from checkpoint_helpers import cache_files, cache_read, cache_write
 import copy
 import io
 import json
@@ -21,8 +22,8 @@ class CheckpointConsistencyTests(unittest.TestCase):
         self.files = [(name, data)]
         self.make()
         first = self.runit()
-        self.checkpoint = next((self.out / 'checkpoints').glob('*.json'))
-        self.saved = json.loads(self.checkpoint.read_bytes())
+        self.checkpoint = next(cache_files(self.out / 'checkpoints'))
+        self.saved = cache_read(self.checkpoint)
         self.original_source = (self.src / name).read_bytes()
         return first
 
@@ -30,7 +31,7 @@ class CheckpointConsistencyTests(unittest.TestCase):
         saved = copy.deepcopy(self.saved)
         change(saved['result'])
         saved['result_sha256'] = sha(canonical(saved['result']))
-        self.checkpoint.write_bytes(canonical(saved))
+        cache_write(self.checkpoint,saved)
 
     def blocked(self, reason):
         with patch.object(corpus, '_parser', side_effect=AssertionError('Cache must be rejected before parsing')):
@@ -139,11 +140,11 @@ class CheckpointConsistencyTests(unittest.TestCase):
     def test_segment_checkpoint_is_validated_when_aggregate_is_missing(self):
         self.prepare('valid.py', b'def keep():\n    return 1\n')
         self.checkpoint.unlink()
-        checkpoint = next((self.out / 'segments').glob('*.json'))
-        saved = json.loads(checkpoint.read_bytes())
+        checkpoint = next(cache_files(self.out / 'segments'))
+        saved = cache_read(checkpoint)
         saved['result']['segment'] = None
         saved['result_sha256'] = sha(canonical(saved['result']))
-        checkpoint.write_bytes(canonical(saved))
+        cache_write(checkpoint,saved)
         before = self.a.calls
         report = self.runit()
         self.assertEqual(report['coverage']['blocked'][0]['reason'], 'SEGMENT_CHECKPOINT_BINDING')

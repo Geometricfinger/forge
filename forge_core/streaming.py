@@ -38,9 +38,9 @@ def canonical_chunks(value):
         yield chunk.encode('ascii')
 
 
-def gzip_chunks(chunks):
+def gzip_chunks(chunks, *, level=9):
     """One deterministic gzip member; no complete uncompressed cart in RAM."""
-    compressor = zlib.compressobj(level=9, wbits=31)
+    compressor = zlib.compressobj(level=level, wbits=31)
     for chunk in chunks:
         encoded = compressor.compress(chunk)
         if encoded:

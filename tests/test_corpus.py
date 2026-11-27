@@ -1,3 +1,4 @@
+from checkpoint_helpers import cache_files, cache_read, cache_write
 import copy,json,tempfile,unittest,io,zipfile
 from pathlib import Path
 from unittest.mock import patch
@@ -36,7 +37,7 @@ class CorpusTests(unittest.TestCase):
     def test_changed_source_blocks_cached(self):
         self.runit();(self.src/'a.py').write_bytes(b'#change\n'+CODE);r=self.runit();self.assertEqual(r['status'],'INCOMPLETE');self.assertEqual(r['coverage']['blocked'][0]['reason'],'SOURCE_VERSION_MISMATCH');self.assertEqual(r['summary']['segments'],1)
     def test_corrupt_checkpoint_blocks(self):
-        self.runit();p=next((self.out/'checkpoints').glob('*.json'));o=json.loads(p.read_bytes());o['result']['upstream_code_executed']=True;p.write_bytes(canonical(o));r=self.runit();self.assertEqual(r['status'],'INCOMPLETE')
+        self.runit();p=next(cache_files(self.out/'checkpoints'));o=cache_read(p);o['result']['upstream_code_executed']=True;cache_write(p,o);r=self.runit();self.assertEqual(r['status'],'INCOMPLETE')
     def test_profile_change_blocks(self):
         self.runit();p=json.loads((corpus.ROOT/'templates/corpus_profile.json').read_bytes());p['id']='changed'
         with self.assertRaises(Blocked):self.runit(profile=p)
@@ -99,14 +100,14 @@ del RechallengeTests
 
 def test_missing_container_checkpoint_reuses_segments(self):
     self.runit();n=self.a.calls
-    for p in (self.out/'checkpoints').glob('*.json'):p.unlink()
+    for p in cache_files(self.out/'checkpoints'):p.unlink()
     r=self.runit();self.assertEqual(self.a.calls,n);self.assertEqual(r['summary']['definitions'],2)
 CorpusTests.test_missing_container_checkpoint_reuses_segments=test_missing_container_checkpoint_reuses_segments
 
 def test_segment_cache_corrupt_refused(self):
     self.runit();n=self.a.calls
-    for p in (self.out/'checkpoints').glob('*.json'):p.unlink()
-    p=next((self.out/'segments').glob('*.json'));p.write_text('{}')
+    for p in cache_files(self.out/'checkpoints'):p.unlink()
+    p=next(cache_files(self.out/'segments'));p.write_text('{}')
     r=self.runit();self.assertEqual(r['status'],'INCOMPLETE');self.assertTrue(r['coverage']['blocked'])
 CorpusTests.test_segment_cache_corrupt_refused=test_segment_cache_corrupt_refused
 
