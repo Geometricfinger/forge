@@ -79,12 +79,21 @@ def bindings(nodes: Iterator[ast.AST] | list[ast.AST]) -> set[str]:
     return result
 
 
-def alias_map(tree: ast.Module, fn: ast.FunctionDef | ast.AsyncFunctionDef) -> dict[str, str]:
+def module_alias_map(tree: ast.Module) -> dict[str, str]:
+    """Declared module imports after conservative module-level rebinding checks."""
     aliases = imported_aliases(tree.body)
     # Conservative: any non-import rebinding at module level suppresses resolution.
     module_nonimports = [s for s in tree.body if not isinstance(s, (ast.Import, ast.ImportFrom))]
     for name in bindings(scoped_nodes(module_nonimports)):
         aliases.pop(name, None)
+    return aliases
+
+
+def alias_map(tree: ast.Module, fn: ast.FunctionDef | ast.AsyncFunctionDef, *,
+              module_aliases: dict[str, str] | None = None) -> dict[str, str]:
+    # A caller may reuse module information within this exact parsed source.
+    # Each scope owns its copy: local shadowing must not alter sibling scopes.
+    aliases = module_alias_map(tree) if module_aliases is None else module_aliases.copy()
     nodes = list(scoped_nodes(fn.body))
     local_imports = imported_aliases(fn.body)
     args = [*fn.args.posonlyargs, *fn.args.args, *fn.args.kwonlyargs]

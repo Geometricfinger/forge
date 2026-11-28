@@ -30,7 +30,7 @@ def main():
         # while retaining a bounded watchdog and process-group termination.
         command([sys.executable,str(ROOT/'run_tests.py'),'--out',str(out/'workbench-tests')],ROOT,out/'workbench-tests.log',300)
         t=loads(read(out/'workbench-tests/tests.json'))
-        if t['tests_run']!=1708 or any(t[k] for k in ('failures','errors','skips')):raise Blocked('WORKBENCH_TESTS_FAILED')
+        if t['tests_run']!=1709 or any(t[k] for k in ('failures','errors','skips')):raise Blocked('WORKBENCH_TESTS_FAILED')
         report['workbench_tests']=t
         w=initialize(out/'home')
         from forge_core import corpus,corpus_demo
@@ -111,7 +111,7 @@ def main():
         report['reuse_packet']=verify_packet(out/'reuse-packet')
         report['reuse_trial']={'status':reuse['status'],'acquisition_stages':reuse['acquisition_stages'],'verdicts':reuse['verdicts'],'test_executions':len(reuse['test_results']['results']),'function_invocations':reuse['test_results']['function_invocations'],'model_calls':0,'external_code_executed':False}
         command(w.cycle_command(out/'controlled-cycle'),ROOT,out/'controlled-cycle.log')
-        c=loads(read(out/'controlled-cycle/demo.json',8_000_000));expected={'hound-tests':483,'addon-tests':69,'controller-tests':72};suites=[]
+        c=loads(read(out/'controlled-cycle/demo.json',8_000_000));expected={'hound-tests':483,'addon-tests':75,'controller-tests':72};suites=[]
         for stage,n in expected.items():
             p=out/'controlled-cycle'/stage/'tests.json';v=loads(read(p));tests=v.get('tests_run',v.get('tests'))
             if tests!=n or any(v[k] for k in ('failures','errors','skips')):raise Blocked('INHERITED_TEST_FAILURE')

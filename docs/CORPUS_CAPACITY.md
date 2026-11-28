@@ -96,6 +96,15 @@ separate source-size limit. Such reports remain `COMPLETED_WITH_GAPS`: searchabl
 definitions do not imply complete API-call analysis. Check both the definition
 coverage and the recorded gaps before using a result.
 
+The configured API analyzer computes module import bindings once per inspected
+source, after resolving declared relative paths. Each function receives its own
+copy before local imports, arguments and rebinding are checked. No import context
+is retained across source scans. This removes repeated module-wide setup for
+files with many functions; it does not guarantee capacity for arbitrary code.
+The API worker's 12-second CPU limit, 768 MiB address-space limit, 25-second outer
+timeout and 8,000,000-byte combined output limit remain unchanged. Limit failures
+still produce explicit gaps instead of complete API coverage.
+
 Literal symbol lookup traverses the saved definition metadata. Ranked search
 also constructs an in-memory index and has its own record bound. A successful
 scan or symbol lookup does not establish that every downstream operation fits

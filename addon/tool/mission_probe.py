@@ -173,6 +173,9 @@ def scan(data, source_id, profile, hound_root):
     if sum(1 for _ in ast.walk(tree)) > hound.base.MAX_NODES:
         raise ValueError('AST_NODE_LIMIT')
     import_context = hound.library_rules.resolve_relative_imports(tree, source_id)
+    # Resolve relative paths first, then share only this source's module setup.
+    # LocalFlow copies the map before applying each function's binding rules.
+    module_aliases = hound.base.module_alias_map(tree)
     writes = {hound.base.dotted(n).split('.')[0] for n in ast.walk(tree)
               if isinstance(n, ast.Attribute) and isinstance(n.ctx, (ast.Store, ast.Del)) and hound.base.dotted(n)}
     library = RegistryLibrary(hound.library_rules, profile)
@@ -200,7 +203,8 @@ def scan(data, source_id, profile, hound_root):
     scope_cache = {}
     for name, fn in hound.base.functions(tree):
         count += 1
-        flow = hound.LocalFlow(tree, fn, name, module_writes=writes, library=library)
+        flow = hound.LocalFlow(tree, fn, name, module_writes=writes,
+                               module_aliases=module_aliases, library=library)
         flow.env.update(compiler_global_imports(data, tree, fn, name, hound, writes, scope_cache))
         flow.sequence(fn.body, flow.env)
         collect(flow, 'function')
@@ -208,7 +212,8 @@ def scan(data, source_id, profile, hound_root):
     module.body = tree.body
     module.lineno = 1
     module.end_lineno = max(1, len(data.splitlines()))
-    flow = hound.LocalFlow(tree, module, '<module>', module_writes=set(), library=library)
+    flow = hound.LocalFlow(tree, module, '<module>', module_writes=set(),
+                           module_aliases=module_aliases, library=library)
     flow.env = {}
     flow.sequence(tree.body, flow.env)
     collect(flow, 'script')

@@ -1,8 +1,8 @@
 {
   "manifests": {
-    "addon": "9f5303f2922931dcdace9ffb5794763a60b2815221dada7fae258c5d3352bec9",
-    "hound": "116f3bb5064fd60e2fefa4d2a757367604586916942b2c19a258a652451741e3",
-    "loop": "595797f6eadfcbad5e41c6fca174b3d3578de9fd4e1bbcbd821e302de458df03"
+    "addon": "f05a6e6ceaed5700f45253e37b3b31a411bec2bb645bc4e6139b457187a90fff",
+    "hound": "47a50db483b932e4bfa4f974b8f9d26fd220281683ab51e9d8af8bc2b66344ee",
+    "loop": "ef624a8233b2a7af43e3f77582804a33a84593eb553b2659a4e7606eb48ccab3"
   },
   "schema": 1
 }

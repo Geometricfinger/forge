@@ -166,6 +166,48 @@ class ScopeCacheChecks(unittest.TestCase):
         self.assertEqual(len(r['findings']),1)
 
 
+class ModuleAliasContextChecks(unittest.TestCase):
+    def scan(self, data, source_id='synthetic:module-context'):
+        result=m.scan(data,source_id,P,B)
+        m.validate_result(result,data,source_id,P,B)
+        return result['findings']
+
+    def test_parameter_shadow_does_not_change_sibling_scope(self):
+        data=(b'import ast\ndef shadow(ast,s):\n return ast.parse(s)\n'
+              b'def visible(s):\n return ast.parse(s)\n')
+        self.assertEqual([r['qualified_name'] for r in self.scan(data)],['visible'])
+
+    def test_local_import_does_not_change_sibling_scope(self):
+        data=(b'import ast\ndef shadow(s):\n import json as ast\n return ast.parse(s)\n'
+              b'def visible(s):\n return ast.parse(s)\n')
+        self.assertEqual([r['qualified_name'] for r in self.scan(data)],['visible'])
+
+    def test_local_import_is_not_bound_before_its_statement(self):
+        data=(b'import ast\ndef local(s):\n before=ast.parse(s)\n'
+              b' import ast\n return ast.parse(s)\n')
+        rows=self.scan(data)
+        self.assertEqual(len(rows),1)
+        self.assertEqual(rows[0]['evidence'][0]['line_start'],5)
+
+    def test_empty_module_context_keeps_local_imports(self):
+        data=(b'import ast\nast=None\ndef hidden(s):\n return ast.parse(s)\n'
+              b'def local(s):\n import ast\n return ast.parse(s)\n')
+        self.assertEqual([r['qualified_name'] for r in self.scan(data)],['local'])
+
+    def test_context_never_crosses_source_scans(self):
+        for data,expected in [(S,1),(b'def f(s):\n return ast.parse(s)\n',0),
+                              (b'import ast\nast=None\ndef f(s):\n return ast.parse(s)\n',0),(S,1)]:
+            with self.subTest(source_sha256=m.sha(data)):
+                self.assertEqual(len(self.scan(data,'synthetic:same-source-id')),expected)
+
+    def test_relative_imports_resolve_before_context_is_built(self):
+        data=b'from . import parse\ndef f(s):\n return parse(s)\n'
+        source_id='github:example/project@'+'a'*40+':ast/module.py'
+        rows=self.scan(data,source_id)
+        self.assertEqual([r['resolved_api'] for r in rows],['ast.parse'])
+        self.assertEqual(self.scan(data),[])
+
+
 def main():
     global B
     ap=argparse.ArgumentParser();ap.add_argument('--hound',type=Path,required=True);ap.add_argument('--out',type=Path,required=True);args=ap.parse_args()

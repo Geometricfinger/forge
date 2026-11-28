@@ -41,7 +41,7 @@ def main():
         if not a.skip_regression:
             for name,cmd,count in [
               ('hound-tests',[sys.executable,str(Path(runtime['hound'])/'run_tests.py')],483),
-              ('addon-tests',[sys.executable,str(Path(runtime['addon'])/'tool/test_addon.py'),'--hound',runtime['hound']],69),
+              ('addon-tests',[sys.executable,str(Path(runtime['addon'])/'tool/test_addon.py'),'--hound',runtime['hound']],75),
               ('controller-tests',[sys.executable,str(ROOT/'run_tests.py'),'--runtime',str(a.runtime or out/'runtime/runtime.json')],EXPECTED_CONTROLLER_TESTS)]:
                 metadata['regression_stages'].append(command_stage(name,cmd,out,count));atomic_json(out/'demo.json',metadata)
         obj=lambda n:strict_json(read(EX/n))
