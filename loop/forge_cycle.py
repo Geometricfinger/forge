@@ -19,7 +19,7 @@ CORE=['forge_cycle.py','probe_worker.py','safeio.py','prepare_runtime.py']
 TASK_TIMEOUT=15
 MAX_RESULT=8_000_000
 MAX_CANDIDATES=8
-PINNED_ADDON_FILES={'tool/mission_probe.py': '954a70b593b3f50d56d51f3149a8a9060ecb4e4d547261bd86cc8ed053bf680d', 'contracts/hound_binding.json': '7c8690eda2df3ede9ae744ce63b1b3c1fd819c6903c9dc67c1cb4c9fab2e2350'}
+PINNED_ADDON_FILES={'tool/mission_probe.py': '5b22d1644ba6a22e72938b6ae9aa674e8c364b9563c615245b30cb164e5aa41e', 'contracts/hound_binding.json': 'da01f5c3df4c3584ec70b5d323a83b5a6ca1d35a2bf0da485df779ad0b79ff2c'}
 
 
 def validate_mission(m):

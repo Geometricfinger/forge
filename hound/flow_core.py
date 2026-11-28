@@ -68,9 +68,9 @@ class Flow:
 
 
 class LocalFlow:
-    def __init__(self, tree: ast.Module, fn, name: str, *, module_writes=None, capabilities=None, library=None):
+    def __init__(self, tree: ast.Module, fn, name: str, *, module_writes=None, module_aliases=None, capabilities=None, library=None):
         self.fn,self.name,self.findings=fn,name,[]
-        aliases=base.alias_map(tree,fn)
+        aliases=base.alias_map(tree,fn,module_aliases=module_aliases)
         local=base.imported_aliases(fn.body)
         if '<locals>' in name: aliases={k:v for k,v in aliases.items() if local.get(k)==v}
         if module_writes is None:
